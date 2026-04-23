@@ -111,6 +111,7 @@ type alias CellSnap =
     { col : Int
     , row : Int
     , soilType : String
+    , cover : String
     , n : Float
     , p : Float
     , k : Float
@@ -129,6 +130,16 @@ type alias GardenSnap =
 type alias PantrySnap =
     { totalMassG : Float
     , bySpecies : List ( String, Float )
+    , items : List PantryItem
+    }
+
+
+type alias PantryItem =
+    { speciesId : String
+    , speciesName : String
+    , compartment : String
+    , massG : Float
+    , daysLeft : Int
     }
 
 
@@ -198,6 +209,12 @@ type Msg
     | GotSow (Result Http.Error SimSnapshot)
     | Advance Int
     | GotAdvance (Result Http.Error SimSnapshot)
+    | WaterCell Int Int Float
+    | MulchCell Int Int
+    | CompostCell Int Int Float
+    | UprootCell Int Int
+    | TransformItem String String String Float
+    | GotAction (Result Http.Error SimSnapshot)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -278,6 +295,37 @@ update msg model =
         GotAdvance (Err e) ->
             ( { model | status = Idle, error = Just (httpErr e) }, Cmd.none )
 
+        WaterCell col row mm ->
+            withSim model (\sid -> waterCell model.backendUrl sid col row mm)
+
+        MulchCell col row ->
+            withSim model (\sid -> mulchCell model.backendUrl sid col row)
+
+        CompostCell col row kg ->
+            withSim model (\sid -> compostCell model.backendUrl sid col row kg)
+
+        UprootCell col row ->
+            withSim model (\sid -> uprootCell model.backendUrl sid col row)
+
+        TransformItem speciesId from to mass ->
+            withSim model (\sid -> transformItem model.backendUrl sid speciesId from to mass)
+
+        GotAction (Ok snap) ->
+            ( { model | status = Idle, state = Just snap, error = Nothing }, Cmd.none )
+
+        GotAction (Err e) ->
+            ( { model | status = Idle, error = Just (httpErr e) }, Cmd.none )
+
+
+withSim : Model -> (String -> Cmd Msg) -> ( Model, Cmd Msg )
+withSim model toCmd =
+    case model.simId of
+        Just sid ->
+            ( { model | status = Loading, error = Nothing }, toCmd sid )
+
+        Nothing ->
+            ( { model | error = Just "Aucune simulation active." }, Cmd.none )
+
 
 httpErr : Http.Error -> String
 httpErr e =
@@ -342,6 +390,85 @@ advance url simId days =
         }
 
 
+waterCell : String -> String -> Int -> Int -> Float -> Cmd Msg
+waterCell url simId col row mm =
+    Http.post
+        { url = url ++ "/sim/" ++ simId ++ "/water"
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "col", Encode.int col )
+                    , ( "row", Encode.int row )
+                    , ( "mm", Encode.float mm )
+                    ]
+                )
+        , expect = Http.expectJson GotAction (D.field "state" simSnapshotDecoder)
+        }
+
+
+mulchCell : String -> String -> Int -> Int -> Cmd Msg
+mulchCell url simId col row =
+    Http.post
+        { url = url ++ "/sim/" ++ simId ++ "/mulch"
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "col", Encode.int col )
+                    , ( "row", Encode.int row )
+                    ]
+                )
+        , expect = Http.expectJson GotAction (D.field "state" simSnapshotDecoder)
+        }
+
+
+compostCell : String -> String -> Int -> Int -> Float -> Cmd Msg
+compostCell url simId col row kg =
+    Http.post
+        { url = url ++ "/sim/" ++ simId ++ "/compost"
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "col", Encode.int col )
+                    , ( "row", Encode.int row )
+                    , ( "kg_per_m2", Encode.float kg )
+                    ]
+                )
+        , expect = Http.expectJson GotAction (D.field "state" simSnapshotDecoder)
+        }
+
+
+uprootCell : String -> String -> Int -> Int -> Cmd Msg
+uprootCell url simId col row =
+    Http.post
+        { url = url ++ "/sim/" ++ simId ++ "/uproot"
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "col", Encode.int col )
+                    , ( "row", Encode.int row )
+                    ]
+                )
+        , expect = Http.expectJson GotAction (D.field "state" simSnapshotDecoder)
+        }
+
+
+transformItem : String -> String -> String -> String -> String -> Float -> Cmd Msg
+transformItem url simId speciesId from to mass =
+    Http.post
+        { url = url ++ "/sim/" ++ simId ++ "/transform"
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "species_id", Encode.string speciesId )
+                    , ( "from", Encode.string from )
+                    , ( "to", Encode.string to )
+                    , ( "mass_g", Encode.float mass )
+                    ]
+                )
+        , expect = Http.expectJson GotAction (D.field "state" simSnapshotDecoder)
+        }
+
+
 -- =============================================================================
 -- DECODERS
 -- =============================================================================
@@ -395,6 +522,7 @@ cellSnapDecoder =
         |> andMap (D.field "col" D.int)
         |> andMap (D.field "row" D.int)
         |> andMap (D.field "soil_type" D.string)
+        |> andMap (D.field "cover" D.string)
         |> andMap (D.field "n" D.float)
         |> andMap (D.field "p" D.float)
         |> andMap (D.field "k" D.float)
@@ -416,9 +544,20 @@ gardenSnapDecoder =
 
 pantrySnapDecoder : Decoder PantrySnap
 pantrySnapDecoder =
-    D.map2 PantrySnap
+    D.map3 PantrySnap
         (D.field "total_mass_g" D.float)
         (D.field "by_species" (D.list (tupleDecoder D.string D.float)))
+        (D.field "items" (D.list pantryItemDecoder))
+
+
+pantryItemDecoder : Decoder PantryItem
+pantryItemDecoder =
+    D.map5 PantryItem
+        (D.field "species_id" D.string)
+        (D.field "species_name" D.string)
+        (D.field "compartment" D.string)
+        (D.field "mass_g" D.float)
+        (D.field "days_left" D.int)
 
 
 householdSnapDecoder : Decoder HouseholdSnap
@@ -553,6 +692,7 @@ viewMain model snap =
             [ viewCatalog model
             , viewStats snap
             , viewPantry snap
+            , viewKitchen model snap
             , viewEvents snap
             ]
         ]
@@ -758,7 +898,7 @@ viewSelectedCell model snap =
                         [ h3 [] [ text ("Cellule (" ++ String.fromInt col ++ ", " ++ String.fromInt row ++ ")") ]
                         , div [ A.class "cell-info" ]
                             [ dl []
-                                [ dt [] [ text "Sol" ], dd [] [ text c.soilType ]
+                                [ dt [] [ text "Sol" ], dd [] [ text (c.soilType ++ " · " ++ coverLabel c.cover) ]
                                 , dt [] [ text "Eau" ], dd [] [ text (String.fromFloat (toOneDecimal c.waterMm) ++ " mm") ]
                                 , dt [] [ text "T° sol" ], dd [] [ text (String.fromFloat (toOneDecimal c.soilTempC) ++ " °C") ]
                                 , dt [] [ text "N / P / K" ], dd [] [ text (npk c) ]
@@ -773,7 +913,32 @@ viewSelectedCell model snap =
                                         , text (" — " ++ p_.stage ++ " · biomasse " ++ String.fromFloat (toZeroDecimal p_.biomassG) ++ " g · santé " ++ String.fromFloat (toZeroDecimal (p_.health * 100)) ++ "%")
                                         ]
                             ]
+                        , h3 [ A.style "margin-top" "0.8rem" ] [ text "Actions" ]
+                        , div [ A.class "controls" ]
+                            [ btnAction model (WaterCell col row 10) "💧 +10 mm"
+                            , btnAction model (WaterCell col row 25) "💧💧 +25 mm"
+                            , btnAction model (MulchCell col row) (if c.cover == "mulch" then "🍂 (paillé)" else "🍂 Pailler")
+                            , btnAction model (CompostCell col row 1.0) "🌱 Compost 1 kg/m²"
+                            , case c.plant of
+                                Just _ -> btnAction model (UprootCell col row) "✂ Arracher"
+                                Nothing -> text ""
+                            ]
                         ]
+
+
+btnAction : Model -> Msg -> String -> Html Msg
+btnAction model msg label =
+    button [ E.onClick msg, A.disabled (model.status == Loading) ] [ text label ]
+
+
+coverLabel : String -> String
+coverLabel c =
+    case c of
+        "bare" -> "nu"
+        "mulch" -> "paillé"
+        "living" -> "engrais vert"
+        "crop" -> "cultivé"
+        _ -> c
 
 
 viewCatalog : Model -> Html Msg
@@ -859,6 +1024,63 @@ viewPantry snap =
                     )
                     snap.pantry.bySpecies
                 )
+        ]
+
+
+viewKitchen : Model -> SimSnapshot -> Html Msg
+viewKitchen model snap =
+    let
+        freshItems =
+            snap.pantry.items
+                |> List.filter (\it -> it.compartment == "frais" && it.massG > 5)
+    in
+    if List.isEmpty freshItems then
+        text ""
+
+    else
+        div [ A.class "panel" ]
+            [ h2 [] [ text "🥘 Cuisine" ]
+            , p [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ]
+                [ text "Transforme le frais (durée courte) en stockage longue durée." ]
+            , div [ A.class "pantry-list" ]
+                (List.map (viewKitchenRow model) freshItems)
+            ]
+
+
+viewKitchenRow : Model -> PantryItem -> Html Msg
+viewKitchenRow model it =
+    let
+        amount =
+            min 200.0 it.massG
+
+        btn target label =
+            button
+                [ E.onClick (TransformItem it.speciesId "fresh" target amount)
+                , A.disabled (model.status == Loading)
+                , A.style "padding" "3px 6px"
+                , A.style "font-size" "0.75rem"
+                , A.style "margin" "1px"
+                ]
+                [ text label ]
+    in
+    div
+        [ A.class "pantry-row"
+        , A.style "flex-direction" "column"
+        , A.style "align-items" "stretch"
+        , A.style "padding" "0.4rem 0"
+        ]
+        [ div [ A.style "display" "flex", A.style "justify-content" "space-between", A.style "margin-bottom" "0.2rem" ]
+            [ span [] [ strongTxt it.speciesName, text (" · " ++ String.fromFloat (toZeroDecimal it.massG) ++ " g") ]
+            , span [ A.style "font-size" "0.75rem", A.style "color" "#5a3a22" ]
+                [ text ("expire dans " ++ String.fromInt it.daysLeft ++ "j") ]
+            ]
+        , div [ A.style "display" "flex", A.style "flex-wrap" "wrap" ]
+            [ btn "cellar" "→ cellier"
+            , btn "lacto" "→ lacto"
+            , btn "canned" "→ conserve"
+            , btn "frozen" "→ congel"
+            , btn "dry" "→ sec"
+            ]
         ]
 
 

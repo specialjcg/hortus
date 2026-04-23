@@ -35,6 +35,7 @@ pub struct CellSnapshot {
     pub col: u16,
     pub row: u16,
     pub soil_type: String,
+    pub cover: String,
     pub n: f64,
     pub p: f64,
     pub k: f64,
@@ -62,6 +63,17 @@ pub struct PantrySnapshot {
     pub total_mass_g: f64,
     pub by_species: Vec<(String, f64)>,
     pub by_compartment: Vec<(String, f64)>,
+    /// Liste détaillée des lots — utilisée par la cuisine pour transformer.
+    pub items: Vec<PantryItemSnap>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PantryItemSnap {
+    pub species_id: String,
+    pub species_name: String,
+    pub compartment: String,
+    pub mass_g: f64,
+    pub days_left: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -117,10 +129,17 @@ pub fn snapshot(sim: &Simulation, id: &str) -> SimSnapshot {
                     harvest_count: p.harvest_count,
                 }
             });
+            let cover = match c.state.cover {
+                crate::domain::soil::GroundCover::Bare => "bare",
+                crate::domain::soil::GroundCover::Mulch => "mulch",
+                crate::domain::soil::GroundCover::Living => "living",
+                crate::domain::soil::GroundCover::Crop => "crop",
+            };
             CellSnapshot {
                 col: c.coord.col,
                 row: c.coord.row,
                 soil_type: c.state.soil_type.name().into(),
+                cover: cover.into(),
                 n: c.state.n,
                 p: c.state.p,
                 k: c.state.k,
@@ -135,15 +154,24 @@ pub fn snapshot(sim: &Simulation, id: &str) -> SimSnapshot {
 
     let mut by_species: std::collections::BTreeMap<String, f64> = Default::default();
     let mut by_compartment: std::collections::BTreeMap<String, f64> = Default::default();
+    let mut items: Vec<PantryItemSnap> = Vec::new();
     for it in &sim.pantry.items {
         let name = sim
             .catalog
             .get(it.species.as_str())
             .map(|s| s.name_fr.clone())
             .unwrap_or_else(|| it.species.0.clone());
-        *by_species.entry(name).or_insert(0.0) += it.mass_g;
+        *by_species.entry(name.clone()).or_insert(0.0) += it.mass_g;
         *by_compartment.entry(it.compartment.name().into()).or_insert(0.0) += it.mass_g;
+        items.push(PantryItemSnap {
+            species_id: it.species.0.clone(),
+            species_name: name,
+            compartment: it.compartment.name().into(),
+            mass_g: it.mass_g,
+            days_left: it.best_before.days_since(sim.date),
+        });
     }
+    items.sort_by(|a, b| a.species_name.cmp(&b.species_name));
 
     SimSnapshot {
         id: id.to_string(),
@@ -159,6 +187,7 @@ pub fn snapshot(sim: &Simulation, id: &str) -> SimSnapshot {
             total_mass_g: sim.pantry.total_mass().max(0.0),
             by_species: by_species.into_iter().collect(),
             by_compartment: by_compartment.into_iter().collect(),
+            items,
         },
         household: HouseholdSnapshot {
             adults: sim.household.adults,
