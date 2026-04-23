@@ -1,0 +1,27 @@
+[package]
+name = "hortus-backend"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hortus"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hortus-backend"
+path = "src/main.rs"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rand = "0.8"
+rand_chacha = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "1"
+
+[dev-dependencies]
+approx = "0.5"
