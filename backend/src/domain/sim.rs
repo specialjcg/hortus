@@ -168,6 +168,74 @@ impl Simulation {
         Ok(())
     }
 
+    /// Arrosage manuel d'une cellule (mm équivalent pluie). Renvoie le runoff.
+    pub fn water(&mut self, coord: CellCoord, mm: f64) -> Result<f64, String> {
+        if mm <= 0.0 || mm > 200.0 {
+            return Err("mm doit être dans (0, 200]".into());
+        }
+        let cell = self.garden.get_mut(coord).ok_or_else(|| format!("hors limites : {:?}", coord))?;
+        let ev = cell.state.add_water(mm);
+        Ok(ev.runoff_mm)
+    }
+
+    /// Pose du paillage organique sur une cellule. Réduit l'évaporation,
+    /// améliore lentement la matière organique.
+    pub fn mulch(&mut self, coord: CellCoord) -> Result<(), String> {
+        let cell = self.garden.get_mut(coord).ok_or_else(|| format!("hors limites : {:?}", coord))?;
+        cell.state.cover = GroundCover::Mulch;
+        // Apport instantané de MO modeste (paillage = matière sèche en surface).
+        cell.state.organic_matter_pct = (cell.state.organic_matter_pct + 0.2).min(15.0);
+        Ok(())
+    }
+
+    /// Apport de compost (kg/m²). Augmente l'azote disponible et la matière organique.
+    /// Conversion approximative : 1 kg compost mûr / m² ≈ +1 N (échelle 0-10) + 0.5 % MO.
+    pub fn add_compost(&mut self, coord: CellCoord, kg_per_m2: f64) -> Result<(), String> {
+        if kg_per_m2 <= 0.0 || kg_per_m2 > 10.0 {
+            return Err("compost en kg/m² doit être dans (0, 10]".into());
+        }
+        let cell = self.garden.get_mut(coord).ok_or_else(|| format!("hors limites : {:?}", coord))?;
+        cell.state.n = (cell.state.n + kg_per_m2).min(10.0);
+        cell.state.p = (cell.state.p + kg_per_m2 * 0.6).min(10.0);
+        cell.state.k = (cell.state.k + kg_per_m2 * 0.8).min(10.0);
+        cell.state.organic_matter_pct = (cell.state.organic_matter_pct + kg_per_m2 * 0.5).min(15.0);
+        Ok(())
+    }
+
+    /// Arrache une plante (récolte d'une vivace, démontage d'une annuelle finie).
+    /// Renvoie la biomasse perdue (g).
+    pub fn uproot(&mut self, coord: CellCoord) -> Result<f64, String> {
+        let cell = self.garden.get_mut(coord).ok_or_else(|| format!("hors limites : {:?}", coord))?;
+        let mass = cell.plant.as_ref().map(|p| p.biomass_g).unwrap_or(0.0);
+        cell.plant = None;
+        cell.state.cover = GroundCover::Bare;
+        Ok(mass)
+    }
+
+    /// Transforme un lot du pantry (par exemple frais → lacto/conserve/séché).
+    /// Renvoie la masse réellement stockée après pertes de transformation.
+    pub fn transform(
+        &mut self,
+        species_id: &str,
+        from: super::pantry::StorageCompartment,
+        to: super::pantry::StorageCompartment,
+        mass_g: f64,
+    ) -> Result<f64, String> {
+        if mass_g <= 0.0 {
+            return Err("mass_g doit être > 0".into());
+        }
+        let species = self
+            .catalog
+            .get(species_id)
+            .ok_or_else(|| format!("espèce inconnue : {species_id}"))?
+            .clone();
+        let kept = self.pantry.process(&species, from, to, mass_g, self.date);
+        if kept <= 0.0 {
+            return Err("aucun stock disponible pour cette transformation".into());
+        }
+        Ok(kept)
+    }
+
     /// Avance la simulation d'un jour. Renvoie le rapport du tick.
     pub fn tick(&mut self) -> TickReport {
         let weather = self.weather_gen.step(self.date);
@@ -536,5 +604,59 @@ mod tests {
     fn unknown_species_fails() {
         let mut s = Simulation::new_default(5);
         assert!(s.sow(CellCoord::new(0, 0), "banana").is_err());
+    }
+
+    #[test]
+    fn water_action_increases_cell_moisture() {
+        let mut s = Simulation::new_default(1);
+        let c = CellCoord::new(0, 0);
+        let before = s.garden.get(c).unwrap().state.water_mm;
+        s.water(c, 20.0).unwrap();
+        let after = s.garden.get(c).unwrap().state.water_mm;
+        assert!(after > before);
+    }
+
+    #[test]
+    fn mulch_action_changes_cover() {
+        let mut s = Simulation::new_default(1);
+        let c = CellCoord::new(0, 0);
+        s.mulch(c).unwrap();
+        let cover = s.garden.get(c).unwrap().state.cover;
+        assert!(matches!(cover, GroundCover::Mulch));
+    }
+
+    #[test]
+    fn compost_increases_npk_and_om() {
+        let mut s = Simulation::new_default(1);
+        let c = CellCoord::new(0, 0);
+        let n_before = s.garden.get(c).unwrap().state.n;
+        let om_before = s.garden.get(c).unwrap().state.organic_matter_pct;
+        s.add_compost(c, 2.0).unwrap();
+        let cell = s.garden.get(c).unwrap();
+        assert!(cell.state.n > n_before);
+        assert!(cell.state.organic_matter_pct > om_before);
+    }
+
+    #[test]
+    fn uproot_removes_plant() {
+        let mut s = Simulation::new_default(1);
+        let c = CellCoord::new(0, 0);
+        s.sow(c, "kale").unwrap();
+        assert!(s.garden.get(c).unwrap().plant.is_some());
+        let _ = s.uproot(c).unwrap();
+        assert!(s.garden.get(c).unwrap().plant.is_none());
+    }
+
+    #[test]
+    fn transform_lacto_extends_shelf_life() {
+        use super::super::pantry::StorageCompartment;
+        let mut s = Simulation::new_default(1);
+        // Pousse de la masse fraîche dans le pantry directement (sans tick).
+        let species = s.catalog.get("kale").unwrap().clone();
+        s.pantry.store_fresh_harvest(&species, 1000.0, s.date);
+        let kept = s
+            .transform("kale", StorageCompartment::Fresh, StorageCompartment::Lacto, 500.0)
+            .unwrap();
+        assert!(kept > 0.0 && kept < 500.0); // pertes de transformation
     }
 }

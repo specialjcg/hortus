@@ -22,6 +22,11 @@ pub fn router() -> Router {
         .route("/sim/new", post(create_sim))
         .route("/sim/{id}/state", get(get_state))
         .route("/sim/{id}/sow", post(sow))
+        .route("/sim/{id}/water", post(water))
+        .route("/sim/{id}/mulch", post(mulch))
+        .route("/sim/{id}/compost", post(compost))
+        .route("/sim/{id}/uproot", post(uproot))
+        .route("/sim/{id}/transform", post(transform))
         .route("/sim/{id}/advance", post(advance))
         .route("/sim/{id}/catalog", get(get_catalog))
         .route("/sim/{id}", axum::routing::delete(delete_sim))
@@ -168,4 +173,162 @@ async fn delete_sim(
 ) -> Result<StatusCode, StatusCode> {
     state.sims.lock().unwrap().remove(&id).ok_or(StatusCode::NOT_FOUND)?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ---- actions joueur ----
+
+#[derive(Debug, Deserialize)]
+pub struct CellAction {
+    pub col: u16,
+    pub row: u16,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WaterReq {
+    pub col: u16,
+    pub row: u16,
+    pub mm: f64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CompostReq {
+    pub col: u16,
+    pub row: u16,
+    pub kg_per_m2: f64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TransformReq {
+    pub species_id: String,
+    pub from: String,
+    pub to: String,
+    pub mass_g: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ActionResponse {
+    pub ok: bool,
+    pub message: String,
+    pub state: SimSnapshot,
+}
+
+fn with_sim_mut<F, T>(
+    state: &AppState,
+    id: &str,
+    f: F,
+) -> Result<(T, SimSnapshot), (StatusCode, String)>
+where
+    F: FnOnce(&mut Simulation) -> Result<T, String>,
+{
+    let mut store = state.sims.lock().unwrap();
+    let sim = store
+        .get_mut(id)
+        .ok_or((StatusCode::NOT_FOUND, format!("sim {id} introuvable")))?;
+    let result = f(sim).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    let snap = snapshot(sim, id);
+    Ok((result, snap))
+}
+
+async fn water(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<WaterReq>,
+) -> Result<Json<ActionResponse>, (StatusCode, String)> {
+    let (runoff, snap) = with_sim_mut(&state, &id, |sim| {
+        sim.water(CellCoord::new(req.col, req.row), req.mm)
+    })?;
+    Ok(Json(ActionResponse {
+        ok: true,
+        message: format!(
+            "{} mm arrosés en ({},{}), runoff {:.1} mm",
+            req.mm, req.col, req.row, runoff
+        ),
+        state: snap,
+    }))
+}
+
+async fn mulch(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<CellAction>,
+) -> Result<Json<ActionResponse>, (StatusCode, String)> {
+    let (_, snap) = with_sim_mut(&state, &id, |sim| {
+        sim.mulch(CellCoord::new(req.col, req.row))
+    })?;
+    Ok(Json(ActionResponse {
+        ok: true,
+        message: format!("paillage en ({},{})", req.col, req.row),
+        state: snap,
+    }))
+}
+
+async fn compost(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<CompostReq>,
+) -> Result<Json<ActionResponse>, (StatusCode, String)> {
+    let (_, snap) = with_sim_mut(&state, &id, |sim| {
+        sim.add_compost(CellCoord::new(req.col, req.row), req.kg_per_m2)
+    })?;
+    Ok(Json(ActionResponse {
+        ok: true,
+        message: format!(
+            "compost {} kg/m² en ({},{})",
+            req.kg_per_m2, req.col, req.row
+        ),
+        state: snap,
+    }))
+}
+
+async fn uproot(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<CellAction>,
+) -> Result<Json<ActionResponse>, (StatusCode, String)> {
+    let (mass, snap) = with_sim_mut(&state, &id, |sim| {
+        sim.uproot(CellCoord::new(req.col, req.row))
+    })?;
+    Ok(Json(ActionResponse {
+        ok: true,
+        message: format!("plante arrachée en ({},{}) — {:.0} g de biomasse", req.col, req.row, mass),
+        state: snap,
+    }))
+}
+
+async fn transform(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<TransformReq>,
+) -> Result<Json<ActionResponse>, (StatusCode, String)> {
+    use crate::domain::pantry::StorageCompartment;
+    let from = parse_compartment(&req.from)
+        .ok_or((StatusCode::BAD_REQUEST, format!("compartiment inconnu : {}", req.from)))?;
+    let to = parse_compartment(&req.to)
+        .ok_or((StatusCode::BAD_REQUEST, format!("compartiment inconnu : {}", req.to)))?;
+    let species_id = req.species_id.clone();
+    let mass = req.mass_g;
+    let (kept, snap) = with_sim_mut(&state, &id, move |sim| {
+        sim.transform(&species_id, from, to, mass)
+    })?;
+    Ok(Json(ActionResponse {
+        ok: true,
+        message: format!(
+            "transformé {:.0} g {} → {} ({:.0} g conservés)",
+            req.mass_g, req.from, req.to, kept
+        ),
+        state: snap,
+    }))
+}
+
+fn parse_compartment(s: &str) -> Option<crate::domain::pantry::StorageCompartment> {
+    use crate::domain::pantry::StorageCompartment as C;
+    match s.to_ascii_lowercase().as_str() {
+        "fresh" | "frais" => Some(C::Fresh),
+        "cellar" | "cellier" => Some(C::Cellar),
+        "dry" | "sec" => Some(C::Dry),
+        "frozen" | "congel" | "congelé" => Some(C::Frozen),
+        "canned" | "conserve" => Some(C::Canned),
+        "lacto" | "lactofermenté" => Some(C::Lacto),
+        _ => None,
+    }
 }
