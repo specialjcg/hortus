@@ -347,9 +347,300 @@ pub fn apple_tree() -> Species {
     }
 }
 
-/// Catalogue MVP : 5 espèces référencées par leur ID string pour lookup rapide.
+// ============================================================================
+// Espèces stratégiques additionnelles — ciblées sur l'autonomie
+// ============================================================================
+
+/// Pomme de terre (Solanum tuberosum) — base calorique + stockage cellier 6 mois.
+pub fn potato() -> Species {
+    Species {
+        id: SpeciesId::new("potato"),
+        name_fr: "Pomme de terre".into(),
+        name_latin: "Solanum tuberosum".into(),
+        family: Family::Solanaceae,
+        life_cycle: LifeCycle::Annual,
+        layer: Layer::Root,
+        thermal: ThermalRange { germination_min_c: 7.0, frost_kill_c: -1.0, growth_optimum_c: 18.0, heat_stress_c: 30.0 },
+        water: WaterNeeds { weekly_optimal_mm: 25.0, stress_below: 0.30 },
+        nutrients: NutrientNeeds { n: 1.5, p: 2.0, k: 2.5 },
+        growth: GrowthProfile { gdd_to_maturity: 1100.0, days_to_maturity: 110, years_to_first_harvest: 0, photoperiod_min_h: 0.0 },
+        yields: YieldProfile { g_per_plant_optimal: 800.0, plants_per_m2: 5.0, harvests_per_year: 1 },
+        storage: StorageProfile { fresh_days: 14, cellar_days: 180, dry_days: 365, frozen_days: 365, canned_days: 730, lacto_days: 0 },
+        nutrition: NutritionProfile {
+            kcal: 77.0, protein_g: 2.0, lipid_g: 0.1, carb_g: 17.0, fiber_g: 2.2,
+            vit_a_ug: 0.0, vit_c_mg: 19.7, vit_e_mg: 0.01, vit_k_ug: 1.9, vit_b9_ug: 15.0,
+            iron_mg: 0.81, calcium_mg: 12.0, magnesium_mg: 23.0, potassium_mg: 425.0, zinc_mg: 0.30,
+        },
+        companions: Companionship::default(),
+        sowing_window: CalendarWindow { doy_start: 90, doy_end: 120 },
+        harvest_window: CalendarWindow { doy_start: 200, doy_end: 280 },
+        ph_optimum: (5.5, 1.0),
+        nitrogen_fixer: false, allelopathic: false, beneficial_for_pollinators: false,
+    }
+}
+
+/// Oignon (Allium cepa) — base culinaire + stockage cellier longue durée.
+pub fn onion() -> Species {
+    Species {
+        id: SpeciesId::new("onion"),
+        name_fr: "Oignon".into(),
+        name_latin: "Allium cepa".into(),
+        family: Family::Liliaceae,
+        life_cycle: LifeCycle::Biennial,
+        layer: Layer::Root,
+        thermal: ThermalRange { germination_min_c: 7.0, frost_kill_c: -8.0, growth_optimum_c: 18.0, heat_stress_c: 28.0 },
+        water: WaterNeeds { weekly_optimal_mm: 18.0, stress_below: 0.30 },
+        nutrients: NutrientNeeds { n: 1.0, p: 2.0, k: 2.5 },
+        growth: GrowthProfile { gdd_to_maturity: 1500.0, days_to_maturity: 130, years_to_first_harvest: 0, photoperiod_min_h: 12.0 },
+        yields: YieldProfile { g_per_plant_optimal: 100.0, plants_per_m2: 25.0, harvests_per_year: 1 },
+        storage: StorageProfile { fresh_days: 21, cellar_days: 180, dry_days: 365, frozen_days: 365, canned_days: 730, lacto_days: 90 },
+        nutrition: NutritionProfile {
+            kcal: 40.0, protein_g: 1.1, lipid_g: 0.1, carb_g: 9.3, fiber_g: 1.7,
+            vit_a_ug: 0.0, vit_c_mg: 7.4, vit_e_mg: 0.02, vit_k_ug: 0.4, vit_b9_ug: 19.0,
+            iron_mg: 0.21, calcium_mg: 23.0, magnesium_mg: 10.0, potassium_mg: 146.0, zinc_mg: 0.17,
+        },
+        companions: Companionship { friends: vec![SpeciesId::new("carrot")], foes: vec![SpeciesId::new("dry_bean")] },
+        sowing_window: CalendarWindow { doy_start: 60, doy_end: 90 },
+        harvest_window: CalendarWindow { doy_start: 220, doy_end: 260 },
+        ph_optimum: (6.5, 0.5),
+        nitrogen_fixer: false, allelopathic: false, beneficial_for_pollinators: false,
+    }
+}
+
+/// Poireau (Allium porrum) — légume frais d'hiver, sauveur de soudure.
+pub fn leek() -> Species {
+    Species {
+        id: SpeciesId::new("leek"),
+        name_fr: "Poireau".into(),
+        name_latin: "Allium porrum".into(),
+        family: Family::Liliaceae,
+        life_cycle: LifeCycle::Biennial,
+        layer: Layer::Herbaceous,
+        thermal: ThermalRange { germination_min_c: 5.0, frost_kill_c: -10.0, growth_optimum_c: 16.0, heat_stress_c: 28.0 },
+        water: WaterNeeds { weekly_optimal_mm: 25.0, stress_below: 0.30 },
+        nutrients: NutrientNeeds { n: 2.0, p: 2.0, k: 2.0 },
+        growth: GrowthProfile { gdd_to_maturity: 1100.0, days_to_maturity: 150, years_to_first_harvest: 0, photoperiod_min_h: 0.0 },
+        yields: YieldProfile { g_per_plant_optimal: 200.0, plants_per_m2: 12.0, harvests_per_year: 1 },
+        storage: StorageProfile { fresh_days: 21, cellar_days: 60, dry_days: 90, frozen_days: 365, canned_days: 365, lacto_days: 90 },
+        nutrition: NutritionProfile {
+            kcal: 36.0, protein_g: 1.5, lipid_g: 0.3, carb_g: 7.6, fiber_g: 1.8,
+            vit_a_ug: 83.0, vit_c_mg: 12.0, vit_e_mg: 0.92, vit_k_ug: 47.0, vit_b9_ug: 64.0,
+            iron_mg: 1.1, calcium_mg: 59.0, magnesium_mg: 28.0, potassium_mg: 180.0, zinc_mg: 0.12,
+        },
+        companions: Companionship { friends: vec![SpeciesId::new("carrot")], foes: vec![] },
+        sowing_window: CalendarWindow { doy_start: 60, doy_end: 150 },
+        harvest_window: CalendarWindow { doy_start: 280, doy_end: 90 },
+        ph_optimum: (6.5, 0.5),
+        nitrogen_fixer: false, allelopathic: false, beneficial_for_pollinators: false,
+    }
+}
+
+/// Épinard (Spinacia oleracea) — vit A/K/fer printemps + automne, soudure.
+pub fn spinach() -> Species {
+    Species {
+        id: SpeciesId::new("spinach"),
+        name_fr: "Épinard".into(),
+        name_latin: "Spinacia oleracea".into(),
+        family: Family::Chenopodiaceae,
+        life_cycle: LifeCycle::Annual,
+        layer: Layer::Herbaceous,
+        thermal: ThermalRange { germination_min_c: 4.0, frost_kill_c: -8.0, growth_optimum_c: 16.0, heat_stress_c: 25.0 },
+        water: WaterNeeds { weekly_optimal_mm: 25.0, stress_below: 0.30 },
+        nutrients: NutrientNeeds { n: 2.5, p: 1.5, k: 2.0 },
+        growth: GrowthProfile { gdd_to_maturity: 600.0, days_to_maturity: 50, years_to_first_harvest: 0, photoperiod_min_h: 0.0 },
+        yields: YieldProfile { g_per_plant_optimal: 500.0, plants_per_m2: 12.0, harvests_per_year: 1 },
+        storage: StorageProfile { fresh_days: 7, cellar_days: 14, dry_days: 60, frozen_days: 365, canned_days: 365, lacto_days: 90 },
+        nutrition: NutritionProfile {
+            kcal: 23.0, protein_g: 2.9, lipid_g: 0.4, carb_g: 3.6, fiber_g: 2.2,
+            vit_a_ug: 469.0, vit_c_mg: 28.0, vit_e_mg: 2.0, vit_k_ug: 483.0, vit_b9_ug: 194.0,
+            iron_mg: 2.7, calcium_mg: 99.0, magnesium_mg: 79.0, potassium_mg: 558.0, zinc_mg: 0.53,
+        },
+        companions: Companionship::default(),
+        sowing_window: CalendarWindow { doy_start: 50, doy_end: 270 },
+        harvest_window: CalendarWindow { doy_start: 90, doy_end: 330 },
+        ph_optimum: (6.7, 0.5),
+        nitrogen_fixer: false, allelopathic: false, beneficial_for_pollinators: false,
+    }
+}
+
+/// Mâche (Valerianella locusta) — salade d'hiver très rustique, soudure.
+pub fn lambs_lettuce() -> Species {
+    Species {
+        id: SpeciesId::new("lambs_lettuce"),
+        name_fr: "Mâche".into(),
+        name_latin: "Valerianella locusta".into(),
+        family: Family::Other,
+        life_cycle: LifeCycle::Annual,
+        layer: Layer::GroundCover,
+        thermal: ThermalRange { germination_min_c: 5.0, frost_kill_c: -15.0, growth_optimum_c: 12.0, heat_stress_c: 22.0 },
+        water: WaterNeeds { weekly_optimal_mm: 15.0, stress_below: 0.30 },
+        nutrients: NutrientNeeds { n: 1.5, p: 1.0, k: 1.5 },
+        growth: GrowthProfile { gdd_to_maturity: 400.0, days_to_maturity: 75, years_to_first_harvest: 0, photoperiod_min_h: 0.0 },
+        yields: YieldProfile { g_per_plant_optimal: 30.0, plants_per_m2: 50.0, harvests_per_year: 1 },
+        storage: StorageProfile { fresh_days: 5, cellar_days: 10, dry_days: 0, frozen_days: 60, canned_days: 0, lacto_days: 30 },
+        nutrition: NutritionProfile {
+            kcal: 21.0, protein_g: 2.0, lipid_g: 0.4, carb_g: 3.6, fiber_g: 1.5,
+            vit_a_ug: 350.0, vit_c_mg: 38.0, vit_e_mg: 0.6, vit_k_ug: 200.0, vit_b9_ug: 142.0,
+            iron_mg: 2.2, calcium_mg: 38.0, magnesium_mg: 13.0, potassium_mg: 459.0, zinc_mg: 0.59,
+        },
+        companions: Companionship::default(),
+        sowing_window: CalendarWindow { doy_start: 220, doy_end: 280 },
+        harvest_window: CalendarWindow { doy_start: 280, doy_end: 90 },
+        ph_optimum: (6.5, 1.0),
+        nitrogen_fixer: false, allelopathic: false, beneficial_for_pollinators: false,
+    }
+}
+
+/// Courge butternut (Cucurbita moschata) — calories automnales, cellier 6 mois.
+pub fn butternut_squash() -> Species {
+    Species {
+        id: SpeciesId::new("butternut_squash"),
+        name_fr: "Courge butternut".into(),
+        name_latin: "Cucurbita moschata".into(),
+        family: Family::Cucurbitaceae,
+        life_cycle: LifeCycle::Annual,
+        layer: Layer::Vine,
+        thermal: ThermalRange { germination_min_c: 13.0, frost_kill_c: -1.0, growth_optimum_c: 24.0, heat_stress_c: 35.0 },
+        water: WaterNeeds { weekly_optimal_mm: 30.0, stress_below: 0.30 },
+        nutrients: NutrientNeeds { n: 3.0, p: 2.5, k: 3.0 },
+        growth: GrowthProfile { gdd_to_maturity: 1400.0, days_to_maturity: 110, years_to_first_harvest: 0, photoperiod_min_h: 0.0 },
+        yields: YieldProfile { g_per_plant_optimal: 3000.0, plants_per_m2: 0.3, harvests_per_year: 1 },
+        storage: StorageProfile { fresh_days: 60, cellar_days: 180, dry_days: 365, frozen_days: 365, canned_days: 730, lacto_days: 0 },
+        nutrition: NutritionProfile {
+            kcal: 45.0, protein_g: 1.0, lipid_g: 0.1, carb_g: 12.0, fiber_g: 2.0,
+            vit_a_ug: 532.0, vit_c_mg: 21.0, vit_e_mg: 1.4, vit_k_ug: 1.1, vit_b9_ug: 27.0,
+            iron_mg: 0.7, calcium_mg: 48.0, magnesium_mg: 34.0, potassium_mg: 352.0, zinc_mg: 0.15,
+        },
+        companions: Companionship { friends: vec![SpeciesId::new("dry_bean")], foes: vec![] },
+        sowing_window: CalendarWindow { doy_start: 130, doy_end: 160 },
+        harvest_window: CalendarWindow { doy_start: 250, doy_end: 300 },
+        ph_optimum: (6.0, 0.5),
+        nitrogen_fixer: false, allelopathic: false, beneficial_for_pollinators: true,
+    }
+}
+
+/// Courgette (Cucurbita pepo) — abondance estivale, transformation lacto/conserve.
+pub fn zucchini() -> Species {
+    Species {
+        id: SpeciesId::new("zucchini"),
+        name_fr: "Courgette".into(),
+        name_latin: "Cucurbita pepo".into(),
+        family: Family::Cucurbitaceae,
+        life_cycle: LifeCycle::Annual,
+        layer: Layer::Vine,
+        thermal: ThermalRange { germination_min_c: 13.0, frost_kill_c: -1.0, growth_optimum_c: 22.0, heat_stress_c: 35.0 },
+        water: WaterNeeds { weekly_optimal_mm: 30.0, stress_below: 0.40 },
+        nutrients: NutrientNeeds { n: 2.5, p: 2.0, k: 2.5 },
+        growth: GrowthProfile { gdd_to_maturity: 900.0, days_to_maturity: 70, years_to_first_harvest: 0, photoperiod_min_h: 0.0 },
+        yields: YieldProfile { g_per_plant_optimal: 4000.0, plants_per_m2: 0.5, harvests_per_year: 1 },
+        storage: StorageProfile { fresh_days: 7, cellar_days: 21, dry_days: 90, frozen_days: 365, canned_days: 365, lacto_days: 60 },
+        nutrition: NutritionProfile {
+            kcal: 17.0, protein_g: 1.2, lipid_g: 0.3, carb_g: 3.0, fiber_g: 1.0,
+            vit_a_ug: 10.0, vit_c_mg: 17.0, vit_e_mg: 0.12, vit_k_ug: 4.3, vit_b9_ug: 24.0,
+            iron_mg: 0.37, calcium_mg: 16.0, magnesium_mg: 18.0, potassium_mg: 261.0, zinc_mg: 0.32,
+        },
+        companions: Companionship { friends: vec![SpeciesId::new("dry_bean")], foes: vec![] },
+        sowing_window: CalendarWindow { doy_start: 130, doy_end: 170 },
+        harvest_window: CalendarWindow { doy_start: 180, doy_end: 260 },
+        ph_optimum: (6.5, 0.5),
+        nitrogen_fixer: false, allelopathic: false, beneficial_for_pollinators: true,
+    }
+}
+
+/// Topinambour (Helianthus tuberosus) — vivace robuste, calories d'automne-hiver.
+pub fn jerusalem_artichoke() -> Species {
+    Species {
+        id: SpeciesId::new("jerusalem_artichoke"),
+        name_fr: "Topinambour".into(),
+        name_latin: "Helianthus tuberosus".into(),
+        family: Family::Asteraceae,
+        life_cycle: LifeCycle::Perennial,
+        layer: Layer::Root,
+        thermal: ThermalRange { germination_min_c: 5.0, frost_kill_c: -20.0, growth_optimum_c: 20.0, heat_stress_c: 32.0 },
+        water: WaterNeeds { weekly_optimal_mm: 15.0, stress_below: 0.20 },
+        nutrients: NutrientNeeds { n: 1.0, p: 1.0, k: 1.5 },
+        growth: GrowthProfile { gdd_to_maturity: 1500.0, days_to_maturity: 200, years_to_first_harvest: 0, photoperiod_min_h: 0.0 },
+        yields: YieldProfile { g_per_plant_optimal: 1500.0, plants_per_m2: 4.0, harvests_per_year: 1 },
+        storage: StorageProfile { fresh_days: 7, cellar_days: 90, dry_days: 90, frozen_days: 180, canned_days: 365, lacto_days: 60 },
+        nutrition: NutritionProfile {
+            kcal: 73.0, protein_g: 2.0, lipid_g: 0.0, carb_g: 17.0, fiber_g: 1.6,
+            vit_a_ug: 1.0, vit_c_mg: 4.0, vit_e_mg: 0.19, vit_k_ug: 0.1, vit_b9_ug: 13.0,
+            iron_mg: 3.4, calcium_mg: 14.0, magnesium_mg: 17.0, potassium_mg: 429.0, zinc_mg: 0.12,
+        },
+        companions: Companionship::default(),
+        sowing_window: CalendarWindow { doy_start: 60, doy_end: 100 },
+        harvest_window: CalendarWindow { doy_start: 280, doy_end: 90 },
+        ph_optimum: (6.5, 1.0),
+        nitrogen_fixer: false, allelopathic: false, beneficial_for_pollinators: true,
+    }
+}
+
+/// Framboisier (Rubus idaeus) — fruit perenne d'été, fibres + vit C.
+pub fn raspberry() -> Species {
+    Species {
+        id: SpeciesId::new("raspberry"),
+        name_fr: "Framboisier".into(),
+        name_latin: "Rubus idaeus".into(),
+        family: Family::Rosaceae,
+        life_cycle: LifeCycle::Shrub,
+        layer: Layer::Shrub,
+        thermal: ThermalRange { germination_min_c: 5.0, frost_kill_c: -25.0, growth_optimum_c: 20.0, heat_stress_c: 30.0 },
+        water: WaterNeeds { weekly_optimal_mm: 25.0, stress_below: 0.30 },
+        nutrients: NutrientNeeds { n: 2.0, p: 1.5, k: 2.0 },
+        growth: GrowthProfile { gdd_to_maturity: 1500.0, days_to_maturity: 365, years_to_first_harvest: 1, photoperiod_min_h: 0.0 },
+        yields: YieldProfile { g_per_plant_optimal: 1500.0, plants_per_m2: 1.0, harvests_per_year: 1 },
+        storage: StorageProfile { fresh_days: 3, cellar_days: 5, dry_days: 180, frozen_days: 365, canned_days: 730, lacto_days: 0 },
+        nutrition: NutritionProfile {
+            kcal: 52.0, protein_g: 1.2, lipid_g: 0.7, carb_g: 12.0, fiber_g: 6.5,
+            vit_a_ug: 2.0, vit_c_mg: 26.0, vit_e_mg: 0.87, vit_k_ug: 7.8, vit_b9_ug: 21.0,
+            iron_mg: 0.7, calcium_mg: 25.0, magnesium_mg: 22.0, potassium_mg: 151.0, zinc_mg: 0.42,
+        },
+        companions: Companionship::default(),
+        sowing_window: CalendarWindow { doy_start: 305, doy_end: 90 },
+        harvest_window: CalendarWindow { doy_start: 180, doy_end: 260 },
+        ph_optimum: (6.0, 0.5),
+        nitrogen_fixer: false, allelopathic: false, beneficial_for_pollinators: true,
+    }
+}
+
+/// Cassissier (Ribes nigrum) — bombe vit C, conservation longue (sirop, congel).
+pub fn blackcurrant() -> Species {
+    Species {
+        id: SpeciesId::new("blackcurrant"),
+        name_fr: "Cassissier".into(),
+        name_latin: "Ribes nigrum".into(),
+        family: Family::Grossulariaceae,
+        life_cycle: LifeCycle::Shrub,
+        layer: Layer::Shrub,
+        thermal: ThermalRange { germination_min_c: 5.0, frost_kill_c: -25.0, growth_optimum_c: 18.0, heat_stress_c: 28.0 },
+        water: WaterNeeds { weekly_optimal_mm: 22.0, stress_below: 0.30 },
+        nutrients: NutrientNeeds { n: 1.5, p: 1.5, k: 2.0 },
+        growth: GrowthProfile { gdd_to_maturity: 1400.0, days_to_maturity: 365, years_to_first_harvest: 2, photoperiod_min_h: 0.0 },
+        yields: YieldProfile { g_per_plant_optimal: 3000.0, plants_per_m2: 1.0, harvests_per_year: 1 },
+        storage: StorageProfile { fresh_days: 5, cellar_days: 7, dry_days: 180, frozen_days: 365, canned_days: 730, lacto_days: 90 },
+        nutrition: NutritionProfile {
+            kcal: 63.0, protein_g: 1.4, lipid_g: 0.4, carb_g: 15.0, fiber_g: 4.3,
+            vit_a_ug: 12.0, vit_c_mg: 200.0, vit_e_mg: 1.0, vit_k_ug: 5.0, vit_b9_ug: 8.0,
+            iron_mg: 1.5, calcium_mg: 55.0, magnesium_mg: 24.0, potassium_mg: 322.0, zinc_mg: 0.27,
+        },
+        companions: Companionship::default(),
+        sowing_window: CalendarWindow { doy_start: 305, doy_end: 90 },
+        harvest_window: CalendarWindow { doy_start: 180, doy_end: 220 },
+        ph_optimum: (6.0, 0.5),
+        nitrogen_fixer: false, allelopathic: false, beneficial_for_pollinators: true,
+    }
+}
+
+/// Catalogue MVP : 15 espèces pilotes — cible élargie pour vraie autonomie.
 pub fn default_catalog() -> HashMap<String, Species> {
-    let species = vec![tomato_cherry(), carrot(), dry_bean(), kale(), apple_tree()];
+    let species = vec![
+        // Originelles
+        tomato_cherry(), carrot(), dry_bean(), kale(), apple_tree(),
+        // Stratégiques pour autonomie
+        potato(), onion(), leek(), spinach(), lambs_lettuce(),
+        butternut_squash(), zucchini(), jerusalem_artichoke(),
+        raspberry(), blackcurrant(),
+    ];
     species.into_iter().map(|s| (s.id.0.clone(), s)).collect()
 }
 
@@ -358,8 +649,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn catalog_has_5_species() {
-        assert_eq!(default_catalog().len(), 5);
+    fn catalog_has_15_species() {
+        assert_eq!(default_catalog().len(), 15);
+    }
+
+    #[test]
+    fn potato_is_calorie_dense() {
+        assert!(potato().nutrition.kcal > 70.0);
+        assert!(potato().storage.cellar_days >= 150);
+    }
+
+    #[test]
+    fn blackcurrant_has_record_vit_c() {
+        assert!(blackcurrant().nutrition.vit_c_mg > 150.0);
+    }
+
+    #[test]
+    fn lambs_lettuce_is_winter_hardy() {
+        assert!(lambs_lettuce().thermal.frost_kill_c < -10.0);
+    }
+
+    #[test]
+    fn jerusalem_artichoke_is_perennial() {
+        assert!(matches!(jerusalem_artichoke().life_cycle, LifeCycle::Perennial));
     }
 
     #[test]
