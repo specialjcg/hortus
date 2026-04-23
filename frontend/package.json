@@ -1,0 +1,13 @@
+{
+    "name": "hortus-frontend",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Hortus — interface Elm pour le simulateur de jardin",
+    "scripts": {
+        "build": "elm make src/Main.elm --output=static/elm.js",
+        "build:optimize": "elm make src/Main.elm --optimize --output=static/elm.js"
+    },
+    "devDependencies": {
+        "elm": "^0.19.1-5"
+    }
+}

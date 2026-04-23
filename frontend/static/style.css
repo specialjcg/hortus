@@ -1,0 +1,218 @@
+/* Palette terre + verdure inspirée potager */
+:root {
+    --soil-dark: #3d2818;
+    --soil: #5a3a22;
+    --soil-light: #8b6e3d;
+    --green-dark: #3a5d2b;
+    --green: #6b9c47;
+    --green-bright: #9bc55c;
+    --leaf-yellow: #d4b85a;
+    --paper: #f5ecd6;
+    --paper-warm: #ede1bf;
+    --ink: #2a1f12;
+    --rust: #b85c1f;
+    --water-blue: #6695c4;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: "Inter", -apple-system, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    background-image:
+        repeating-linear-gradient(
+            45deg,
+            transparent 0,
+            transparent 24px,
+            rgba(58, 93, 43, 0.02) 24px,
+            rgba(58, 93, 43, 0.02) 25px
+        );
+}
+
+.app {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+h1, h2, h3 {
+    font-family: "EB Garamond", Georgia, serif;
+    color: var(--soil-dark);
+    font-weight: 600;
+    margin-top: 0;
+}
+
+h1 { font-size: 1.8rem; letter-spacing: 0.02em; }
+h2 { font-size: 1.1rem; margin-bottom: 0.4rem; }
+h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    border-bottom: 2px solid var(--soil-light);
+    padding-bottom: 0.8rem;
+    margin-bottom: 1.2rem;
+}
+
+.header .meta {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.85rem;
+    color: var(--soil);
+}
+.header .meta strong { color: var(--soil-dark); }
+
+.layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+}
+
+.panel {
+    background: var(--paper-warm);
+    border: 1px solid rgba(90, 58, 34, 0.2);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+    margin-bottom: 1rem;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+}
+
+button {
+    background: var(--soil);
+    color: var(--paper);
+    border: 1px solid var(--soil-dark);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+button:hover:not(:disabled) { background: var(--soil-dark); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button.primary { background: var(--green-dark); border-color: var(--green-dark); }
+button.primary:hover:not(:disabled) { background: var(--green); }
+button.danger { background: var(--rust); border-color: var(--rust); }
+
+.species-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+}
+.species-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    background: rgba(255,255,255,0.4);
+    font-size: 0.85rem;
+}
+.species-row:hover { background: rgba(255,255,255,0.7); }
+.species-row.selected {
+    background: var(--green-bright);
+    border-color: var(--green-dark);
+    font-weight: 500;
+}
+.species-row .latin { font-style: italic; opacity: 0.6; font-size: 0.8em; margin-left: 0.5em; }
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem 1rem;
+    font-size: 0.85rem;
+}
+.stats-grid .label { color: var(--soil); }
+.stats-grid .value { font-weight: 600; text-align: right; }
+
+.pantry-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+}
+.pantry-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.2rem 0;
+    border-bottom: 1px dotted rgba(90,58,34,0.2);
+}
+
+.events-list {
+    max-height: 220px;
+    overflow-y: auto;
+    font-size: 0.78rem;
+    font-family: "Courier New", monospace;
+    line-height: 1.4;
+}
+.event {
+    padding: 0.15rem 0;
+    border-bottom: 1px dotted rgba(90,58,34,0.15);
+}
+.event .date { color: var(--soil); margin-right: 0.4rem; }
+.event.harvested { color: var(--green-dark); }
+.event.deficit { color: var(--rust); }
+.event.frost { color: var(--water-blue); font-weight: 600; }
+
+.weather-row {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.85rem;
+    align-items: center;
+    color: var(--soil-dark);
+}
+.weather-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+.error {
+    background: #fde0d0;
+    color: #7a2a0a;
+    padding: 0.6rem 1rem;
+    border-left: 4px solid var(--rust);
+    border-radius: 3px;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.cell-info {
+    font-size: 0.8rem;
+    background: rgba(255,255,255,0.5);
+    padding: 0.5rem 0.7rem;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+}
+.cell-info dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.6rem; }
+.cell-info dt { color: var(--soil); }
+.cell-info dd { margin: 0; font-weight: 500; }
+
+.day-bar {
+    display: flex;
+    height: 16px;
+    margin-top: 0.5rem;
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid rgba(90,58,34,0.3);
+}
+.day-bar .ok { background: var(--green); }
+.day-bar .deficit { background: var(--rust); }
