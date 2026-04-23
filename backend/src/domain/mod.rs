@@ -19,3 +19,4 @@ pub mod nutrition;
 pub mod pantry;
 pub mod household;
 pub mod catalog;
+pub mod sim;

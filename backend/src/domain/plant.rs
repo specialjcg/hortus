@@ -51,6 +51,12 @@ pub struct Plant {
     pub water_stress_days: u16,
     /// Compteur de récoltes effectuées (vivaces / arbres).
     pub harvest_count: u16,
+    /// Date de la dernière récolte (utilisé par les vivaces / arbres pour
+    /// éviter de re-récolter dans la même année).
+    pub last_harvested_at: Option<SimDate>,
+    /// Pour les arbres/arbustes plantés "établis" (déjà adultes) : nombre
+    /// d'années à ajouter à l'âge calculé pour franchir `years_to_first_harvest`.
+    pub years_grown_before_planting: u16,
 }
 
 impl Plant {
@@ -64,6 +70,8 @@ impl Plant {
             health: 1.0,
             water_stress_days: 0,
             harvest_count: 0,
+            last_harvested_at: None,
+            years_grown_before_planting: 0,
         }
     }
 
