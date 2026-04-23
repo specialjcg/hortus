@@ -300,7 +300,6 @@ async fn transform(
     Path(id): Path<String>,
     Json(req): Json<TransformReq>,
 ) -> Result<Json<ActionResponse>, (StatusCode, String)> {
-    use crate::domain::pantry::StorageCompartment;
     let from = parse_compartment(&req.from)
         .ok_or((StatusCode::BAD_REQUEST, format!("compartiment inconnu : {}", req.from)))?;
     let to = parse_compartment(&req.to)
