@@ -21,3 +21,13 @@ Thumbs.db
 # Local config
 .env
 .env.local
+
+# Local data (user-specific)
+backend/data/hortus.db
+backend/data/*.db-journal
+backend/data/*.db-wal
+backend/data/*.db-shm
+
+# Screenshots / scratch
+img.png
+*.local.*

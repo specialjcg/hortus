@@ -1,333 +1,449 @@
-//! Routes HTTP.
+//! Routes HTTP — calendrier des plantations (stateless).
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
-    routing::{get, post},
+    routing::{get, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
-use crate::api::snapshot::{snapshot, species_cards, SimSnapshot, SpeciesCard};
-use crate::api::state::{fresh_id, AppState};
-use crate::domain::garden::CellCoord;
-use crate::domain::sim::{Simulation, TickReport};
+use crate::db::{self, Db};
+use crate::domain::geo::{ClimateProfile, Location};
+use crate::domain::species::{CalendarWindow, Species};
+use crate::journal::{
+    self, Action, ActionFilter, ActionInput, Parcel, ParcelInput, ACTION_KINDS,
+};
+
+/// État partagé.
+#[derive(Clone)]
+pub struct AppState {
+    pub species: Arc<Vec<Species>>,
+    pub db: Db,
+}
 
 pub fn router() -> Router {
-    let state = AppState::new();
+    let candidates = [
+        "data/species.json",
+        "backend/data/species.json",
+        "../data/species.json",
+        "../../data/species.json",
+    ];
+    let species = candidates
+        .iter()
+        .find_map(|path| {
+            Species::load_from_json(path).ok().map(|s| {
+                tracing::info!("catalogue chargé depuis {} ({} espèces)", path, s.len());
+                s
+            })
+        })
+        .unwrap_or_else(|| {
+            eprintln!("[warn] data/species.json introuvable — catalogue vide");
+            Vec::new()
+        });
+    let db = db::open().unwrap_or_else(|e| {
+        eprintln!("[fatal] DB non ouverte : {e}");
+        std::process::exit(1);
+    });
+    let state = AppState { species: Arc::new(species), db };
+
     Router::new()
         .route("/health", get(health))
-        .route("/sim/new", post(create_sim))
-        .route("/sim/{id}/state", get(get_state))
-        .route("/sim/{id}/sow", post(sow))
-        .route("/sim/{id}/water", post(water))
-        .route("/sim/{id}/mulch", post(mulch))
-        .route("/sim/{id}/compost", post(compost))
-        .route("/sim/{id}/uproot", post(uproot))
-        .route("/sim/{id}/transform", post(transform))
-        .route("/sim/{id}/advance", post(advance))
-        .route("/sim/{id}/catalog", get(get_catalog))
-        .route("/sim/{id}", axum::routing::delete(delete_sim))
+        .route("/species", get(list_species))
+        .route("/cities", get(list_cities))
+        .route("/calendar", get(calendar))
+        .route("/forecast", get(forecast))
+        .route("/historical-year", get(historical_year))
+        .route("/action-kinds", get(list_action_kinds))
+        .route("/parcels", get(get_parcels).post(create_parcel))
+        .route("/parcels/{id}", put(put_parcel).delete(del_parcel))
+        .route("/actions", get(get_actions).post(create_action).delete(del_all_actions))
+        .route("/actions/{id}", put(put_action).delete(del_action))
         .with_state(state)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
 }
 
-async fn health() -> &'static str { "ok" }
-
-#[derive(Debug, Deserialize, Default)]
-pub struct NewSimReq {
-    #[serde(default = "default_seed")]
-    pub seed: u64,
-    #[serde(default)]
-    pub plant_pilot_plan: bool,
+async fn list_action_kinds() -> Json<Vec<&'static str>> {
+    Json(ACTION_KINDS.to_vec())
 }
 
-fn default_seed() -> u64 { 42 }
+#[derive(Debug, Serialize)]
+pub struct HistoricalDay {
+    pub doy: u16,
+    pub temp_min_c: f64,
+    pub temp_max_c: f64,
+    pub precipitation_mm: f64,
+    pub samples: u16,
+}
 
-async fn create_sim(
-    State(state): State<AppState>,
-    Json(req): Json<NewSimReq>,
-) -> (StatusCode, Json<SimSnapshot>) {
-    let mut sim = Simulation::new_default(req.seed);
-    if req.plant_pilot_plan {
-        let _ = sim.plant_established_tree(CellCoord::new(0, 0), "apple_tree", 5);
+async fn historical_year(Query(q): Query<ForecastQuery>) -> Json<Vec<HistoricalDay>> {
+    use crate::domain::weather_live;
+    use std::collections::HashMap;
+
+    let slug = q.city.as_deref().unwrap_or("le_bois_doingt");
+    let loc = Location::by_slug(slug);
+    let today = chrono::Local::now().date_naive();
+    let years_back = 5;
+    let start = match chrono::NaiveDate::from_ymd_opt(today.year() - years_back, 1, 1) {
+        Some(d) => d,
+        None => return Json(Vec::new()),
+    };
+    let end = today - chrono::Duration::days(1);
+    let map =
+        weather_live::fetch_live_weather(loc.latitude_deg, loc.longitude_deg, start, end).await;
+
+    // Agréger par DOY (1..365)
+    let mut by_doy: HashMap<u16, (f64, f64, f64, u16)> = HashMap::new();
+    for w in map.into_values() {
+        let doy = w.date.day_of_year.min(365);
+        let entry = by_doy.entry(doy).or_insert((0.0, 0.0, 0.0, 0));
+        entry.0 += w.temp_min_c;
+        entry.1 += w.temp_max_c;
+        entry.2 += w.precipitation_mm;
+        entry.3 += 1;
     }
-    let id = fresh_id();
-    let snap = snapshot(&sim, &id);
-    state.sims.lock().unwrap().insert(id.clone(), sim);
-    (StatusCode::CREATED, Json(snap))
-}
 
-async fn get_state(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<SimSnapshot>, StatusCode> {
-    let store = state.sims.lock().unwrap();
-    let sim = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
-    Ok(Json(snapshot(sim, &id)))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SowReq {
-    pub col: u16,
-    pub row: u16,
-    pub species_id: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct SowResponse {
-    pub ok: bool,
-    pub message: String,
-    pub state: SimSnapshot,
-}
-
-async fn sow(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-    Json(req): Json<SowReq>,
-) -> Result<Json<SowResponse>, (StatusCode, String)> {
-    let mut store = state.sims.lock().unwrap();
-    let sim = store
-        .get_mut(&id)
-        .ok_or((StatusCode::NOT_FOUND, format!("sim {id} introuvable")))?;
-    match sim.sow(CellCoord::new(req.col, req.row), &req.species_id) {
-        Ok(()) => Ok(Json(SowResponse {
-            ok: true,
-            message: format!("{} semé en ({},{})", req.species_id, req.col, req.row),
-            state: snapshot(sim, &id),
-        })),
-        Err(e) => Err((StatusCode::BAD_REQUEST, e)),
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AdvanceReq {
-    pub days: u32,
-}
-
-#[derive(Debug, Serialize)]
-pub struct AdvanceResponse {
-    pub state: SimSnapshot,
-    /// Récapitulatif compact des ticks joués (pour ne pas saturer la réponse).
-    pub ticks: Vec<TickSummary>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct TickSummary {
-    pub date: crate::domain::time::SimDate,
-    pub harvests_g: f64,
-    pub fully_covered: bool,
-    pub n_events: usize,
-}
-
-impl From<&TickReport> for TickSummary {
-    fn from(r: &TickReport) -> Self {
-        Self {
-            date: r.date,
-            harvests_g: r.harvests_g,
-            fully_covered: r.consumption.balance.fully_covered,
-            n_events: r.events.len(),
+    let mut out: Vec<HistoricalDay> = Vec::new();
+    for doy in 1u16..=365 {
+        if let Some(&(sum_min, sum_max, sum_pr, n)) = by_doy.get(&doy) {
+            if n > 0 {
+                let nf = n as f64;
+                out.push(HistoricalDay {
+                    doy,
+                    temp_min_c: sum_min / nf,
+                    temp_max_c: sum_max / nf,
+                    precipitation_mm: sum_pr / nf,
+                    samples: n,
+                });
+            }
         }
     }
-}
-
-async fn advance(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-    Json(req): Json<AdvanceReq>,
-) -> Result<Json<AdvanceResponse>, (StatusCode, String)> {
-    if req.days == 0 || req.days > 3650 {
-        return Err((StatusCode::BAD_REQUEST, "days doit être 1..=3650".into()));
-    }
-    let mut store = state.sims.lock().unwrap();
-    let sim = store
-        .get_mut(&id)
-        .ok_or((StatusCode::NOT_FOUND, format!("sim {id} introuvable")))?;
-    let before = sim.history.len();
-    for _ in 0..req.days { sim.tick(); }
-    let ticks: Vec<TickSummary> = sim.history[before..]
-        .iter()
-        .map(TickSummary::from)
-        .collect();
-    Ok(Json(AdvanceResponse {
-        state: snapshot(sim, &id),
-        ticks,
-    }))
-}
-
-async fn get_catalog(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<Vec<SpeciesCard>>, StatusCode> {
-    let store = state.sims.lock().unwrap();
-    let sim = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
-    Ok(Json(species_cards(sim)))
-}
-
-async fn delete_sim(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<StatusCode, StatusCode> {
-    state.sims.lock().unwrap().remove(&id).ok_or(StatusCode::NOT_FOUND)?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-// ---- actions joueur ----
-
-#[derive(Debug, Deserialize)]
-pub struct CellAction {
-    pub col: u16,
-    pub row: u16,
+    Json(out)
 }
 
 #[derive(Debug, Deserialize)]
-pub struct WaterReq {
-    pub col: u16,
-    pub row: u16,
-    pub mm: f64,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CompostReq {
-    pub col: u16,
-    pub row: u16,
-    pub kg_per_m2: f64,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct TransformReq {
-    pub species_id: String,
-    pub from: String,
-    pub to: String,
-    pub mass_g: f64,
+pub struct ForecastQuery {
+    pub city: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct ActionResponse {
-    pub ok: bool,
-    pub message: String,
-    pub state: SimSnapshot,
+pub struct ForecastDay {
+    pub date: String,
+    pub temp_min_c: f64,
+    pub temp_max_c: f64,
+    pub precipitation_mm: f64,
+    pub wind_kmh: f64,
+    pub kind: String,
 }
 
-fn with_sim_mut<F, T>(
-    state: &AppState,
-    id: &str,
-    f: F,
-) -> Result<(T, SimSnapshot), (StatusCode, String)>
-where
-    F: FnOnce(&mut Simulation) -> Result<T, String>,
-{
-    let mut store = state.sims.lock().unwrap();
-    let sim = store
-        .get_mut(id)
-        .ok_or((StatusCode::NOT_FOUND, format!("sim {id} introuvable")))?;
-    let result = f(sim).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
-    let snap = snapshot(sim, id);
-    Ok((result, snap))
+async fn forecast(Query(q): Query<ForecastQuery>) -> Json<Vec<ForecastDay>> {
+    use crate::domain::weather_live;
+    let slug = q.city.as_deref().unwrap_or("le_bois_doingt");
+    let loc = Location::by_slug(slug);
+    let today = chrono::Local::now().date_naive();
+    let end = today + chrono::Duration::days(7);
+    let map = weather_live::fetch_live_weather(loc.latitude_deg, loc.longitude_deg, today, end).await;
+    let mut out: Vec<ForecastDay> = map
+        .into_values()
+        .filter_map(|w| {
+            let nd = chrono::NaiveDate::from_yo_opt(w.date.year as i32, w.date.day_of_year as u32)?;
+            Some(ForecastDay {
+                date: nd.format("%Y-%m-%d").to_string(),
+                temp_min_c: w.temp_min_c,
+                temp_max_c: w.temp_max_c,
+                precipitation_mm: w.precipitation_mm,
+                wind_kmh: w.wind_kmh,
+                kind: format!("{:?}", w.kind),
+            })
+        })
+        .collect();
+    out.sort_by(|a, b| a.date.cmp(&b.date));
+    Json(out)
 }
 
-async fn water(
+async fn get_parcels(State(s): State<AppState>) -> Result<Json<Vec<Parcel>>, (StatusCode, String)> {
+    journal::list_parcels(&s.db)
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+async fn create_parcel(
+    State(s): State<AppState>,
+    Json(input): Json<ParcelInput>,
+) -> Result<(StatusCode, Json<Parcel>), (StatusCode, String)> {
+    if input.name.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "name obligatoire".into()));
+    }
+    journal::insert_parcel(&s.db, &input)
+        .map(|p| (StatusCode::CREATED, Json(p)))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+async fn put_parcel(
+    State(s): State<AppState>,
+    Path(id): Path<i64>,
+    Json(input): Json<ParcelInput>,
+) -> Result<Json<Parcel>, (StatusCode, String)> {
+    journal::update_parcel(&s.db, id, &input)
+        .map(Json)
+        .map_err(|e| {
+            if e == "parcelle inconnue" {
+                (StatusCode::NOT_FOUND, e)
+            } else {
+                (StatusCode::INTERNAL_SERVER_ERROR, e)
+            }
+        })
+}
+
+async fn del_parcel(
+    State(s): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    journal::delete_parcel(&s.db, id)
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| {
+            if e == "parcelle inconnue" {
+                (StatusCode::NOT_FOUND, e)
+            } else {
+                (StatusCode::INTERNAL_SERVER_ERROR, e)
+            }
+        })
+}
+
+async fn get_actions(
+    State(s): State<AppState>,
+    Query(f): Query<ActionFilter>,
+) -> Result<Json<Vec<Action>>, (StatusCode, String)> {
+    journal::list_actions(&s.db, &f)
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+async fn create_action(
+    State(s): State<AppState>,
+    Json(input): Json<ActionInput>,
+) -> Result<(StatusCode, Json<Action>), (StatusCode, String)> {
+    if let Some(pid) = input.parcel_id {
+        match journal::parcel_exists(&s.db, pid) {
+            Ok(false) => return Err((StatusCode::BAD_REQUEST, format!("parcel_id {pid} inconnu"))),
+            Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, e)),
+            _ => {}
+        }
+    }
+    journal::insert_action(&s.db, &input)
+        .map(|a| (StatusCode::CREATED, Json(a)))
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))
+}
+
+async fn put_action(
+    State(s): State<AppState>,
+    Path(id): Path<i64>,
+    Json(input): Json<ActionInput>,
+) -> Result<Json<Action>, (StatusCode, String)> {
+    journal::update_action(&s.db, id, &input)
+        .map(Json)
+        .map_err(|e| {
+            if e == "action inconnue" {
+                (StatusCode::NOT_FOUND, e)
+            } else {
+                (StatusCode::BAD_REQUEST, e)
+            }
+        })
+}
+
+async fn del_action(
+    State(s): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    journal::delete_action(&s.db, id)
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| {
+            if e == "action inconnue" {
+                (StatusCode::NOT_FOUND, e)
+            } else {
+                (StatusCode::INTERNAL_SERVER_ERROR, e)
+            }
+        })
+}
+
+async fn del_all_actions(State(s): State<AppState>) -> Result<StatusCode, (StatusCode, String)> {
+    journal::delete_all_actions(&s.db)
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+async fn health() -> &'static str {
+    "ok"
+}
+
+async fn list_species(State(state): State<AppState>) -> Json<Vec<Species>> {
+    Json((*state.species).clone())
+}
+
+#[derive(Debug, Serialize)]
+pub struct CityDto {
+    pub slug: String,
+    pub name: String,
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+async fn list_cities() -> Json<Vec<CityDto>> {
+    Json(
+        Location::available()
+            .iter()
+            .map(|(slug, name)| {
+                let loc = Location::by_slug(slug);
+                CityDto {
+                    slug: (*slug).into(),
+                    name: (*name).into(),
+                    latitude: loc.latitude_deg,
+                    longitude: loc.longitude_deg,
+                }
+            })
+            .collect(),
+    )
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CalendarQuery {
+    /// Slug de ville (défaut : le_bois_doingt).
+    pub city: Option<String>,
+    /// Si true, tente d'actualiser le climat via Open-Meteo (5 dernières années).
+    #[serde(default)]
+    pub refresh_climate: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CalendarResponse {
+    pub location: LocationDto,
+    pub climate: ClimateProfile,
+    /// Origine du profil climat : "defaults" (statique) ou "open_meteo_5y".
+    pub climate_source: String,
+    pub species: Vec<SpeciesLocal>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LocationDto {
+    pub name: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub altitude_m: f64,
+}
+
+/// Espèce avec fenêtres ajustées au climat local.
+#[derive(Debug, Serialize)]
+pub struct SpeciesLocal {
+    #[serde(flatten)]
+    pub species: Species,
+    /// Décalage appliqué (jours) entre la fenêtre nominale et la fenêtre locale.
+    /// Positif = plus tard (climat plus froid), négatif = plus tôt (plus chaud).
+    pub shift_days: i16,
+    pub indoor_sow_local: Option<CalendarWindow>,
+    pub direct_sow_local: Option<CalendarWindow>,
+    pub transplant_local: Option<CalendarWindow>,
+    pub harvest_local: CalendarWindow,
+}
+
+async fn calendar(
     State(state): State<AppState>,
-    Path(id): Path<String>,
-    Json(req): Json<WaterReq>,
-) -> Result<Json<ActionResponse>, (StatusCode, String)> {
-    let (runoff, snap) = with_sim_mut(&state, &id, |sim| {
-        sim.water(CellCoord::new(req.col, req.row), req.mm)
-    })?;
-    Ok(Json(ActionResponse {
-        ok: true,
-        message: format!(
-            "{} mm arrosés en ({},{}), runoff {:.1} mm",
-            req.mm, req.col, req.row, runoff
-        ),
-        state: snap,
+    Query(q): Query<CalendarQuery>,
+) -> Result<Json<CalendarResponse>, (StatusCode, String)> {
+    let city_slug = q.city.as_deref().unwrap_or("le_bois_doingt");
+    let loc = Location::by_slug(city_slug);
+
+    // Profil climatique : par défaut statique, sinon calculé depuis Open-Meteo 5y.
+    let (climate, climate_source) = if q.refresh_climate {
+        match fetch_5y_climate(loc.latitude_deg, loc.longitude_deg).await {
+            Some(c) => (c, "open_meteo_5y".to_string()),
+            None => (loc.climate.clone(), "defaults (open-meteo indisponible)".to_string()),
+        }
+    } else {
+        (loc.climate.clone(), "defaults".to_string())
+    };
+
+    // Référentiel : Paris. Les fenêtres nominales des espèces sont exprimées
+    // pour ce climat-là ; on calcule un décalage pour la ville cible.
+    let reference = ClimateProfile::paris();
+    let shift = spring_shift_days(&reference, &climate);
+
+    let species_local: Vec<SpeciesLocal> = state
+        .species
+        .iter()
+        .map(|s| {
+            SpeciesLocal {
+                indoor_sow_local: s.indoor_sow.map(|w| shift_window(w, shift)),
+                direct_sow_local: s.direct_sow.map(|w| shift_window(w, shift)),
+                transplant_local: s.transplant.map(|w| shift_window(w, shift)),
+                harvest_local: shift_window(s.harvest, shift),
+                species: s.clone(),
+                shift_days: shift,
+            }
+        })
+        .collect();
+
+    Ok(Json(CalendarResponse {
+        location: LocationDto {
+            name: loc.name.clone(),
+            latitude: loc.latitude_deg,
+            longitude: loc.longitude_deg,
+            altitude_m: loc.altitude_m,
+        },
+        climate,
+        climate_source,
+        species: species_local,
     }))
 }
 
-async fn mulch(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-    Json(req): Json<CellAction>,
-) -> Result<Json<ActionResponse>, (StatusCode, String)> {
-    let (_, snap) = with_sim_mut(&state, &id, |sim| {
-        sim.mulch(CellCoord::new(req.col, req.row))
-    })?;
-    Ok(Json(ActionResponse {
-        ok: true,
-        message: format!("paillage en ({},{})", req.col, req.row),
-        state: snap,
-    }))
+/// Décalage de printemps en jours entre climat cible et référence.
+/// Règle simple : comparer les Tmin moyens de mars-avril. Chaque °C d'avance
+/// déplace de 4 jours.
+fn spring_shift_days(reference: &ClimateProfile, target: &ClimateProfile) -> i16 {
+    let ref_spring = (reference.temp_min_c[2] + reference.temp_min_c[3]) / 2.0;
+    let tgt_spring = (target.temp_min_c[2] + target.temp_min_c[3]) / 2.0;
+    let delta = tgt_spring - ref_spring;
+    (-delta * 4.0).round() as i16
 }
 
-async fn compost(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-    Json(req): Json<CompostReq>,
-) -> Result<Json<ActionResponse>, (StatusCode, String)> {
-    let (_, snap) = with_sim_mut(&state, &id, |sim| {
-        sim.add_compost(CellCoord::new(req.col, req.row), req.kg_per_m2)
-    })?;
-    Ok(Json(ActionResponse {
-        ok: true,
-        message: format!(
-            "compost {} kg/m² en ({},{})",
-            req.kg_per_m2, req.col, req.row
-        ),
-        state: snap,
-    }))
-}
-
-async fn uproot(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-    Json(req): Json<CellAction>,
-) -> Result<Json<ActionResponse>, (StatusCode, String)> {
-    let (mass, snap) = with_sim_mut(&state, &id, |sim| {
-        sim.uproot(CellCoord::new(req.col, req.row))
-    })?;
-    Ok(Json(ActionResponse {
-        ok: true,
-        message: format!("plante arrachée en ({},{}) — {:.0} g de biomasse", req.col, req.row, mass),
-        state: snap,
-    }))
-}
-
-async fn transform(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-    Json(req): Json<TransformReq>,
-) -> Result<Json<ActionResponse>, (StatusCode, String)> {
-    let from = parse_compartment(&req.from)
-        .ok_or((StatusCode::BAD_REQUEST, format!("compartiment inconnu : {}", req.from)))?;
-    let to = parse_compartment(&req.to)
-        .ok_or((StatusCode::BAD_REQUEST, format!("compartiment inconnu : {}", req.to)))?;
-    let species_id = req.species_id.clone();
-    let mass = req.mass_g;
-    let (kept, snap) = with_sim_mut(&state, &id, move |sim| {
-        sim.transform(&species_id, from, to, mass)
-    })?;
-    Ok(Json(ActionResponse {
-        ok: true,
-        message: format!(
-            "transformé {:.0} g {} → {} ({:.0} g conservés)",
-            req.mass_g, req.from, req.to, kept
-        ),
-        state: snap,
-    }))
-}
-
-fn parse_compartment(s: &str) -> Option<crate::domain::pantry::StorageCompartment> {
-    use crate::domain::pantry::StorageCompartment as C;
-    match s.to_ascii_lowercase().as_str() {
-        "fresh" | "frais" => Some(C::Fresh),
-        "cellar" | "cellier" => Some(C::Cellar),
-        "dry" | "sec" => Some(C::Dry),
-        "frozen" | "congel" | "congelé" => Some(C::Frozen),
-        "canned" | "conserve" => Some(C::Canned),
-        "lacto" | "lactofermenté" => Some(C::Lacto),
-        _ => None,
+fn shift_window(w: CalendarWindow, shift: i16) -> CalendarWindow {
+    CalendarWindow {
+        doy_start: shift_doy(w.doy_start, shift),
+        doy_end: shift_doy(w.doy_end, shift),
     }
 }
+
+fn shift_doy(doy: u16, shift: i16) -> u16 {
+    let mut v = doy as i32 + shift as i32;
+    while v < 1 {
+        v += 365;
+    }
+    while v > 365 {
+        v -= 365;
+    }
+    v as u16
+}
+
+/// Récupère 5 ans de météo quotidienne et calcule un ClimateProfile.
+async fn fetch_5y_climate(lat: f64, lon: f64) -> Option<ClimateProfile> {
+    use crate::domain::weather_live;
+    let today = chrono::Local::now().date_naive();
+    let start = chrono::NaiveDate::from_ymd_opt(today.year() - 5, 1, 1)?;
+    let end = today - chrono::Duration::days(1); // hier (évite les données manquantes du jour)
+    let series_map = weather_live::fetch_live_weather(lat, lon, start, end).await;
+    if series_map.is_empty() {
+        return None;
+    }
+    let mut series: Vec<_> = series_map.into_values().collect();
+    series.sort_by_key(|w| (w.date.year, w.date.day_of_year));
+    Some(ClimateProfile::from_daily_series(
+        format!("Calculé (5 ans Open-Meteo, {:.4}°N {:.4}°E)", lat, lon),
+        &series,
+    ))
+}
+
+// Ajout nécessaire pour `today.year() - 5`.
+use chrono::Datelike;

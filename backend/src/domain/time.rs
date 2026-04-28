@@ -17,9 +17,26 @@ pub struct SimDate {
 impl SimDate {
     pub const DAYS_PER_YEAR: u16 = 365;
 
-    /// Premier jour de l'an 1 (1er janvier de la simulation).
+    /// Premier jour de l'an 1 (1er janvier d'une simulation abstraite).
     pub fn start() -> Self {
         Self { year: 1, day_of_year: 1 }
+    }
+
+    /// Date du jour (horloge système locale, troncature au 365è jour si bissextile).
+    pub fn today() -> Self {
+        use chrono::Datelike;
+        let now = chrono::Local::now().date_naive();
+        let doy = now.ordinal() as u16;
+        let doy = doy.min(Self::DAYS_PER_YEAR);
+        Self {
+            year: now.year() as u16,
+            day_of_year: doy,
+        }
+    }
+
+    /// 1er janvier de l'année calendaire de `d`.
+    pub fn new_year_of(d: Self) -> Self {
+        Self { year: d.year, day_of_year: 1 }
     }
 
     pub fn new(year: u16, day_of_year: u16) -> Self {

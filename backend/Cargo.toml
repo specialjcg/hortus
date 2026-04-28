@@ -22,6 +22,23 @@ rand_chacha = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1"
+chrono = { version = "0.4", features = ["serde", "clock"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [dev-dependencies]
 approx = "0.5"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[profile.bench]
+inherits = "release"
+debug = true
+strip = false
+
+[profile.dev.package."*"]
+opt-level = 3

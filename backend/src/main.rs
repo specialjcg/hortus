@@ -13,7 +13,11 @@ async fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(3000);
     let addr = format!("0.0.0.0:{port}");
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .expect("failed to bind TCP port");
     tracing::info!("hortus-backend listening on http://{addr}");
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app)
+        .await
+        .expect("axum server crashed");
 }
