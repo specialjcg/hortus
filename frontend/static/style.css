@@ -16,6 +16,10 @@
 
 * { box-sizing: border-box; }
 
+/* Force le rendu couleur des emojis sur tous les OS (Linux notamment, où Inter+sans
+   n'inclut pas Noto Color Emoji par défaut → glyph fallback en bloc monochrome). */
+svg text { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif; }
+
 body {
     margin: 0;
     padding: 0;

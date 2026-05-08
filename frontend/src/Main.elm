@@ -368,6 +368,7 @@ type Msg
     | CancelMoving
     | DragStart Int Zone Int Int
     | DragMoveIn Zone Int Int
+    | DragEnterZone Zone
     | DragEnd
     | OpenPlantMenu Int
     | ClosePlantMenu
@@ -543,6 +544,12 @@ update msg model =
                                 || abs (y - d.currentY) > 3
                     in
                     ( { model | dragging = Just { d | currentX = x, currentY = y, currentZone = zone, moved = hasMoved } }, Cmd.none )
+                Nothing -> ( model, Cmd.none )
+
+        DragEnterZone zone ->
+            case model.dragging of
+                Just d ->
+                    ( { model | dragging = Just { d | currentZone = zone, moved = True } }, Cmd.none )
                 Nothing -> ( model, Cmd.none )
 
         DragEnd ->
@@ -2537,6 +2544,7 @@ viewShelter model =
             , SA.width (String.fromInt w)
             , SE.on "click" (shelterClickDecoder w h)
             , SE.on "mousemove" (zoneMoveDecoder Shelter w h)
+            , SE.on "mouseover" (D.succeed (DragEnterZone Shelter))
             , SA.style ("max-width:100%;height:auto;border:3px dashed #5a8ab8;border-radius:8px;cursor:"
                 ++ (case ( model.paletteSpecies, model.dragging ) of
                         ( _, Just _ ) -> "grabbing"
@@ -2790,8 +2798,9 @@ viewShelterPlant model p =
                 TileGrowing _ pr -> 22 + round (pr * 10)
                 TileMature _ -> 32
                 _ -> 22
-        isHover = model.hoverPlant == Just p.id
-        isMoving = model.movingPlant == Just p.id
+        isHover = model.hoverPlant == Just p.id && model.dragging == Nothing
+        isDragged = (model.dragging |> Maybe.map .id) == Just p.id
+        isMoving = model.movingPlant == Just p.id || isDragged
         ready = p.progress >= 0.6
         opacity = if isMoving then "0.35" else "1"
         name = speciesShortName p.speciesId
@@ -2801,7 +2810,7 @@ viewShelterPlant model p =
         , SE.onMouseOut (HoverPlant Nothing)
         , SE.on "mousedown" (plantDragDecoder p.id Shelter)
         , SE.stopPropagationOn "click" (D.succeed ( NoOp, True ))
-        , SA.style "cursor:grab"
+        , SA.style ("cursor:grab" ++ (if model.dragging /= Nothing && not isDragged then ";pointer-events:none" else ""))
         , SA.opacity opacity
         ]
         ([ Svg.circle
@@ -2814,17 +2823,65 @@ viewShelterPlant model p =
             , SA.strokeWidth (if ready then "2" else "1.5")
             ]
             []
-         , Svg.text_
-            [ SA.x (String.fromInt p.x)
-            , SA.y (String.fromInt (p.y + size // 3))
-            , SA.fontSize (String.fromInt size)
-            , SA.textAnchor "middle"
-            , SA.style "pointer-events:none"
-            ]
-            [ Svg.text (if emoji == "" then speciesEmoji p.speciesId else emoji) ]
+         , plantGlyph True p.x p.y size (if emoji == "" then speciesEmoji p.speciesId else emoji)
          ]
             ++ (if isHover then hoverOverlayShelter p size else [])
         )
+
+
+plantGlyph : Bool -> Int -> Int -> Int -> String -> Svg.Svg Msg
+plantGlyph _ cx cy size emoji =
+    Svg.text_
+        [ SA.x (String.fromInt cx)
+        , SA.y (String.fromInt (cy + size // 3))
+        , SA.fontSize (String.fromInt size)
+        , SA.textAnchor "middle"
+        , SA.style "pointer-events:none"
+        ]
+        [ Svg.text emoji ]
+
+
+sproutSvg : Int -> Int -> Int -> Svg.Svg Msg
+sproutSvg cx cy size =
+    let
+        s = toFloat size
+        cxf = toFloat cx
+        cyf = toFloat cy
+        -- tige verticale
+        stemX = cxf
+        stemTop = cyf - s * 0.05
+        stemBot = cyf + s * 0.35
+        -- feuille gauche (ellipse penchée)
+        leafLX = cxf - s * 0.22
+        leafLY = cyf - s * 0.05
+        -- feuille droite
+        leafRX = cxf + s * 0.22
+        leafRY = cyf - s * 0.05
+        f x = String.fromFloat x
+    in
+    Svg.g [ SA.style "pointer-events:none" ]
+        [ Svg.line
+            [ SA.x1 (f stemX), SA.y1 (f stemBot)
+            , SA.x2 (f stemX), SA.y2 (f stemTop)
+            , SA.stroke "#3a7a2b", SA.strokeWidth (f (s * 0.07))
+            , SA.strokeLinecap "round"
+            ]
+            []
+        , Svg.ellipse
+            [ SA.cx (f leafLX), SA.cy (f leafLY)
+            , SA.rx (f (s * 0.22)), SA.ry (f (s * 0.13))
+            , SA.fill "#5fae3a"
+            , SA.transform ("rotate(-35 " ++ f leafLX ++ " " ++ f leafLY ++ ")")
+            ]
+            []
+        , Svg.ellipse
+            [ SA.cx (f leafRX), SA.cy (f leafRY)
+            , SA.rx (f (s * 0.22)), SA.ry (f (s * 0.13))
+            , SA.fill "#5fae3a"
+            , SA.transform ("rotate(35 " ++ f leafRX ++ " " ++ f leafRY ++ ")")
+            ]
+            []
+        ]
 
 
 hoverOverlayShelter : PlantOnTerrain -> Int -> List (Svg.Svg Msg)
@@ -2887,6 +2944,7 @@ viewTerrain model =
             , SA.width (String.fromInt w)
             , SE.on "click" (terrainClickDecoder w h)
             , SE.on "mousemove" (terrainMouseMoveDecoder w h)
+            , SE.on "mouseover" (D.succeed (DragEnterZone Terrain))
             , SE.onMouseOut TerrainCursorLeave
             , SA.style ("max-width:100%;height:auto;border:3px solid #6a4a2a;border-radius:8px;cursor:"
                 ++ (case ( model.paletteSpecies, model.dragging ) of
@@ -3017,8 +3075,9 @@ viewPlantOnTerrain model p =
                 TileGrowing _ pr -> 22 + round (pr * 10)
                 TileMature _ -> 32
                 _ -> 22
-        isHover = model.hoverPlant == Just p.id
-        isMoving = model.movingPlant == Just p.id
+        isHover = model.hoverPlant == Just p.id && model.dragging == Nothing
+        isDragged = (model.dragging |> Maybe.map .id) == Just p.id
+        isMoving = model.movingPlant == Just p.id || isDragged
         opacity = if isMoving then "0.35" else "1"
         bgColor =
             case p.state of
@@ -3058,14 +3117,7 @@ viewPlantOnTerrain model p =
             , SA.opacity "0.95"
             ]
             []
-         , Svg.text_
-            [ SA.x (String.fromInt p.x)
-            , SA.y (String.fromInt (p.y + size // 3))
-            , SA.fontSize (String.fromInt size)
-            , SA.textAnchor "middle"
-            , SA.style "pointer-events:none"
-            ]
-            [ Svg.text (if emoji == "" then speciesEmoji p.speciesId else emoji) ]
+         , plantGlyph True p.x p.y size (if emoji == "" then speciesEmoji p.speciesId else emoji)
          ]
             ++ (if isHover then hoverOverlayTerrain p size else [])
         )

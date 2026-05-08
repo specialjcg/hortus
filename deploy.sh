@@ -110,10 +110,11 @@ create_package() {
     mkdir -p "$PACKAGE_DIR/static"
     cp frontend/static/elm.js "$PACKAGE_DIR/static/"
     cp frontend/static/style.css "$PACKAGE_DIR/static/"
-    # index.html: patcher backendUrl + cache-bust elm.js (timestamp deploy)
+    # index.html: patcher backendUrl + cache-bust elm.js / style.css (timestamp deploy)
     BUILD_TS=$(date +%s)
     sed -e 's|backendUrl: *"http://localhost:[0-9]*"|backendUrl: ""|g' \
         -e "s|elm\\.js\"|elm.js?v=${BUILD_TS}\"|g" \
+        -e "s|style\\.css\"|style.css?v=${BUILD_TS}\"|g" \
         frontend/static/index.html > "$PACKAGE_DIR/static/index.html"
 
     # Catalogue espece (necessaire au runtime)
