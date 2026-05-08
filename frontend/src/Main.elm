@@ -592,7 +592,20 @@ update msg model =
             ( model, applyBulkCmd model )
 
         TerrainCursorMove x y ->
-            ( { model | cursorOnTerrain = Just ( x, y ) }, Cmd.none )
+            let
+                newDragging =
+                    case model.dragging of
+                        Just d ->
+                            let
+                                hasMoved =
+                                    d.moved
+                                        || abs (x - d.currentX) > 3
+                                        || abs (y - d.currentY) > 3
+                            in
+                            Just { d | currentX = x, currentY = y, currentZone = Terrain, moved = hasMoved }
+                        Nothing -> Nothing
+            in
+            ( { model | cursorOnTerrain = Just ( x, y ), dragging = newDragging }, Cmd.none )
 
         TerrainCursorLeave ->
             ( { model | cursorOnTerrain = Nothing }, Cmd.none )
@@ -1651,6 +1664,13 @@ daysSinceSeed model plant = daysBetween plant.date (effectiveToday model)
 
 viewMaintenanceSuggestion : String -> String -> PlantOnTerrain -> Html Msg
 viewMaintenanceSuggestion kind icon pl =
+    let
+        ( label, bgColor ) =
+            case kind of
+                "arrosage" -> ( "💧 Arroser", "#5a8ab8" )
+                "paillage" -> ( "🍂 Pailler", "#8b6e3d" )
+                _ -> ( "✓ Noter", "#5a3a22" )
+    in
     div
         [ A.class "pantry-row"
         , A.style "padding" "0.4rem 0"
@@ -1664,11 +1684,13 @@ viewMaintenanceSuggestion kind icon pl =
             ]
         , button
             [ E.onClick (QuickAction pl.id kind)
-            , A.style "padding" "3px 8px", A.style "font-size" "0.75rem"
-            , A.style "background" "#fff6de", A.style "border" "1px solid #d4b85a"
+            , A.style "padding" "4px 10px", A.style "font-size" "0.78rem"
+            , A.style "background" bgColor, A.style "color" "white"
+            , A.style "border" "none"
             , A.style "border-radius" "3px", A.style "cursor" "pointer"
+            , A.style "font-weight" "600"
             ]
-            [ text "✓ noter" ]
+            [ text label ]
         ]
 
 
