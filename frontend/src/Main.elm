@@ -90,7 +90,6 @@ type alias Model =
     , historicalLoading : Bool
     , paletteSpecies : Maybe String
     , hoverPlant : Maybe Int -- action id
-    , transplantingFrom : Maybe Int -- id action semis_abri en cours de repiquage
     , movingPlant : Maybe Int -- id action en cours de déplacement (click-move)
     , dragging : Maybe DragState
     , plantMenu : Maybe Int -- id du plant avec menu ouvert
@@ -286,7 +285,6 @@ init flags =
       , historicalLoading = False
       , paletteSpecies = Nothing
       , hoverPlant = Nothing
-      , transplantingFrom = Nothing
       , movingPlant = Nothing
       , dragging = Nothing
       , plantMenu = Nothing
@@ -366,9 +364,6 @@ type Msg
     | HoverPlant (Maybe Int)
     | DeletePlant Int
     | PlaceInShelter Int Int
-    | StartTransplanting Int
-    | CancelTransplanting
-    | DoTransplant Int Int Int -- fromActionId, x, y
     | StartMoving Int
     | CancelMoving
     | DragStart Int Zone Int Int
@@ -450,16 +445,12 @@ update msg model =
             ( { model | paletteSpecies = Nothing }, Cmd.none )
 
         PlaceAtPixel px py ->
-            case ( model.movingPlant, model.transplantingFrom ) of
-                ( Just id, _ ) ->
+            case model.movingPlant of
+                Just id ->
                     ( { model | movingPlant = Nothing }
                     , moveActionCmd model id px py
                     )
-                ( _, Just fromId ) ->
-                    ( { model | transplantingFrom = Nothing }
-                    , doTransplantCmd model fromId px py
-                    )
-                _ ->
+                Nothing ->
                     case model.paletteSpecies of
                         Just sid ->
                             case validatePlacement model sid px py of
@@ -526,19 +517,8 @@ update msg model =
                             ( model, createAction model.backendUrl newForm )
                         Nothing -> ( model, Cmd.none )
 
-        StartTransplanting id ->
-            ( { model | transplantingFrom = Just id, paletteSpecies = Nothing }, Cmd.none )
-
-        CancelTransplanting ->
-            ( { model | transplantingFrom = Nothing }, Cmd.none )
-
-        DoTransplant fromId px py ->
-            ( { model | transplantingFrom = Nothing }
-            , doTransplantCmd model fromId px py
-            )
-
         StartMoving id ->
-            ( { model | movingPlant = Just id, paletteSpecies = Nothing, transplantingFrom = Nothing }, Cmd.none )
+            ( { model | movingPlant = Just id, paletteSpecies = Nothing }, Cmd.none )
 
         CancelMoving ->
             ( { model | movingPlant = Nothing }, Cmd.none )
@@ -548,7 +528,6 @@ update msg model =
                 | dragging = Just { id = id, fromZone = zone, currentX = x, currentY = y, currentZone = zone, moved = False }
                 , paletteSpecies = Nothing
                 , movingPlant = Nothing
-                , transplantingFrom = Nothing
                 , plantMenu = Nothing
               }
             , Cmd.none
@@ -1270,36 +1249,6 @@ moveActionCmd model id px py =
             in
             updateAction model.backendUrl id form
         Nothing -> Cmd.none
-
-
--- Crée une action repiquage sur le terrain + supprime l'action semis_abri d'origine.
-doTransplantCmd : Model -> Int -> Int -> Int -> Cmd Msg
-doTransplantCmd model fromId px py =
-    let
-        sourceAction =
-            model.actions |> List.filter (\a -> a.id == fromId) |> List.head
-    in
-    case sourceAction of
-        Just src ->
-            let
-                sid = src.speciesId |> Maybe.withDefault ""
-                form =
-                    { date = model.today
-                    , parcelId = ""
-                    , speciesId = sid
-                    , kind = "repiquage"
-                    , quantity = ""
-                    , notes = "repiqué depuis pépinière"
-                    , gridX = String.fromInt px
-                    , gridY = String.fromInt py
-                    }
-            in
-            Cmd.batch
-                [ createAction model.backendUrl form
-                , deleteAction model.backendUrl fromId
-                ]
-        Nothing -> Cmd.none
-
 
 
 -- DECODERS
@@ -2552,10 +2501,9 @@ viewShelter model =
         heightM = toFloat h / 100
         areaM2 = round1 (widthM * heightM)
         hint =
-            case ( model.paletteSpecies, model.transplantingFrom ) of
-                ( _, Just _ ) -> "↓ Repiquage en cours : clique sur le terrain pour poser."
-                ( Just sid, Nothing ) -> "🌡 Clique dans l'abri pour mettre " ++ sid ++ " en pépinière."
-                ( Nothing, Nothing ) -> "Pépinière : sème sous abri (chauffé, godets, châssis)."
+            case model.paletteSpecies of
+                Just sid -> "🌡 Clique dans l'abri pour mettre " ++ sid ++ " en pépinière."
+                Nothing -> "Pépinière : sème sous abri, puis glisse-dépose vers le jardin pour repiquer."
         plants = shelterPlantsFromActions model
     in
     div [ A.class "panel" ]
@@ -2568,10 +2516,9 @@ viewShelter model =
             , SE.on "click" (shelterClickDecoder w h)
             , SE.on "mousemove" (zoneMoveDecoder Shelter w h)
             , SA.style ("max-width:100%;height:auto;border:3px dashed #5a8ab8;border-radius:8px;cursor:"
-                ++ (case ( model.paletteSpecies, model.transplantingFrom, model.dragging ) of
-                        ( _, _, Just _ ) -> "grabbing"
-                        ( _, Just _, Nothing ) -> "not-allowed"
-                        ( Just _, Nothing, Nothing ) -> "crosshair"
+                ++ (case ( model.paletteSpecies, model.dragging ) of
+                        ( _, Just _ ) -> "grabbing"
+                        ( Just _, Nothing ) -> "crosshair"
                         _ -> "default"
                    )
                 ++ ";background:linear-gradient(180deg,#dfe8f0 0%,#c7d6e5 100%)"
@@ -2870,15 +2817,6 @@ hoverOverlayShelter p size =
         ]
         [ Svg.text (speciesShortName p.speciesId ++ " · " ++ String.fromInt (round (p.progress * 100)) ++ "%") ]
     , Svg.text_
-        [ SA.x (String.fromInt (p.x - 28))
-        , SA.y (String.fromInt (p.y - size // 2 - 6))
-        , SA.fontSize "12"
-        , SA.fill "#4a9b3c"
-        , SE.stopPropagationOn "click" (D.succeed ( StartTransplanting p.id, True ))
-        , SA.style "cursor:pointer"
-        ]
-        [ Svg.text "↓ repiquer" ]
-    , Svg.text_
         [ SA.x (String.fromInt p.x)
         , SA.y (String.fromInt (p.y - size // 2 - 6))
         , SA.fontSize "13"
@@ -2913,7 +2851,7 @@ viewTerrain model =
                 Just sid ->
                     "🖱 Clique sur le terrain pour poser " ++ speciesShortName sid ++ " · Échap pour annuler"
                 Nothing ->
-                    "Sélectionne une espèce dans la palette à droite, puis clique sur le terrain pour la poser."
+                    "Clique sur une espèce de la palette pour la poser. Glisse un plant de l'abri vers le jardin pour repiquer."
         plants = plantsFromActions model
     in
     div [ A.class "panel" ]
