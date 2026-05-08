@@ -16,6 +16,12 @@
 
 * { box-sizing: border-box; }
 
+/* Empêche la sélection texte (highlight orange/bleu navigateur) pendant
+   un drag-and-drop sur le terrain ou l'abri. Les inputs/textarea gardent
+   la sélection normale via override plus bas. */
+.panel, .panel h2, .panel h3, .panel p, svg { user-select: none; -webkit-user-select: none; }
+input, textarea, select { user-select: text; -webkit-user-select: text; }
+
 /* Force le rendu couleur des emojis sur tous les OS (Linux notamment, où Inter+sans
    n'inclut pas Noto Color Emoji par défaut → glyph fallback en bloc monochrome). */
 svg text { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif; }

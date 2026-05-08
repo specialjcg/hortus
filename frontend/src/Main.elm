@@ -2829,16 +2829,24 @@ viewShelterPlant model p =
         )
 
 
+-- Le glyph emoji 🌱 (U+1F331) se dessine avec un pot en terre cuite orange
+-- dans toutes les fonts emoji système (Noto Color, Apple, Twemoji…). Comme
+-- on ne peut pas "extraire" la pousse sans le pot, on remplace 🌱/🌿 par
+-- un sprout SVG natif (tige + feuilles, full vert, sans pot). Les autres
+-- emojis (espèces : 🍅 🥕 …) gardent leur rendu emoji standard.
 plantGlyph : Bool -> Int -> Int -> Int -> String -> Svg.Svg Msg
 plantGlyph _ cx cy size emoji =
-    Svg.text_
-        [ SA.x (String.fromInt cx)
-        , SA.y (String.fromInt (cy + size // 3))
-        , SA.fontSize (String.fromInt size)
-        , SA.textAnchor "middle"
-        , SA.style "pointer-events:none"
-        ]
-        [ Svg.text emoji ]
+    if emoji == "🌱" || emoji == "🌿" then
+        sproutSvg cx cy size
+    else
+        Svg.text_
+            [ SA.x (String.fromInt cx)
+            , SA.y (String.fromInt (cy + size // 3))
+            , SA.fontSize (String.fromInt size)
+            , SA.textAnchor "middle"
+            , SA.style "pointer-events:none"
+            ]
+            [ Svg.text emoji ]
 
 
 sproutSvg : Int -> Int -> Int -> Svg.Svg Msg
