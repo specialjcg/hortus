@@ -31,3 +31,7 @@ backend/data/*.db-shm
 # Screenshots / scratch
 img.png
 *.local.*
+
+# Deploy artifacts
+deploy_package/
+backend/target-docker/
