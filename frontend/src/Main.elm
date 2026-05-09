@@ -33,9 +33,10 @@ main =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.dragging of
-        Just _ -> Browser.Events.onMouseUp (D.succeed DragEnd)
-        Nothing -> Sub.none
+    case ( model.dragging, model.panning ) of
+        ( Just _, _ ) -> Browser.Events.onMouseUp (D.succeed DragEnd)
+        ( _, Just _ ) -> Browser.Events.onMouseUp (D.succeed GardenPanEnd)
+        _ -> Sub.none
 
 
 
@@ -100,7 +101,17 @@ type alias Model =
     , cursorOnTerrain : Maybe ( Int, Int )
     , confirmingClearAll : Bool
     , viewDoy : Int -- jour de l'année visualisé (1..365)
+    , gardenView : GardenView
+    , panning : Maybe PanState
     }
+
+
+type alias GardenView =
+    { zoom : Float, panX : Float, panY : Float }
+
+
+type alias PanState =
+    { startMouseX : Int, startMouseY : Int, startPanX : Float, startPanY : Float }
 
 
 type Zone
@@ -295,6 +306,8 @@ init flags =
       , cursorOnTerrain = Nothing
       , confirmingClearAll = False
       , viewDoy = isoToDoy flags.today
+      , gardenView = { zoom = 1, panX = 0, panY = 0 }
+      , panning = Nothing
       }
     , Cmd.batch
         [ fetchCities flags.backendUrl
@@ -385,6 +398,10 @@ type Msg
     | CancelClearAll
     | SetViewDoy Int
     | ResetViewDoy
+    | GardenZoom Float Int Int -- deltaY, ox, oy
+    | GardenZoomReset
+    | GardenPanStart Bool Int Int -- altKey, x, y
+    | GardenPanEnd
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -599,20 +616,31 @@ update msg model =
             ( model, applyBulkCmd model )
 
         TerrainCursorMove x y ->
-            let
-                newDragging =
-                    case model.dragging of
-                        Just d ->
-                            let
-                                hasMoved =
-                                    d.moved
-                                        || abs (x - d.currentX) > 3
-                                        || abs (y - d.currentY) > 3
-                            in
-                            Just { d | currentX = x, currentY = y, currentZone = Terrain, moved = hasMoved }
-                        Nothing -> Nothing
-            in
-            ( { model | cursorOnTerrain = Just ( x, y ), dragging = newDragging }, Cmd.none )
+            case model.panning of
+                Just pan ->
+                    let
+                        gv = model.gardenView
+                        dx = toFloat (x - pan.startMouseX) / gv.zoom
+                        dy = toFloat (y - pan.startMouseY) / gv.zoom
+                        newPanX = clamp 0 (800 - 800 / gv.zoom) (pan.startPanX - dx)
+                        newPanY = clamp 0 (560 - 560 / gv.zoom) (pan.startPanY - dy)
+                    in
+                    ( { model | gardenView = { gv | panX = newPanX, panY = newPanY } }, Cmd.none )
+                Nothing ->
+                    let
+                        newDragging =
+                            case model.dragging of
+                                Just d ->
+                                    let
+                                        hasMoved =
+                                            d.moved
+                                                || abs (x - d.currentX) > 3
+                                                || abs (y - d.currentY) > 3
+                                    in
+                                    Just { d | currentX = x, currentY = y, currentZone = Terrain, moved = hasMoved }
+                                Nothing -> Nothing
+                    in
+                    ( { model | cursorOnTerrain = Just ( x, y ), dragging = newDragging }, Cmd.none )
 
         TerrainCursorLeave ->
             ( { model | cursorOnTerrain = Nothing }, Cmd.none )
@@ -633,6 +661,33 @@ update msg model =
 
         ResetViewDoy ->
             ( { model | viewDoy = isoToDoy model.today }, Cmd.none )
+
+        GardenZoom dy ox oy ->
+            let
+                gv = model.gardenView
+                factor = if dy < 0 then 1.15 else 1 / 1.15
+                newZoom = clamp 1 6 (gv.zoom * factor)
+                cursorSvgX = gv.panX + toFloat ox / gv.zoom
+                cursorSvgY = gv.panY + toFloat oy / gv.zoom
+                newPanX = cursorSvgX - toFloat ox / newZoom
+                newPanY = cursorSvgY - toFloat oy / newZoom
+                clampedPanX = clamp 0 (800 - 800 / newZoom) newPanX
+                clampedPanY = clamp 0 (560 - 560 / newZoom) newPanY
+            in
+            ( { model | gardenView = { zoom = newZoom, panX = clampedPanX, panY = clampedPanY } }, Cmd.none )
+
+        GardenZoomReset ->
+            ( { model | gardenView = { zoom = 1, panX = 0, panY = 0 } }, Cmd.none )
+
+        GardenPanStart altKey x y ->
+            if altKey then
+                let gv = model.gardenView in
+                ( { model | panning = Just { startMouseX = x, startMouseY = y, startPanX = gv.panX, startPanY = gv.panY } }, Cmd.none )
+            else
+                ( model, Cmd.none )
+
+        GardenPanEnd ->
+            ( { model | panning = Nothing }, Cmd.none )
 
         HoverPlant mid ->
             ( { model | hoverPlant = mid }, Cmd.none )
@@ -851,7 +906,7 @@ fetchParcels url =
 fetchActions : String -> Cmd Msg
 fetchActions url =
     Http.get
-        { url = url ++ "/actions?limit=200"
+        { url = url ++ "/actions?limit=5000"
         , expect = Http.expectJson GotActions (D.list actionDecoder)
         }
 
@@ -2572,19 +2627,34 @@ zoneMoveDecoder zone w h =
         (D.field "offsetY" (D.map round D.float))
 
 
--- mousemove sur terrain : alimente DragMoveIn ET TerrainCursorMove (fusion via batch).
-terrainMouseMoveDecoder : Int -> Int -> Decoder Msg
-terrainMouseMoveDecoder w h =
+-- mousemove sur terrain : convertit offsetX/Y → coords SVG via zoom/pan.
+terrainMouseMoveDecoder : Int -> Int -> GardenView -> Decoder Msg
+terrainMouseMoveDecoder w h gv =
     D.map2
-        (\x y ->
-            -- on choisit DragMoveIn si drag, sinon TerrainCursorMove
-            -- via une seule sortie : DragMoveIn ne prend effet que si dragging≠Nothing
-            -- on émet 2 messages → impossible avec Browser.element ; on émet TerrainCursorMove
-            -- et on conserve DragMoveIn via le décodeur séparé sur le SVG.
-            -- Simplification : on émet seulement TerrainCursorMove ici, et DragMoveIn est traité
-            -- via les subscriptions Browser.Events globales si besoin.
-            TerrainCursorMove (clamp 0 (w - 1) x) (clamp 0 (h - 1) y)
+        (\ox oy ->
+            let
+                sx = round (gv.panX + toFloat ox / gv.zoom)
+                sy = round (gv.panY + toFloat oy / gv.zoom)
+            in
+            TerrainCursorMove (clamp 0 (w - 1) sx) (clamp 0 (h - 1) sy)
         )
+        (D.field "offsetX" (D.map round D.float))
+        (D.field "offsetY" (D.map round D.float))
+
+
+wheelDecoder : Decoder Msg
+wheelDecoder =
+    D.map3 (\dy ox oy -> GardenZoom dy ox oy)
+        (D.field "deltaY" D.float)
+        (D.field "offsetX" (D.map round D.float))
+        (D.field "offsetY" (D.map round D.float))
+
+
+-- mousedown sur terrain : si Alt enfoncé → start pan. Sinon NoOp.
+panMouseDownDecoder : Decoder Msg
+panMouseDownDecoder =
+    D.map3 (\alt x y -> GardenPanStart alt x y)
+        (D.field "altKey" D.bool)
         (D.field "offsetX" (D.map round D.float))
         (D.field "offsetY" (D.map round D.float))
 
@@ -2941,25 +3011,51 @@ viewTerrain model =
                     "Clique sur une espèce de la palette pour la poser. Glisse un plant de l'abri vers le jardin pour repiquer."
         plants = plantsFromActions model
     in
+    let
+        gv = model.gardenView
+        vbW = toFloat w / gv.zoom
+        vbH = toFloat h / gv.zoom
+        vbStr =
+            String.fromFloat gv.panX ++ " "
+                ++ String.fromFloat gv.panY ++ " "
+                ++ String.fromFloat vbW ++ " "
+                ++ String.fromFloat vbH
+        cursorStyle =
+            case ( model.panning, model.paletteSpecies, model.dragging ) of
+                ( Just _, _, _ ) -> "grabbing"
+                ( _, _, Just _ ) -> "grabbing"
+                ( _, Just _, _ ) -> "crosshair"
+                _ -> "default"
+    in
     div [ A.class "panel" ]
         [ h2 []
             [ text ("🌾 Mon jardin · " ++ String.fromFloat widthM ++ " m × " ++ String.fromFloat heightM ++ " m = " ++ String.fromFloat areaM2 ++ " m²")
             ]
         , p [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ]
-            [ text (hint ++ " · " ++ String.fromInt plantCount ++ " plant(s) installé(s)") ]
+            [ text (hint ++ " · " ++ String.fromInt plantCount ++ " plant(s) installé(s) · molette = zoom · Alt+drag = pan") ]
+        , div [ A.style "display" "flex", A.style "gap" "0.4rem", A.style "margin-bottom" "0.3rem", A.style "font-size" "0.76rem", A.style "align-items" "center" ]
+            [ span [ A.style "color" "#5a3a22" ]
+                [ text ("zoom " ++ String.fromInt (round (gv.zoom * 100)) ++ "%") ]
+            , button
+                [ E.onClick GardenZoomReset
+                , A.style "padding" "2px 8px", A.style "font-size" "0.72rem"
+                , A.style "background" "#fff6de", A.style "color" "#5a3a22"
+                , A.style "border" "1px solid #d4b85a", A.style "border-radius" "3px"
+                , A.style "cursor" "pointer"
+                ]
+                [ text "⟲ reset" ]
+            ]
         , Svg.svg
-            [ SA.viewBox ("0 0 " ++ String.fromInt w ++ " " ++ String.fromInt h)
+            [ SA.viewBox vbStr
             , SA.width (String.fromInt w)
-            , SE.on "click" (terrainClickDecoder w h)
-            , SE.on "mousemove" (terrainMouseMoveDecoder w h)
+            , SE.on "click" (terrainClickDecoder w h gv)
+            , SE.on "mousemove" (terrainMouseMoveDecoder w h gv)
             , SE.on "mouseover" (D.succeed (DragEnterZone Terrain))
             , SE.onMouseOut TerrainCursorLeave
+            , SE.preventDefaultOn "wheel" (wheelDecoder |> D.map (\m -> ( m, True )))
+            , SE.preventDefaultOn "mousedown" (panMouseDownDecoder |> D.map (\m -> ( m, True )))
             , SA.style ("max-width:100%;height:auto;border:3px solid #6a4a2a;border-radius:8px;cursor:"
-                ++ (case ( model.paletteSpecies, model.dragging ) of
-                        ( _, Just _ ) -> "grabbing"
-                        ( Just _, Nothing ) -> "crosshair"
-                        _ -> "default"
-                   )
+                ++ cursorStyle
                 ++ ";background:" ++ terrainBackground model
                 ++ (case model.dragging of
                         Just d -> if d.currentZone == Terrain then ";box-shadow:0 0 0 3px #4a9b3c" else ""
@@ -3008,9 +3104,16 @@ terrainPatterns =
 -- Décodeur qui extrait (offsetX, offsetY) d'un clic et les clampe aux dimensions du terrain.
 
 
-terrainClickDecoder : Int -> Int -> Decoder Msg
-terrainClickDecoder w h =
-    D.map2 (\x y -> PlaceAtPixel (clamp 0 (w - 1) x) (clamp 0 (h - 1) y))
+terrainClickDecoder : Int -> Int -> GardenView -> Decoder Msg
+terrainClickDecoder w h gv =
+    D.map2
+        (\ox oy ->
+            let
+                sx = round (gv.panX + toFloat ox / gv.zoom)
+                sy = round (gv.panY + toFloat oy / gv.zoom)
+            in
+            PlaceAtPixel (clamp 0 (w - 1) sx) (clamp 0 (h - 1) sy)
+        )
         (D.field "offsetX" (D.map round D.float))
         (D.field "offsetY" (D.map round D.float))
 
@@ -3094,6 +3197,19 @@ viewPlantOnTerrain model p =
                 TileMature _ -> "#f3c04a"
                 _ -> "#e8d39a"
         paillage = hasRecentPaillage model p
+        spacingRadius =
+            case findSpecies p.speciesId model of
+                Just sp -> sp.spacingCm // 2
+                Nothing -> 20
+        hasSpacingConflict =
+            plantsFromActions model
+                |> List.any
+                    (\other ->
+                        other.id /= p.id
+                            && distanceTo p.x p.y other < spacingRadius * 2
+                    )
+        spacingColor =
+            if hasSpacingConflict then "#a03030" else "#4a9b3c"
     in
     Svg.g
         [ SE.onMouseOver (HoverPlant (Just p.id))
@@ -3103,7 +3219,21 @@ viewPlantOnTerrain model p =
         , SA.style "cursor:grab"
         , SA.opacity opacity
         ]
-        ([ -- Petit anneau paillage : très proche du plant, n'envahit pas
+        ([ -- Frontière plantation : rouge si voisin trop proche, vert sinon
+           Svg.circle
+            [ SA.cx (String.fromInt p.x)
+            , SA.cy (String.fromInt p.y)
+            , SA.r (String.fromInt spacingRadius)
+            , SA.fill spacingColor
+            , SA.fillOpacity "0.10"
+            , SA.stroke spacingColor
+            , SA.strokeWidth "2"
+            , SA.strokeDasharray "5,3"
+            , SA.opacity "0.85"
+            , SA.style "pointer-events:none"
+            ]
+            []
+         , -- Petit anneau paillage : très proche du plant, n'envahit pas
            Svg.circle
             [ SA.cx (String.fromInt p.x)
             , SA.cy (String.fromInt p.y)

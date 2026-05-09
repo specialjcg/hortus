@@ -358,3 +358,162 @@ pub fn parcel_exists(db: &Db, id: i64) -> Result<bool, String> {
         .map(|o| o.is_some())
         .map_err(|e| format!("exists : {e}"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+    use std::sync::{Arc, Mutex};
+
+    fn mk_db() -> Db {
+        let conn = Connection::open_in_memory().expect("in-memory db");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE parcel (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                surface_m2 REAL,
+                exposition TEXT,
+                soil_notes TEXT,
+                grid_x INTEGER NOT NULL DEFAULT 0,
+                grid_y INTEGER NOT NULL DEFAULT 0,
+                grid_w INTEGER NOT NULL DEFAULT 2,
+                grid_h INTEGER NOT NULL DEFAULT 2,
+                color TEXT NOT NULL DEFAULT '#8fbc4a',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE action (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                parcel_id INTEGER,
+                species_id TEXT,
+                kind TEXT NOT NULL,
+                quantity_g REAL,
+                notes TEXT,
+                grid_x INTEGER,
+                grid_y INTEGER,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (parcel_id) REFERENCES parcel(id) ON DELETE SET NULL
+            );
+            "#,
+        )
+        .expect("schema");
+        Arc::new(Mutex::new(conn))
+    }
+
+    fn mk_action(date: &str, kind: &str, sid: Option<&str>, x: Option<i64>, y: Option<i64>) -> ActionInput {
+        ActionInput {
+            date: date.into(),
+            parcel_id: None,
+            species_id: sid.map(String::from),
+            kind: kind.into(),
+            quantity_g: None,
+            notes: None,
+            grid_x: x,
+            grid_y: y,
+        }
+    }
+
+    /// Régression : un client qui demande un limit > total ne doit pas crasher
+    /// et doit recevoir TOUTES les actions, y compris les plus anciennes.
+    #[test]
+    fn list_actions_high_limit_returns_all() {
+        let db = mk_db();
+        // 10 arrosages récents + 5 semis_abri anciens
+        for i in 0..10 {
+            insert_action(&db, &mk_action(&format!("2026-05-{:02}", i + 1), "arrosage", Some("tomato"), Some(10), Some(20))).unwrap();
+        }
+        for i in 0..5 {
+            insert_action(&db, &mk_action(&format!("2026-04-{:02}", i + 1), "semis_abri", Some("pumpkin"), Some(100), Some(50))).unwrap();
+        }
+
+        let f = ActionFilter { limit: Some(5000), ..Default::default() };
+        let got = list_actions(&db, &f).expect("list ok");
+        assert_eq!(got.len(), 15, "doit retourner les 15 actions, pas seulement 10");
+        assert_eq!(got.iter().filter(|a| a.kind == "semis_abri").count(), 5);
+    }
+
+    /// Régression historique : limit=200 + 200 arrosages récents écrasaient les
+    /// semis_abri plus anciens (cause du bug "abri vide").
+    #[test]
+    fn list_actions_low_limit_drops_old_semis_abri() {
+        let db = mk_db();
+        // 10 semis_abri anciens (avril)
+        for i in 0..10 {
+            insert_action(&db, &mk_action(&format!("2026-04-{:02}", i + 1), "semis_abri", Some("pumpkin"), Some(100), Some(50))).unwrap();
+        }
+        // 200 arrosages récents (mai) - plus récents donc en tête du tri DESC
+        for i in 0..200 {
+            insert_action(&db, &mk_action(&format!("2026-05-{:02}", (i % 28) + 1), "arrosage", Some("tomato"), Some(10), Some(20))).unwrap();
+        }
+
+        let f = ActionFilter { limit: Some(200), ..Default::default() };
+        let got = list_actions(&db, &f).expect("list ok");
+        assert_eq!(got.len(), 200);
+        let abri_count = got.iter().filter(|a| a.kind == "semis_abri").count();
+        assert_eq!(abri_count, 0, "limit=200 mange tous les semis_abri anciens — c'est attendu, le frontend doit utiliser un limit plus large");
+    }
+
+    /// Le tri par date DESC doit être stable et placer les plus récentes en tête.
+    #[test]
+    fn list_actions_orders_date_desc() {
+        let db = mk_db();
+        insert_action(&db, &mk_action("2026-01-15", "semis_abri", Some("a"), Some(0), Some(0))).unwrap();
+        insert_action(&db, &mk_action("2026-05-01", "semis_abri", Some("b"), Some(0), Some(0))).unwrap();
+        insert_action(&db, &mk_action("2026-03-10", "semis_abri", Some("c"), Some(0), Some(0))).unwrap();
+
+        let got = list_actions(&db, &ActionFilter::default()).unwrap();
+        let dates: Vec<&str> = got.iter().map(|a| a.date.as_str()).collect();
+        assert_eq!(dates, vec!["2026-05-01", "2026-03-10", "2026-01-15"]);
+    }
+
+    /// Filtre par kind doit isoler exclusivement les semis_abri.
+    #[test]
+    fn list_actions_filter_by_kind() {
+        let db = mk_db();
+        insert_action(&db, &mk_action("2026-05-01", "arrosage", Some("a"), Some(0), Some(0))).unwrap();
+        insert_action(&db, &mk_action("2026-05-01", "semis_abri", Some("b"), Some(10), Some(20))).unwrap();
+        insert_action(&db, &mk_action("2026-05-01", "repiquage", Some("c"), Some(30), Some(40))).unwrap();
+
+        let f = ActionFilter { kind: Some("semis_abri".into()), ..Default::default() };
+        let got = list_actions(&db, &f).unwrap();
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].species_id.as_deref(), Some("b"));
+    }
+
+    /// Régression cross-zone : un repiquage venu d'un drag conserve grid_x/y
+    /// (pour rendu sur le terrain) et n'écrase pas les autres actions.
+    #[test]
+    fn insert_repiquage_keeps_grid_coords() {
+        let db = mk_db();
+        let inserted = insert_action(
+            &db,
+            &mk_action("2026-05-09", "repiquage", Some("basil"), Some(231), Some(89)),
+        )
+        .unwrap();
+        assert_eq!(inserted.grid_x, Some(231));
+        assert_eq!(inserted.grid_y, Some(89));
+        assert_eq!(inserted.kind, "repiquage");
+    }
+
+    #[test]
+    fn insert_action_rejects_unknown_kind() {
+        let db = mk_db();
+        let err = insert_action(
+            &db,
+            &mk_action("2026-05-09", "kind_inconnu", Some("basil"), Some(10), Some(20)),
+        );
+        assert!(err.is_err(), "kind inconnu doit être rejeté");
+    }
+
+    #[test]
+    fn delete_action_removes_only_target() {
+        let db = mk_db();
+        let a = insert_action(&db, &mk_action("2026-05-01", "semis_abri", Some("a"), Some(0), Some(0))).unwrap();
+        let b = insert_action(&db, &mk_action("2026-05-02", "semis_abri", Some("b"), Some(0), Some(0))).unwrap();
+        delete_action(&db, a.id).unwrap();
+        let remaining = list_actions(&db, &ActionFilter::default()).unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, b.id);
+    }
+}
