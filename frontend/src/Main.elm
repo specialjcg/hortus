@@ -98,6 +98,10 @@ type alias Model =
     , noteDraft : String -- texte observation en cours de saisie
     , almanacSearch : String -- filtre texte de l'almanach
     , solutionDraft : Maybe ( Int, String ) -- (id note, texte solution en édition)
+    , problems : List Problem
+    , newProblem : Maybe NewProblemDraft
+    , entryDraft : Maybe EntryDraft
+    , closeDraft : Maybe ( Int, String ) -- (id fiche, conclusion en édition)
     , bulkKind : String
     , bulkSpeciesId : Maybe String
     , bulkZone : Maybe Zone
@@ -233,6 +237,45 @@ emptyParcelForm =
     }
 
 
+-- Fiche problème : suivi quasi scientifique d'un souci au jardin.
+-- Timeline d'entrées datées observation/traitement/résultat, puis conclusion.
+type alias Problem =
+    { id : Int
+    , speciesId : Maybe String
+    , actionId : Maybe Int
+    , title : String
+    , category : String
+    , status : String -- "open" | "resolved"
+    , conclusion : Maybe String
+    , entries : List ProblemEntry
+    }
+
+
+type alias ProblemEntry =
+    { id : Int
+    , problemId : Int
+    , date : String
+    , kind : String -- "observation" | "traitement" | "resultat"
+    , text : String
+    }
+
+
+type alias NewProblemDraft =
+    { speciesId : String
+    , actionId : Maybe Int
+    , title : String
+    , category : String
+    , firstObs : String
+    }
+
+
+type alias EntryDraft =
+    { problemId : Int
+    , kind : String
+    , text : String
+    }
+
+
 type alias ActionEntry =
     { id : Int
     , date : String
@@ -307,6 +350,10 @@ init flags =
       , noteDraft = ""
       , almanacSearch = ""
       , solutionDraft = Nothing
+      , problems = []
+      , newProblem = Nothing
+      , entryDraft = Nothing
+      , closeDraft = Nothing
       , bulkKind = "arrosage"
       , bulkSpeciesId = Nothing
       , bulkZone = Nothing
@@ -324,6 +371,7 @@ init flags =
         , fetchActions flags.backendUrl
         , fetchActionKinds flags.backendUrl
         , fetchForecast flags.backendUrl "le_bois_doingt"
+        , fetchProblems flags.backendUrl
         ]
     )
 
@@ -398,6 +446,26 @@ type Msg
     | SetNoteDraft String
     | SaveObservation Int -- plant id
     | SetAlmanacSearch String
+    | GotProblems (Result Http.Error (List Problem))
+    | OpenProblemForm (Maybe String) (Maybe Int) -- espèce, plant préremplis
+    | SetProblemSpecies String
+    | SetProblemTitle String
+    | SetProblemCategory String
+    | SetProblemObs String
+    | CancelProblemForm
+    | SubmitProblem
+    | GotProblemCreated (Result Http.Error Int)
+    | StartEntry Int String -- id fiche, kind
+    | SetEntryText String
+    | CancelEntry
+    | SubmitEntry
+    | StartClose Int
+    | SetCloseText String
+    | CancelClose
+    | SubmitClose
+    | ReopenProblem Int
+    | DeleteProblem Int
+    | GotProblemSaved (Result Http.Error ())
     | EditSolution Int String -- id note, texte initial
     | SetSolutionDraft String
     | CancelSolution
@@ -620,6 +688,124 @@ update msg model =
 
         SetAlmanacSearch s ->
             ( { model | almanacSearch = s }, Cmd.none )
+
+        GotProblems (Ok ps) ->
+            ( { model | problems = ps }, Cmd.none )
+
+        GotProblems (Err e) ->
+            ( { model | error = Just (httpErr e) }, Cmd.none )
+
+        OpenProblemForm msid maid ->
+            ( { model
+                | newProblem =
+                    Just
+                        { speciesId = msid |> Maybe.withDefault ""
+                        , actionId = maid
+                        , title = ""
+                        , category = "maladie"
+                        , firstObs = ""
+                        }
+                , viewMode = AlmanacView
+                , plantMenu = Nothing
+              }
+            , Cmd.none
+            )
+
+        SetProblemSpecies s ->
+            ( { model | newProblem = model.newProblem |> Maybe.map (\d -> { d | speciesId = s }) }, Cmd.none )
+
+        SetProblemTitle s ->
+            ( { model | newProblem = model.newProblem |> Maybe.map (\d -> { d | title = s }) }, Cmd.none )
+
+        SetProblemCategory s ->
+            ( { model | newProblem = model.newProblem |> Maybe.map (\d -> { d | category = s }) }, Cmd.none )
+
+        SetProblemObs s ->
+            ( { model | newProblem = model.newProblem |> Maybe.map (\d -> { d | firstObs = s }) }, Cmd.none )
+
+        CancelProblemForm ->
+            ( { model | newProblem = Nothing }, Cmd.none )
+
+        SubmitProblem ->
+            case model.newProblem of
+                Just d ->
+                    if String.trim d.title == "" then
+                        ( model, Cmd.none )
+                    else
+                        ( model, createProblemCmd model.backendUrl d )
+
+                Nothing -> ( model, Cmd.none )
+
+        GotProblemCreated (Ok pid) ->
+            let
+                obs =
+                    model.newProblem
+                        |> Maybe.map (.firstObs >> String.trim)
+                        |> Maybe.withDefault ""
+            in
+            ( { model | newProblem = Nothing }
+            , if obs == "" then
+                fetchProblems model.backendUrl
+              else
+                createEntryCmd model.backendUrl pid model.today "observation" obs
+            )
+
+        GotProblemCreated (Err e) ->
+            ( { model | error = Just (httpErr e) }, Cmd.none )
+
+        StartEntry pid kind ->
+            ( { model | entryDraft = Just { problemId = pid, kind = kind, text = "" } }, Cmd.none )
+
+        SetEntryText s ->
+            ( { model | entryDraft = model.entryDraft |> Maybe.map (\d -> { d | text = s }) }, Cmd.none )
+
+        CancelEntry ->
+            ( { model | entryDraft = Nothing }, Cmd.none )
+
+        SubmitEntry ->
+            case model.entryDraft of
+                Just ed ->
+                    if String.trim ed.text == "" then
+                        ( model, Cmd.none )
+                    else
+                        ( { model | entryDraft = Nothing }
+                        , createEntryCmd model.backendUrl ed.problemId model.today ed.kind (String.trim ed.text)
+                        )
+
+                Nothing -> ( model, Cmd.none )
+
+        StartClose pid ->
+            ( { model | closeDraft = Just ( pid, "" ) }, Cmd.none )
+
+        SetCloseText s ->
+            ( { model | closeDraft = model.closeDraft |> Maybe.map (\( pid, _ ) -> ( pid, s )) }, Cmd.none )
+
+        CancelClose ->
+            ( { model | closeDraft = Nothing }, Cmd.none )
+
+        SubmitClose ->
+            case model.closeDraft of
+                Just ( pid, conclusion ) ->
+                    if String.trim conclusion == "" then
+                        ( model, Cmd.none )
+                    else
+                        ( { model | closeDraft = Nothing }
+                        , closeProblemCmd model.backendUrl pid (String.trim conclusion)
+                        )
+
+                Nothing -> ( model, Cmd.none )
+
+        ReopenProblem pid ->
+            ( model, reopenProblemCmd model.backendUrl pid )
+
+        DeleteProblem pid ->
+            ( model, deleteProblemCmd model.backendUrl pid )
+
+        GotProblemSaved (Ok _) ->
+            ( model, fetchProblems model.backendUrl )
+
+        GotProblemSaved (Err e) ->
+            ( { model | error = Just (httpErr e) }, Cmd.none )
 
         EditSolution noteId initial ->
             ( { model | solutionDraft = Just ( noteId, initial ) }, Cmd.none )
@@ -976,6 +1162,115 @@ fetchActions url =
         { url = url ++ "/actions?limit=5000"
         , expect = Http.expectJson GotActions (D.list actionDecoder)
         }
+
+
+fetchProblems : String -> Cmd Msg
+fetchProblems url =
+    Http.get
+        { url = url ++ "/problems"
+        , expect = Http.expectJson GotProblems (D.list problemDecoder)
+        }
+
+
+createProblemCmd : String -> NewProblemDraft -> Cmd Msg
+createProblemCmd url draft =
+    Http.post
+        { url = url ++ "/problems"
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "species_id", encodeMaybeString draft.speciesId )
+                    , ( "action_id", encodeMaybeInt (draft.actionId |> Maybe.map String.fromInt |> Maybe.withDefault "") )
+                    , ( "title", Encode.string draft.title )
+                    , ( "category", Encode.string draft.category )
+                    ]
+                )
+        , expect = Http.expectJson GotProblemCreated D.int
+        }
+
+
+createEntryCmd : String -> Int -> String -> String -> String -> Cmd Msg
+createEntryCmd url problemId date kind text_ =
+    Http.post
+        { url = url ++ "/problems/" ++ String.fromInt problemId ++ "/entries"
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "date", Encode.string date )
+                    , ( "kind", Encode.string kind )
+                    , ( "text", Encode.string text_ )
+                    ]
+                )
+        , expect = Http.expectWhatever GotProblemSaved
+        }
+
+
+closeProblemCmd : String -> Int -> String -> Cmd Msg
+closeProblemCmd url problemId conclusion =
+    Http.request
+        { method = "PUT"
+        , headers = []
+        , url = url ++ "/problems/" ++ String.fromInt problemId
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "status", Encode.string "resolved" )
+                    , ( "conclusion", Encode.string conclusion )
+                    ]
+                )
+        , expect = Http.expectWhatever GotProblemSaved
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+reopenProblemCmd : String -> Int -> Cmd Msg
+reopenProblemCmd url problemId =
+    Http.request
+        { method = "PUT"
+        , headers = []
+        , url = url ++ "/problems/" ++ String.fromInt problemId
+        , body = Http.jsonBody (Encode.object [ ( "status", Encode.string "open" ) ])
+        , expect = Http.expectWhatever GotProblemSaved
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+deleteProblemCmd : String -> Int -> Cmd Msg
+deleteProblemCmd url problemId =
+    Http.request
+        { method = "DELETE"
+        , headers = []
+        , url = url ++ "/problems/" ++ String.fromInt problemId
+        , body = Http.emptyBody
+        , expect = Http.expectWhatever GotProblemSaved
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+problemDecoder : Decoder Problem
+problemDecoder =
+    D.succeed Problem
+        |> andMap (D.field "id" D.int)
+        |> andMap (D.field "species_id" (D.nullable D.string))
+        |> andMap (D.field "action_id" (D.nullable D.int))
+        |> andMap (D.field "title" D.string)
+        |> andMap (D.field "category" D.string)
+        |> andMap (D.field "status" D.string)
+        |> andMap (D.field "conclusion" (D.nullable D.string))
+        |> andMap (D.field "entries" (D.list problemEntryDecoder))
+
+
+problemEntryDecoder : Decoder ProblemEntry
+problemEntryDecoder =
+    D.succeed ProblemEntry
+        |> andMap (D.field "id" D.int)
+        |> andMap (D.field "problem_id" D.int)
+        |> andMap (D.field "date" D.string)
+        |> andMap (D.field "kind" D.string)
+        |> andMap (D.field "text" D.string)
 
 
 fetchActionKinds : String -> Cmd Msg
@@ -1780,11 +2075,42 @@ observationNotes model =
             )
 
 
+problemCategories : List ( String, String )
+problemCategories =
+    [ ( "maladie", "🦠 Maladie" )
+    , ( "ravageur", "🐛 Ravageur" )
+    , ( "carence", "🍂 Carence" )
+    , ( "climat", "⛈ Climat" )
+    , ( "croissance", "📉 Croissance" )
+    , ( "germination", "🌱 Germination" )
+    , ( "autre", "❓ Autre" )
+    ]
+
+
+categoryLabel : String -> String
+categoryLabel cat =
+    problemCategories
+        |> List.filter (\( k, _ ) -> k == cat)
+        |> List.head
+        |> Maybe.map Tuple.second
+        |> Maybe.withDefault cat
+
+
+entryKindIcon : String -> String
+entryKindIcon kind =
+    case kind of
+        "observation" -> "👁"
+        "traitement" -> "🧪"
+        "resultat" -> "📊"
+        _ -> "·"
+
+
 viewAlmanacPage : Model -> Html Msg
 viewAlmanacPage model =
     let
         q = String.toLower (String.trim model.almanacSearch)
-        matches a =
+
+        matchesNote a =
             q == ""
                 || List.any (String.contains q)
                     [ String.toLower (a.notes |> Maybe.withDefault "")
@@ -1793,48 +2119,330 @@ viewAlmanacPage model =
                     , a.date
                     ]
 
+        matchesProblem p =
+            q == ""
+                || List.any (String.contains q)
+                    ([ String.toLower p.title
+                     , String.toLower p.category
+                     , String.toLower (p.speciesId |> Maybe.map speciesShortName |> Maybe.withDefault "")
+                     , String.toLower (p.conclusion |> Maybe.withDefault "")
+                     ]
+                        ++ List.map (.text >> String.toLower) p.entries
+                    )
+
         notes =
             observationNotes model
-                |> List.filter matches
+                |> List.filter matchesNote
                 |> List.sortBy .date
                 |> List.reverse
 
-        resolvedCount =
-            notes
-                |> List.filter (\a -> (a.solution |> Maybe.map String.trim |> Maybe.withDefault "") /= "")
-                |> List.length
+        probs = model.problems |> List.filter matchesProblem
+        openProbs = probs |> List.filter (\p -> p.status /= "resolved")
+        resolvedProbs = probs |> List.filter (\p -> p.status == "resolved")
 
-        total = List.length notes
+        sectionTitle icon label count =
+            h3 [ A.style "margin" "0 0 0.6rem 0" ]
+                [ text (icon ++ " " ++ label ++ " (" ++ String.fromInt count ++ ")") ]
     in
-    div [ A.class "panel" ]
-        [ h2 [] [ text "📖 Almanach du jardin" ]
-        , p [ A.style "font-size" "0.85rem", A.style "color" "#5a3a22" ]
-            [ text "Tes observations au fil des saisons : note un problème sur un plant (📓 Mon jardin → clic sur le plant), puis consigne ici la solution trouvée pour la retrouver l'année suivante." ]
-        , div [ A.style "display" "flex", A.style "gap" "0.6rem", A.style "align-items" "center", A.style "margin-bottom" "0.8rem" ]
-            [ input
-                [ A.type_ "search"
-                , A.placeholder "🔍 Rechercher (espèce, problème, solution, date…)"
-                , A.value model.almanacSearch
-                , E.onInput SetAlmanacSearch
-                , A.style "flex" "1", A.style "padding" "6px 10px", A.style "font-size" "0.85rem"
+    div []
+        [ div [ A.class "panel" ]
+            [ h2 [] [ text "📖 Almanach du jardin" ]
+            , p [ A.style "font-size" "0.85rem", A.style "color" "#5a3a22" ]
+                [ text "Suivi méthodique des problèmes : une fiche par souci, avec observations, traitements testés et résultats datés. Clos la fiche avec ta conclusion pour la retrouver les saisons suivantes." ]
+            , div [ A.style "display" "flex", A.style "gap" "0.6rem", A.style "align-items" "center", A.style "flex-wrap" "wrap" ]
+                [ button
+                    [ E.onClick (OpenProblemForm Nothing Nothing)
+                    , A.style "padding" "6px 12px", A.style "background" "#5a7a22"
+                    , A.style "color" "white", A.style "border" "none"
+                    , A.style "border-radius" "4px", A.style "cursor" "pointer"
+                    , A.style "font-size" "0.85rem"
+                    ]
+                    [ text "🔬 Nouvelle fiche" ]
+                , input
+                    [ A.type_ "search"
+                    , A.placeholder "🔍 Rechercher (espèce, symptôme, traitement…)"
+                    , A.value model.almanacSearch
+                    , E.onInput SetAlmanacSearch
+                    , A.style "flex" "1", A.style "min-width" "220px"
+                    , A.style "padding" "6px 10px", A.style "font-size" "0.85rem"
+                    ]
+                    []
                 ]
-                []
-            , span [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ]
-                [ text (String.fromInt total ++ " note(s) · " ++ String.fromInt resolvedCount ++ " résolue(s)") ]
+            , case model.newProblem of
+                Just draft -> viewNewProblemForm model draft
+                Nothing -> text ""
             ]
-        , if List.isEmpty notes then
-            p [ A.style "color" "#5a3a22", A.style "font-size" "0.85rem" ]
-                [ text
-                    (if q == "" then
-                        "Aucune observation pour l'instant."
-                     else
-                        "Rien ne correspond à « " ++ model.almanacSearch ++ " »."
-                    )
-                ]
-          else
-            div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "1rem" ]
-                (groupNotesBySpecies notes |> List.map (viewAlmanacGroup model))
+        , div [ A.class "panel" ]
+            [ sectionTitle "🔴" "Problèmes en cours" (List.length openProbs)
+            , if List.isEmpty openProbs then
+                p [ A.style "font-size" "0.84rem", A.style "color" "#5a3a22" ]
+                    [ text "Aucun problème ouvert — le jardin se porte bien 🌞" ]
+              else
+                div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.8rem" ]
+                    (List.map (viewProblemCard model) openProbs)
+            ]
+        , div [ A.class "panel" ]
+            [ sectionTitle "✅" "Problèmes résolus" (List.length resolvedProbs)
+            , if List.isEmpty resolvedProbs then
+                p [ A.style "font-size" "0.84rem", A.style "color" "#5a3a22" ]
+                    [ text "Les fiches closes avec leur conclusion apparaîtront ici." ]
+              else
+                div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.8rem" ]
+                    (List.map (viewProblemCard model) resolvedProbs)
+            ]
+        , div [ A.class "panel" ]
+            [ sectionTitle "📝" "Notes libres" (List.length notes)
+            , if List.isEmpty notes then
+                p [ A.style "font-size" "0.84rem", A.style "color" "#5a3a22" ]
+                    [ text "Les observations rapides saisies sur un plant apparaissent ici." ]
+              else
+                div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "1rem" ]
+                    (groupNotesBySpecies notes |> List.map (viewAlmanacGroup model))
+            ]
         ]
+
+
+viewNewProblemForm : Model -> NewProblemDraft -> Html Msg
+viewNewProblemForm model draft =
+    let
+        speciesOptions =
+            case model.calendar of
+                Just cal ->
+                    cal.species
+                        |> List.map (\sl -> sl.species.id)
+                        |> List.map
+                            (\sid ->
+                                option [ A.value sid, A.selected (draft.speciesId == sid) ]
+                                    [ text (speciesEmoji sid ++ " " ++ speciesShortName sid) ]
+                            )
+
+                Nothing -> []
+
+        lbl t =
+            div [ A.style "font-size" "0.76rem", A.style "color" "#5a3a22", A.style "font-weight" "600", A.style "margin-top" "0.5rem" ]
+                [ text t ]
+    in
+    div
+        [ A.style "margin-top" "0.7rem", A.style "padding" "0.7rem"
+        , A.style "background" "#fff6de", A.style "border" "2px solid #d4a033"
+        , A.style "border-radius" "6px"
+        ]
+        [ h3 [ A.style "margin" "0" ] [ text "🔬 Nouvelle fiche problème" ]
+        , lbl "Espèce concernée"
+        , select
+            [ E.onInput SetProblemSpecies
+            , A.style "width" "100%", A.style "padding" "5px", A.style "font-size" "0.85rem"
+            ]
+            (option [ A.value "", A.selected (draft.speciesId == "") ] [ text "— générale (tout le jardin) —" ]
+                :: speciesOptions
+            )
+        , lbl "Titre du problème"
+        , input
+            [ A.type_ "text"
+            , A.value draft.title
+            , E.onInput SetProblemTitle
+            , A.placeholder "Ex : feuilles jaunes en bas des plants"
+            , A.style "width" "100%", A.style "padding" "5px 8px"
+            , A.style "box-sizing" "border-box", A.style "font-size" "0.85rem"
+            ]
+            []
+        , lbl "Catégorie"
+        , select
+            [ E.onInput SetProblemCategory
+            , A.style "width" "100%", A.style "padding" "5px", A.style "font-size" "0.85rem"
+            ]
+            (problemCategories
+                |> List.map
+                    (\( k, label ) ->
+                        option [ A.value k, A.selected (draft.category == k) ] [ text label ]
+                    )
+            )
+        , lbl "Première observation (symptômes, hypothèse…)"
+        , textarea
+            [ A.value draft.firstObs
+            , E.onInput SetProblemObs
+            , A.placeholder "Ex : jaunissement des feuilles basses depuis 3 jours, taches brunes. Hypothèse : mildiou ou carence en magnésium."
+            , A.rows 3
+            , A.style "width" "100%", A.style "box-sizing" "border-box", A.style "font-size" "0.85rem"
+            ]
+            []
+        , div [ A.style "margin-top" "0.5rem", A.style "display" "flex", A.style "gap" "0.4rem" ]
+            [ button
+                [ E.onClick SubmitProblem
+                , A.style "padding" "6px 12px", A.style "background" "#5a7a22"
+                , A.style "color" "white", A.style "border" "none"
+                , A.style "border-radius" "4px", A.style "cursor" "pointer"
+                , A.style "font-size" "0.85rem"
+                ]
+                [ text "💾 Créer la fiche" ]
+            , button
+                [ E.onClick CancelProblemForm, A.style "padding" "6px 12px", A.style "font-size" "0.85rem" ]
+                [ text "Annuler" ]
+            ]
+        ]
+
+
+viewProblemCard : Model -> Problem -> Html Msg
+viewProblemCard model p =
+    let
+        resolved = p.status == "resolved"
+        sid = p.speciesId |> Maybe.withDefault ""
+        speciesLabel =
+            if sid == "" then
+                "🌍 Général"
+            else
+                speciesEmoji sid ++ " " ++ speciesShortName sid
+
+        entryLine e =
+            div [ A.style "display" "flex", A.style "gap" "0.5rem", A.style "font-size" "0.84rem", A.style "padding" "0.2rem 0" ]
+                [ span [ A.style "color" "#5a3a22", A.style "font-size" "0.76rem", A.style "white-space" "nowrap", A.style "font-weight" "600" ]
+                    [ text e.date ]
+                , span [] [ text (entryKindIcon e.kind ++ " " ++ e.text) ]
+                ]
+
+        addEntryBtn kind label =
+            button
+                [ E.onClick (StartEntry p.id kind)
+                , A.style "padding" "3px 9px", A.style "font-size" "0.76rem"
+                , A.style "background" "#fff6de", A.style "border" "1px solid #d4a033"
+                , A.style "border-radius" "4px", A.style "cursor" "pointer"
+                ]
+                [ text label ]
+
+        entryEditor =
+            case model.entryDraft of
+                Just ed ->
+                    if ed.problemId == p.id then
+                        [ textarea
+                            [ A.value ed.text
+                            , E.onInput SetEntryText
+                            , A.placeholder
+                                (case ed.kind of
+                                    "traitement" -> "Ex : purin d'ortie dilué à 10 %, pulvérisé le soir"
+                                    "resultat" -> "Ex : jaunissement stoppé après 5 jours, taches stables"
+                                    _ -> "Ex : les taches gagnent les feuilles du milieu"
+                                )
+                            , A.rows 2
+                            , A.style "width" "100%", A.style "margin-top" "0.3rem"
+                            , A.style "box-sizing" "border-box", A.style "font-size" "0.84rem"
+                            ]
+                            []
+                        , div [ A.style "margin-top" "0.3rem", A.style "display" "flex", A.style "gap" "0.4rem" ]
+                            [ button
+                                [ E.onClick SubmitEntry
+                                , A.style "padding" "4px 10px", A.style "background" "#5a7a22"
+                                , A.style "color" "white", A.style "border" "none"
+                                , A.style "border-radius" "4px", A.style "cursor" "pointer"
+                                , A.style "font-size" "0.8rem"
+                                ]
+                                [ text ("💾 Ajouter " ++ entryKindIcon ed.kind) ]
+                            , button [ E.onClick CancelEntry, A.style "font-size" "0.8rem" ] [ text "Annuler" ]
+                            ]
+                        ]
+                    else
+                        []
+
+                Nothing -> []
+
+        closeEditor =
+            case model.closeDraft of
+                Just ( pid, txt ) ->
+                    if pid == p.id then
+                        [ textarea
+                            [ A.value txt
+                            , E.onInput SetCloseText
+                            , A.placeholder "Conclusion : qu'est-ce qui a marché, à refaire ou éviter l'an prochain ?"
+                            , A.rows 2
+                            , A.style "width" "100%", A.style "margin-top" "0.3rem"
+                            , A.style "box-sizing" "border-box", A.style "font-size" "0.84rem"
+                            ]
+                            []
+                        , div [ A.style "margin-top" "0.3rem", A.style "display" "flex", A.style "gap" "0.4rem" ]
+                            [ button
+                                [ E.onClick SubmitClose
+                                , A.style "padding" "4px 10px", A.style "background" "#4a9b3c"
+                                , A.style "color" "white", A.style "border" "none"
+                                , A.style "border-radius" "4px", A.style "cursor" "pointer"
+                                , A.style "font-size" "0.8rem"
+                                ]
+                                [ text "✅ Clore la fiche" ]
+                            , button [ E.onClick CancelClose, A.style "font-size" "0.8rem" ] [ text "Annuler" ]
+                            ]
+                        ]
+                    else
+                        []
+
+                Nothing -> []
+    in
+    div
+        [ A.style "padding" "0.6rem 0.8rem"
+        , A.style "background" (if resolved then "#eef5e0" else "#fdf3e3")
+        , A.style "border-left" ("4px solid " ++ (if resolved then "#4a9b3c" else "#c0392b"))
+        , A.style "border-radius" "5px"
+        ]
+        ([ div [ A.style "display" "flex", A.style "justify-content" "space-between", A.style "align-items" "baseline", A.style "flex-wrap" "wrap", A.style "gap" "0.3rem" ]
+            [ div [ A.style "font-weight" "700", A.style "font-size" "0.95rem" ]
+                [ text ((if resolved then "✅ " else "🔴 ") ++ p.title) ]
+            , div [ A.style "font-size" "0.76rem", A.style "color" "#5a3a22" ]
+                [ text (speciesLabel ++ " · " ++ categoryLabel p.category) ]
+            ]
+         , div [ A.style "margin-top" "0.4rem", A.style "border-left" "2px solid #d4b85a", A.style "padding-left" "0.6rem" ]
+            (List.map entryLine p.entries)
+         ]
+            ++ (case p.conclusion of
+                    Just c ->
+                        if String.trim c == "" then
+                            []
+                        else
+                            [ div
+                                [ A.style "margin-top" "0.4rem", A.style "padding" "0.35rem 0.5rem"
+                                , A.style "background" "#dcedc8", A.style "border-radius" "4px"
+                                , A.style "font-size" "0.84rem", A.style "color" "#2a4a10"
+                                ]
+                                [ text ("💡 " ++ c) ]
+                            ]
+
+                    Nothing -> []
+               )
+            ++ entryEditor
+            ++ closeEditor
+            ++ [ div [ A.style "margin-top" "0.5rem", A.style "display" "flex", A.style "gap" "0.35rem", A.style "flex-wrap" "wrap" ]
+                    (if resolved then
+                        [ button
+                            [ E.onClick (ReopenProblem p.id)
+                            , A.style "padding" "3px 9px", A.style "font-size" "0.76rem", A.style "cursor" "pointer"
+                            ]
+                            [ text "🔄 Rouvrir" ]
+                        , button
+                            [ E.onClick (DeleteProblem p.id)
+                            , A.style "padding" "3px 9px", A.style "font-size" "0.76rem"
+                            , A.style "color" "#a03030", A.style "cursor" "pointer"
+                            ]
+                            [ text "🗑 Supprimer" ]
+                        ]
+
+                     else
+                        [ addEntryBtn "observation" "👁 Observation"
+                        , addEntryBtn "traitement" "🧪 Traitement"
+                        , addEntryBtn "resultat" "📊 Résultat"
+                        , button
+                            [ E.onClick (StartClose p.id)
+                            , A.style "padding" "3px 9px", A.style "font-size" "0.76rem"
+                            , A.style "background" "#4a9b3c", A.style "color" "white"
+                            , A.style "border" "none", A.style "border-radius" "4px"
+                            , A.style "cursor" "pointer"
+                            ]
+                            [ text "✅ Clore" ]
+                        , button
+                            [ E.onClick (DeleteProblem p.id)
+                            , A.style "padding" "3px 9px", A.style "font-size" "0.76rem"
+                            , A.style "color" "#a03030", A.style "cursor" "pointer"
+                            ]
+                            [ text "🗑" ]
+                        ]
+                    )
+               ]
+        )
 
 
 -- Groupe les notes par espèce, dans l'ordre de première apparition
@@ -2879,16 +3487,49 @@ viewPlantContextMenu model =
                                 ]
                                 [ text "💾 Enregistrer observation" ]
                             ]
+                        , div [ A.style "margin-top" "0.5rem" ]
+                            [ button
+                                [ E.onClick (OpenProblemForm a.speciesId (Just id))
+                                , A.style "padding" "5px 10px", A.style "background" "#c0392b"
+                                , A.style "color" "white", A.style "border" "none"
+                                , A.style "border-radius" "4px", A.style "cursor" "pointer"
+                                , A.style "font-size" "0.8rem"
+                                ]
+                                [ text "🔬 Signaler un problème (fiche suivie)" ]
+                            ]
                         , viewPastNotesForSpecies model sid
                         , div [ A.style "margin-top" "0.5rem" ]
                             [ button [ E.onClick ClosePlantMenu, A.style "font-size" "0.78rem" ] [ text "Fermer" ] ]
                         ]
 
 
--- Rappel almanach : dernières observations sur cette espèce, avec solution.
+-- Rappel almanach : fiches problèmes et observations passées de l'espèce.
 viewPastNotesForSpecies : Model -> String -> Html Msg
 viewPastNotesForSpecies model sid =
     let
+        pastProblems =
+            model.problems
+                |> List.filter (\p -> p.speciesId == Just sid)
+                |> List.take 3
+
+        problemLine p =
+            div [ A.style "font-size" "0.78rem", A.style "margin-top" "0.25rem", A.style "padding-left" "0.4rem", A.style "border-left" ("2px solid " ++ (if p.status == "resolved" then "#4a9b3c" else "#c0392b")) ]
+                [ div [] [ text ((if p.status == "resolved" then "✅ " else "🔴 ") ++ p.title) ]
+                , case p.conclusion |> Maybe.map String.trim of
+                    Just c ->
+                        if c == "" then text "" else div [ A.style "color" "#3a6a1a" ] [ text ("💡 " ++ c) ]
+
+                    Nothing -> text ""
+                ]
+
+        problemsBlock =
+            if List.isEmpty pastProblems then
+                []
+            else
+                div [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22", A.style "font-weight" "600", A.style "margin-top" "0.6rem" ]
+                    [ text "🔬 Fiches problème de cette espèce" ]
+                    :: List.map problemLine pastProblems
+
         past =
             observationNotes model
                 |> List.filter (\a -> a.speciesId == Just sid)
@@ -2896,9 +3537,17 @@ viewPastNotesForSpecies model sid =
                 |> List.reverse
                 |> List.take 3
     in
-    if List.isEmpty past then
+    if List.isEmpty past && List.isEmpty problemsBlock then
         text ""
+    else if List.isEmpty past then
+        div [] problemsBlock
     else
+        div []
+            (problemsBlock ++ [ viewPastNotesOnly past ])
+
+
+viewPastNotesOnly : List ActionEntry -> Html Msg
+viewPastNotesOnly past =
         div [ A.style "margin-top" "0.6rem" ]
             (div [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22", A.style "font-weight" "600" ]
                 [ text "📖 Déjà noté sur cette espèce" ]

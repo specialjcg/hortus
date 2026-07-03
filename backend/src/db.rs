@@ -20,6 +20,7 @@ pub fn open() -> Result<Db, String> {
     let conn = Connection::open(&path).map_err(|e| format!("open DB : {e}"))?;
     conn.execute_batch(SCHEMA).map_err(|e| format!("migration : {e}"))?;
     run_additive_migrations(&conn)?;
+    crate::problems::migrate(&conn)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")
         .map_err(|e| format!("pragma : {e}"))?;
     Ok(Arc::new(Mutex::new(conn)))

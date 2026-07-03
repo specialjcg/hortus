@@ -17,6 +17,7 @@ use crate::domain::species::{CalendarWindow, Species};
 use crate::journal::{
     self, Action, ActionFilter, ActionInput, Parcel, ParcelInput, ACTION_KINDS,
 };
+use crate::problems::{self, EntryInput, Problem, ProblemInput, ProblemUpdate};
 
 /// État partagé.
 #[derive(Clone)]
@@ -63,6 +64,9 @@ pub fn router() -> Router {
         .route("/actions", get(get_actions).post(create_action).delete(del_all_actions))
         .route("/actions/bulk", post(create_actions_bulk))
         .route("/actions/{id}", put(put_action).delete(del_action))
+        .route("/problems", get(get_problems).post(create_problem))
+        .route("/problems/{id}", put(put_problem).delete(del_problem))
+        .route("/problems/{id}/entries", post(create_problem_entry))
         .with_state(state)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
@@ -247,6 +251,52 @@ async fn create_actions_bulk(
     let results = journal::insert_actions_bulk(&s.db, &inputs)
         .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
     Ok((StatusCode::CREATED, Json(results)))
+}
+
+async fn get_problems(
+    State(s): State<AppState>,
+) -> Result<Json<Vec<Problem>>, (StatusCode, String)> {
+    problems::list_problems(&s.db)
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+async fn create_problem(
+    State(s): State<AppState>,
+    Json(input): Json<ProblemInput>,
+) -> Result<(StatusCode, Json<i64>), (StatusCode, String)> {
+    problems::insert_problem(&s.db, &input)
+        .map(|id| (StatusCode::CREATED, Json(id)))
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))
+}
+
+async fn put_problem(
+    State(s): State<AppState>,
+    Path(id): Path<i64>,
+    Json(upd): Json<ProblemUpdate>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    problems::update_problem(&s.db, id, &upd)
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))
+}
+
+async fn del_problem(
+    State(s): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    problems::delete_problem(&s.db, id)
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))
+}
+
+async fn create_problem_entry(
+    State(s): State<AppState>,
+    Path(id): Path<i64>,
+    Json(input): Json<EntryInput>,
+) -> Result<(StatusCode, Json<i64>), (StatusCode, String)> {
+    problems::insert_entry(&s.db, id, &input)
+        .map(|eid| (StatusCode::CREATED, Json(eid)))
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))
 }
 
 async fn put_action(
