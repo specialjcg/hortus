@@ -60,6 +60,7 @@ type ViewMode
     = CoachView
     | CalendarView
     | JournalView
+    | AlmanacView
 
 
 type alias Model =
@@ -94,6 +95,9 @@ type alias Model =
     , movingPlant : Maybe Int -- id action en cours de déplacement (click-move)
     , dragging : Maybe DragState
     , plantMenu : Maybe Int -- id du plant avec menu ouvert
+    , noteDraft : String -- texte observation en cours de saisie
+    , almanacSearch : String -- filtre texte de l'almanach
+    , solutionDraft : Maybe ( Int, String ) -- (id note, texte solution en édition)
     , bulkKind : String
     , bulkSpeciesId : Maybe String
     , bulkZone : Maybe Zone
@@ -239,6 +243,7 @@ type alias ActionEntry =
     , notes : Maybe String
     , gridX : Maybe Int
     , gridY : Maybe Int
+    , solution : Maybe String
     }
 
 
@@ -299,6 +304,9 @@ init flags =
       , movingPlant = Nothing
       , dragging = Nothing
       , plantMenu = Nothing
+      , noteDraft = ""
+      , almanacSearch = ""
+      , solutionDraft = Nothing
       , bulkKind = "arrosage"
       , bulkSpeciesId = Nothing
       , bulkZone = Nothing
@@ -342,6 +350,7 @@ type Msg
     | GotParcelSaved (Result Http.Error Parcel)
     | GotActionSaved (Result Http.Error ActionEntry)
     | GotDeleted (Result Http.Error ())
+    | GotBulkSaved (Result Http.Error ())
     | SetParcelName String
     | SetParcelSurface String
     | SetParcelExposition String
@@ -386,6 +395,14 @@ type Msg
     | OpenPlantMenu Int
     | ClosePlantMenu
     | QuickAction Int String -- plant id, kind
+    | SetNoteDraft String
+    | SaveObservation Int -- plant id
+    | SetAlmanacSearch String
+    | EditSolution Int String -- id note, texte initial
+    | SetSolutionDraft String
+    | CancelSolution
+    | SaveSolution Int -- id note
+    | GotSolutionSaved (Result Http.Error ())
     | SetBulkKind String
     | SetBulkSpecies String
     | SetBulkZone String
@@ -591,12 +608,58 @@ update msg model =
             ( { model | plantMenu = Just id }, Cmd.none )
 
         ClosePlantMenu ->
-            ( { model | plantMenu = Nothing }, Cmd.none )
+            ( { model | plantMenu = Nothing, noteDraft = "" }, Cmd.none )
 
         QuickAction plantId kind ->
             ( { model | plantMenu = Nothing }
             , quickActionCmd model plantId kind
             )
+
+        SetNoteDraft s ->
+            ( { model | noteDraft = s }, Cmd.none )
+
+        SetAlmanacSearch s ->
+            ( { model | almanacSearch = s }, Cmd.none )
+
+        EditSolution noteId initial ->
+            ( { model | solutionDraft = Just ( noteId, initial ) }, Cmd.none )
+
+        SetSolutionDraft s ->
+            ( { model
+                | solutionDraft =
+                    model.solutionDraft |> Maybe.map (\( nid, _ ) -> ( nid, s ))
+              }
+            , Cmd.none
+            )
+
+        CancelSolution ->
+            ( { model | solutionDraft = Nothing }, Cmd.none )
+
+        SaveSolution noteId ->
+            case model.solutionDraft of
+                Just ( nid, txt ) ->
+                    if nid == noteId then
+                        ( { model | solutionDraft = Nothing }
+                        , saveSolutionCmd model noteId txt
+                        )
+                    else
+                        ( model, Cmd.none )
+
+                Nothing -> ( model, Cmd.none )
+
+        GotSolutionSaved (Ok _) ->
+            ( model, fetchActions model.backendUrl )
+
+        GotSolutionSaved (Err e) ->
+            ( { model | error = Just (httpErr e) }, Cmd.none )
+
+        SaveObservation plantId ->
+            if String.trim model.noteDraft == "" then
+                ( model, Cmd.none )
+            else
+                ( { model | plantMenu = Nothing, noteDraft = "" }
+                , observationCmd model plantId model.noteDraft
+                )
 
         SetBulkKind k -> ( { model | bulkKind = k }, Cmd.none )
         SetBulkSpecies s -> ( { model | bulkSpeciesId = toMaybe s }, Cmd.none )
@@ -726,6 +789,10 @@ update msg model =
             , fetchActions model.backendUrl
             )
         GotActionSaved (Err e) -> ( { model | error = Just (httpErr e) }, Cmd.none )
+
+        GotBulkSaved (Ok _) ->
+            ( model, fetchActions model.backendUrl )
+        GotBulkSaved (Err e) -> ( { model | error = Just (httpErr e) }, Cmd.none )
 
         GotDeleted (Ok _) ->
             ( model
@@ -1048,6 +1115,15 @@ createAction url form =
         }
 
 
+createBulkActions : String -> List ActionForm -> Cmd Msg
+createBulkActions url forms =
+    Http.post
+        { url = url ++ "/actions/bulk"
+        , body = Http.jsonBody (Encode.list encodeAction forms)
+        , expect = Http.expectWhatever GotBulkSaved
+        }
+
+
 updateAction : String -> Int -> ActionForm -> Cmd Msg
 updateAction url id form =
     Http.request
@@ -1059,6 +1135,43 @@ updateAction url id form =
         , timeout = Nothing
         , tracker = Nothing
         }
+
+
+-- Enregistre la solution d'une note : PUT complet reconstruit depuis
+-- l'ActionEntry existante pour ne perdre aucun champ.
+saveSolutionCmd : Model -> Int -> String -> Cmd Msg
+saveSolutionCmd model noteId solutionText =
+    case model.actions |> List.filter (\a -> a.id == noteId) |> List.head of
+        Just a ->
+            Http.request
+                { method = "PUT"
+                , headers = []
+                , url = model.backendUrl ++ "/actions/" ++ String.fromInt noteId
+                , body = Http.jsonBody (encodeEntryWithSolution a solutionText)
+                , expect = Http.expectWhatever GotSolutionSaved
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+
+        Nothing -> Cmd.none
+
+
+encodeEntryWithSolution : ActionEntry -> String -> Encode.Value
+encodeEntryWithSolution a sol =
+    let
+        maybeOr enc m = m |> Maybe.map enc |> Maybe.withDefault Encode.null
+    in
+    Encode.object
+        [ ( "date", Encode.string a.date )
+        , ( "parcel_id", maybeOr Encode.int a.parcelId )
+        , ( "species_id", maybeOr Encode.string a.speciesId )
+        , ( "kind", Encode.string a.kind )
+        , ( "quantity_g", maybeOr Encode.float a.quantityG )
+        , ( "notes", maybeOr Encode.string a.notes )
+        , ( "grid_x", maybeOr Encode.int a.gridX )
+        , ( "grid_y", maybeOr Encode.int a.gridY )
+        , ( "solution", Encode.string (String.trim sol) )
+        ]
 
 
 deleteAction : String -> Int -> Cmd Msg
@@ -1100,15 +1213,18 @@ dropAcrossZonesCmd model d =
                         Terrain -> "repiquage"
                         Shelter -> "semis_abri"
                 newForm =
-                    { date = model.today
+                    -- Date = date du semis d'origine (a.date), pas today :
+                    -- la progression (daysToHarvest compte depuis le semis)
+                    -- doit inclure le temps passé en pépinière.
+                    { date = a.date
                     , parcelId = ""
                     , speciesId = sid
                     , kind = newKind
                     , quantity = ""
                     , notes =
                         case ( d.fromZone, d.currentZone ) of
-                            ( Shelter, Terrain ) -> "repiqué depuis pépinière"
-                            ( Terrain, Shelter ) -> "replacé sous abri"
+                            ( Shelter, Terrain ) -> "repiqué depuis pépinière le " ++ model.today
+                            ( Terrain, Shelter ) -> "replacé sous abri le " ++ model.today
                             _ -> ""
                     , gridX = String.fromInt d.currentX
                     , gridY = String.fromInt d.currentY
@@ -1260,6 +1376,23 @@ quickActionCmd model plantId kind =
         Nothing -> Cmd.none
 
 
+observationCmd : Model -> Int -> String -> Cmd Msg
+observationCmd model plantId noteText =
+    case model.actions |> List.filter (\a -> a.id == plantId) |> List.head of
+        Just a ->
+            createAction model.backendUrl
+                { date = model.today
+                , parcelId = ""
+                , speciesId = a.speciesId |> Maybe.withDefault ""
+                , kind = "note"
+                , quantity = ""
+                , notes = noteText
+                , gridX = a.gridX |> Maybe.map String.fromInt |> Maybe.withDefault ""
+                , gridY = a.gridY |> Maybe.map String.fromInt |> Maybe.withDefault ""
+                }
+        Nothing -> Cmd.none
+
+
 applyBulkCmd : Model -> Cmd Msg
 applyBulkCmd model =
     let
@@ -1276,8 +1409,8 @@ applyBulkCmd model =
             }
     in
     selected
-        |> List.map (mk >> createAction model.backendUrl)
-        |> Cmd.batch
+        |> List.map mk
+        |> createBulkActions model.backendUrl
 
 
 bulkSelection : Model -> List PlantOnTerrain
@@ -1426,6 +1559,7 @@ actionDecoder =
         |> andMap (D.field "notes" (D.nullable D.string))
         |> andMap (D.field "grid_x" (D.nullable D.int))
         |> andMap (D.field "grid_y" (D.nullable D.int))
+        |> andMap (D.field "solution" (D.nullable D.string))
 
 
 
@@ -1448,6 +1582,7 @@ view model =
             CoachView -> viewCoachPage model
             CalendarView -> viewCalendarPage model
             JournalView -> viewJournalPage model
+            AlmanacView -> viewAlmanacPage model
         ]
 
 
@@ -1548,6 +1683,11 @@ viewViewSwitch model =
                 , A.classList [ ( "primary", model.viewMode == JournalView ) ]
                 ]
                 [ text "📓 Mon jardin" ]
+            , button
+                [ E.onClick (SetViewMode AlmanacView)
+                , A.classList [ ( "primary", model.viewMode == AlmanacView ) ]
+                ]
+                [ text "📖 Almanach" ]
             ]
         ]
 
@@ -1566,9 +1706,246 @@ viewCoachPage model =
                     ]
                 , div []
                     [ viewCoachWatch model cal
+                    , viewCoachObservations model
                     , viewCoachTip model
                     ]
                 ]
+
+
+-- Panneau "Mes observations" (notes texte saisies sur les plants)
+
+
+viewCoachObservations : Model -> Html Msg
+viewCoachObservations model =
+    let
+        observations =
+            observationNotes model
+                |> List.sortBy .date
+                |> List.reverse
+                |> List.take 12
+    in
+    div [ A.class "panel" ]
+        [ h2 [] [ text "📝 Mes observations" ]
+        , if List.isEmpty observations then
+            p [ A.style "color" "#5a3a22", A.style "font-size" "0.85rem" ]
+                [ text "Aucune observation. Clique un plant → écris ce que tu constates." ]
+          else
+            div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.4rem" ]
+                (List.map viewObservationItem observations)
+        ]
+
+
+viewObservationItem : ActionEntry -> Html Msg
+viewObservationItem a =
+    let
+        sid = a.speciesId |> Maybe.withDefault ""
+        head =
+            if sid == "" then
+                a.date
+            else
+                speciesEmoji sid ++ " " ++ speciesShortName sid ++ " · " ++ a.date
+    in
+    div
+        [ A.style "padding" "0.4rem 0.55rem", A.style "background" "#f5f0e0"
+        , A.style "border-left" "3px solid #5a7a22", A.style "border-radius" "4px"
+        ]
+        [ div [ A.style "font-size" "0.74rem", A.style "color" "#5a3a22", A.style "font-weight" "600" ]
+            [ text head ]
+        , div [ A.style "font-size" "0.85rem", A.style "margin-top" "0.15rem" ]
+            [ text (a.notes |> Maybe.withDefault "") ]
+        , case a.solution of
+            Just sol ->
+                if String.trim sol == "" then
+                    text ""
+                else
+                    div [ A.style "font-size" "0.8rem", A.style "margin-top" "0.15rem", A.style "color" "#3a6a1a" ]
+                        [ text ("💡 " ++ sol) ]
+
+            Nothing -> text ""
+        ]
+
+
+-- ALMANACH : historique des observations, solutions, recherche
+
+
+-- Notes d'observation réelles (kind "note", texte non vide, hors marqueur
+-- interne "lot" posé par les actions en lot).
+observationNotes : Model -> List ActionEntry
+observationNotes model =
+    model.actions
+        |> List.filter
+            (\a ->
+                a.kind == "note"
+                    && (a.notes |> Maybe.map (\n -> String.trim n /= "" && n /= "lot") |> Maybe.withDefault False)
+            )
+
+
+viewAlmanacPage : Model -> Html Msg
+viewAlmanacPage model =
+    let
+        q = String.toLower (String.trim model.almanacSearch)
+        matches a =
+            q == ""
+                || List.any (String.contains q)
+                    [ String.toLower (a.notes |> Maybe.withDefault "")
+                    , String.toLower (a.solution |> Maybe.withDefault "")
+                    , String.toLower (a.speciesId |> Maybe.map speciesShortName |> Maybe.withDefault "")
+                    , a.date
+                    ]
+
+        notes =
+            observationNotes model
+                |> List.filter matches
+                |> List.sortBy .date
+                |> List.reverse
+
+        resolvedCount =
+            notes
+                |> List.filter (\a -> (a.solution |> Maybe.map String.trim |> Maybe.withDefault "") /= "")
+                |> List.length
+
+        total = List.length notes
+    in
+    div [ A.class "panel" ]
+        [ h2 [] [ text "📖 Almanach du jardin" ]
+        , p [ A.style "font-size" "0.85rem", A.style "color" "#5a3a22" ]
+            [ text "Tes observations au fil des saisons : note un problème sur un plant (📓 Mon jardin → clic sur le plant), puis consigne ici la solution trouvée pour la retrouver l'année suivante." ]
+        , div [ A.style "display" "flex", A.style "gap" "0.6rem", A.style "align-items" "center", A.style "margin-bottom" "0.8rem" ]
+            [ input
+                [ A.type_ "search"
+                , A.placeholder "🔍 Rechercher (espèce, problème, solution, date…)"
+                , A.value model.almanacSearch
+                , E.onInput SetAlmanacSearch
+                , A.style "flex" "1", A.style "padding" "6px 10px", A.style "font-size" "0.85rem"
+                ]
+                []
+            , span [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ]
+                [ text (String.fromInt total ++ " note(s) · " ++ String.fromInt resolvedCount ++ " résolue(s)") ]
+            ]
+        , if List.isEmpty notes then
+            p [ A.style "color" "#5a3a22", A.style "font-size" "0.85rem" ]
+                [ text
+                    (if q == "" then
+                        "Aucune observation pour l'instant."
+                     else
+                        "Rien ne correspond à « " ++ model.almanacSearch ++ " »."
+                    )
+                ]
+          else
+            div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "1rem" ]
+                (groupNotesBySpecies notes |> List.map (viewAlmanacGroup model))
+        ]
+
+
+-- Groupe les notes par espèce, dans l'ordre de première apparition
+-- (donc l'espèce avec la note la plus récente en premier).
+groupNotesBySpecies : List ActionEntry -> List ( String, List ActionEntry )
+groupNotesBySpecies notes =
+    let
+        keyOf a = a.speciesId |> Maybe.withDefault ""
+        keys =
+            List.foldl
+                (\a acc ->
+                    if List.member (keyOf a) acc then acc else acc ++ [ keyOf a ]
+                )
+                []
+                notes
+    in
+    keys |> List.map (\k -> ( k, List.filter (\a -> keyOf a == k) notes ))
+
+
+viewAlmanacGroup : Model -> ( String, List ActionEntry ) -> Html Msg
+viewAlmanacGroup model ( sid, notes ) =
+    let
+        title =
+            if sid == "" then
+                "📌 Général"
+            else
+                speciesEmoji sid ++ " " ++ speciesShortName sid
+    in
+    div []
+        [ h3 [ A.style "margin" "0 0 0.4rem 0", A.style "font-size" "1rem" ] [ text title ]
+        , div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.5rem" ]
+            (List.map (viewAlmanacEntry model) notes)
+        ]
+
+
+viewAlmanacEntry : Model -> ActionEntry -> Html Msg
+viewAlmanacEntry model a =
+    let
+        sol = a.solution |> Maybe.map String.trim |> Maybe.withDefault ""
+        resolved = sol /= ""
+        editing =
+            case model.solutionDraft of
+                Just ( nid, txt ) ->
+                    if nid == a.id then Just txt else Nothing
+
+                Nothing -> Nothing
+    in
+    div
+        [ A.style "padding" "0.5rem 0.7rem"
+        , A.style "background" (if resolved then "#eef5e0" else "#f5f0e0")
+        , A.style "border-left" ("3px solid " ++ (if resolved then "#4a9b3c" else "#d4a033"))
+        , A.style "border-radius" "4px"
+        ]
+        ([ div [ A.style "font-size" "0.74rem", A.style "color" "#5a3a22", A.style "font-weight" "600" ]
+            [ text (a.date ++ (if resolved then " · ✅ résolu" else "")) ]
+         , div [ A.style "font-size" "0.88rem", A.style "margin-top" "0.15rem" ]
+            [ text (a.notes |> Maybe.withDefault "") ]
+         ]
+            ++ (case editing of
+                    Just txt ->
+                        [ textarea
+                            [ A.value txt
+                            , E.onInput SetSolutionDraft
+                            , A.placeholder "Ex : ombrage + arrosage le soir, résolu en 1 semaine"
+                            , A.rows 2
+                            , A.style "width" "100%", A.style "margin-top" "0.35rem"
+                            , A.style "box-sizing" "border-box", A.style "font-size" "0.84rem"
+                            ]
+                            []
+                        , div [ A.style "margin-top" "0.3rem", A.style "display" "flex", A.style "gap" "0.4rem" ]
+                            [ button
+                                [ E.onClick (SaveSolution a.id)
+                                , A.style "padding" "4px 10px", A.style "background" "#4a9b3c"
+                                , A.style "color" "white", A.style "border" "none"
+                                , A.style "border-radius" "4px", A.style "cursor" "pointer"
+                                , A.style "font-size" "0.8rem"
+                                ]
+                                [ text "💾 Enregistrer" ]
+                            , button
+                                [ E.onClick CancelSolution
+                                , A.style "padding" "4px 10px", A.style "font-size" "0.8rem"
+                                ]
+                                [ text "Annuler" ]
+                            ]
+                        ]
+
+                    Nothing ->
+                        if resolved then
+                            [ div [ A.style "font-size" "0.84rem", A.style "margin-top" "0.3rem", A.style "color" "#3a6a1a" ]
+                                [ text ("💡 " ++ sol)
+                                , button
+                                    [ E.onClick (EditSolution a.id sol)
+                                    , A.style "margin-left" "0.5rem", A.style "font-size" "0.72rem"
+                                    , A.style "cursor" "pointer"
+                                    ]
+                                    [ text "✏ modifier" ]
+                                ]
+                            ]
+                        else
+                            [ div [ A.style "margin-top" "0.3rem" ]
+                                [ button
+                                    [ E.onClick (EditSolution a.id "")
+                                    , A.style "padding" "3px 9px", A.style "font-size" "0.78rem"
+                                    , A.style "background" "#fff6de", A.style "border" "1px solid #d4a033"
+                                    , A.style "border-radius" "4px", A.style "cursor" "pointer"
+                                    ]
+                                    [ text "💡 Ajouter la solution" ]
+                                ]
+                            ]
+               )
+        )
 
 
 -- Panneau "À faire aujourd'hui"
@@ -1608,8 +1985,10 @@ viewCoachTodo model cal =
                                 , indoor = openIndoor
                                 , direct = openDirect
                                 , daysLeft =
-                                    [ sl.indoorSowLocal, sl.directSowLocal ]
-                                        |> List.filterMap identity
+                                    [ ( openIndoor, sl.indoorSowLocal )
+                                    , ( openDirect, sl.directSowLocal )
+                                    ]
+                                        |> List.filterMap (\( open, mw ) -> if open then mw else Nothing)
                                         |> List.map (\w -> daysLeftInWindow doy w)
                                         |> List.minimum
                                         |> Maybe.withDefault 0
@@ -2478,11 +2857,67 @@ viewPlantContextMenu model =
                             , btn "traitement" "💊" "Traiter"
                             , btn "recolte" "🌾" "Récolter"
                             , btn "arrachage" "🗑" "Arracher"
-                            , btn "note" "📝" "Note"
                             ]
+                        , div [ A.style "margin-top" "0.6rem" ]
+                            [ div [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22", A.style "font-weight" "600" ]
+                                [ text "📝 Observation" ]
+                            , textarea
+                                [ A.value model.noteDraft
+                                , E.onInput SetNoteDraft
+                                , A.placeholder "Ex : romanesco file en fleur, pas grossi…"
+                                , A.rows 2
+                                , A.style "width" "100%", A.style "margin-top" "0.2rem"
+                                , A.style "box-sizing" "border-box", A.style "font-size" "0.82rem"
+                                ]
+                                []
+                            , button
+                                [ E.onClick (SaveObservation id)
+                                , A.style "margin-top" "0.3rem", A.style "padding" "6px 10px"
+                                , A.style "background" "#5a7a22", A.style "color" "white"
+                                , A.style "border" "none", A.style "border-radius" "4px"
+                                , A.style "cursor" "pointer", A.style "font-size" "0.85rem"
+                                ]
+                                [ text "💾 Enregistrer observation" ]
+                            ]
+                        , viewPastNotesForSpecies model sid
                         , div [ A.style "margin-top" "0.5rem" ]
                             [ button [ E.onClick ClosePlantMenu, A.style "font-size" "0.78rem" ] [ text "Fermer" ] ]
                         ]
+
+
+-- Rappel almanach : dernières observations sur cette espèce, avec solution.
+viewPastNotesForSpecies : Model -> String -> Html Msg
+viewPastNotesForSpecies model sid =
+    let
+        past =
+            observationNotes model
+                |> List.filter (\a -> a.speciesId == Just sid)
+                |> List.sortBy .date
+                |> List.reverse
+                |> List.take 3
+    in
+    if List.isEmpty past then
+        text ""
+    else
+        div [ A.style "margin-top" "0.6rem" ]
+            (div [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22", A.style "font-weight" "600" ]
+                [ text "📖 Déjà noté sur cette espèce" ]
+                :: List.map
+                    (\a ->
+                        div [ A.style "font-size" "0.78rem", A.style "margin-top" "0.25rem", A.style "padding-left" "0.4rem", A.style "border-left" "2px solid #d4a033" ]
+                            [ div [] [ text (a.date ++ " — " ++ (a.notes |> Maybe.withDefault "")) ]
+                            , case a.solution |> Maybe.map String.trim of
+                                Just sol ->
+                                    if sol == "" then
+                                        text ""
+                                    else
+                                        div [ A.style "color" "#3a6a1a" ] [ text ("💡 " ++ sol) ]
+
+                                Nothing -> text ""
+                            ]
+                    )
+                    past
+            )
 
 
 viewBulkPanel : Model -> Html Msg
@@ -2615,6 +3050,7 @@ viewShelter model =
             ]
             (shelterPatterns
                 ++ List.map (viewShelterPlant model) plants
+                ++ hoverLayer model plants hoverOverlayShelter
                 ++ dragGhost model Shelter
             )
         ]
@@ -2862,13 +3298,7 @@ viewShelterPlant : Model -> PlantOnTerrain -> Svg.Svg Msg
 viewShelterPlant model p =
     let
         emoji = stateEmoji p.state
-        size =
-            case p.state of
-                TileSown _ -> 22
-                TileGrowing _ pr -> 22 + round (pr * 10)
-                TileMature _ -> 32
-                _ -> 22
-        isHover = model.hoverPlant == Just p.id && model.dragging == Nothing
+        size = plantSize p.state
         isDragged = (model.dragging |> Maybe.map .id) == Just p.id
         isMoving = model.movingPlant == Just p.id || isDragged
         ready = p.progress >= 0.6
@@ -2895,8 +3325,30 @@ viewShelterPlant model p =
             []
          , plantGlyph True p.x p.y size (if emoji == "" then speciesEmoji p.speciesId else emoji)
          ]
-            ++ (if isHover then hoverOverlayShelter p size else [])
         )
+
+
+-- Taille d'affichage d'un plant selon son état.
+plantSize : TileState -> Int
+plantSize st =
+    case st of
+        TileSown _ -> 22
+        TileGrowing _ pr -> 22 + round (pr * 10)
+        TileMature _ -> 32
+        _ -> 22
+
+
+-- Overlay hover dessiné en couche haute (après tous les plants) pour ne
+-- jamais être masqué par un plant voisin dessiné plus tard dans le SVG.
+hoverLayer : Model -> List PlantOnTerrain -> (PlantOnTerrain -> Int -> List (Svg.Svg Msg)) -> List (Svg.Svg Msg)
+hoverLayer model plants overlay =
+    case ( model.hoverPlant, model.dragging ) of
+        ( Just hid, Nothing ) ->
+            plants
+                |> List.filter (\p -> p.id == hid)
+                |> List.concatMap (\p -> overlay p (plantSize p.state))
+
+        _ -> []
 
 
 -- Le glyph emoji 🌱 (U+1F331) se dessine avec un pot en terre cuite orange
@@ -3065,6 +3517,7 @@ viewTerrain model =
             ]
             (terrainPatterns
                 ++ List.map (viewPlantOnTerrain model) plants
+                ++ hoverLayer model plants hoverOverlayTerrain
                 ++ dragGhost model Terrain
                 ++ placementOverlay model
             )
@@ -3180,12 +3633,7 @@ viewPlantOnTerrain : Model -> PlantOnTerrain -> Svg.Svg Msg
 viewPlantOnTerrain model p =
     let
         emoji = stateEmoji p.state
-        size =
-            case p.state of
-                TileSown _ -> 22
-                TileGrowing _ pr -> 22 + round (pr * 10)
-                TileMature _ -> 32
-                _ -> 22
+        size = plantSize p.state
         isHover = model.hoverPlant == Just p.id && model.dragging == Nothing
         isDragged = (model.dragging |> Maybe.map .id) == Just p.id
         isMoving = model.movingPlant == Just p.id || isDragged
@@ -3257,7 +3705,6 @@ viewPlantOnTerrain model p =
             []
          , plantGlyph True p.x p.y size (if emoji == "" then speciesEmoji p.speciesId else emoji)
          ]
-            ++ (if isHover then hoverOverlayTerrain p size else [])
         )
 
 

@@ -3,7 +3,7 @@
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    routing::{get, put},
+    routing::{get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -61,6 +61,7 @@ pub fn router() -> Router {
         .route("/parcels", get(get_parcels).post(create_parcel))
         .route("/parcels/{id}", put(put_parcel).delete(del_parcel))
         .route("/actions", get(get_actions).post(create_action).delete(del_all_actions))
+        .route("/actions/bulk", post(create_actions_bulk))
         .route("/actions/{id}", put(put_action).delete(del_action))
         .with_state(state)
         .layer(CorsLayer::permissive())
@@ -237,6 +238,15 @@ async fn create_action(
     journal::insert_action(&s.db, &input)
         .map(|a| (StatusCode::CREATED, Json(a)))
         .map_err(|e| (StatusCode::BAD_REQUEST, e))
+}
+
+async fn create_actions_bulk(
+    State(s): State<AppState>,
+    Json(inputs): Json<Vec<ActionInput>>,
+) -> Result<(StatusCode, Json<Vec<Action>>), (StatusCode, String)> {
+    let results = journal::insert_actions_bulk(&s.db, &inputs)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    Ok((StatusCode::CREATED, Json(results)))
 }
 
 async fn put_action(

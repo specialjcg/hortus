@@ -69,6 +69,7 @@ pub fn run_additive_migrations(conn: &rusqlite::Connection) -> Result<(), String
         "ALTER TABLE parcel ADD COLUMN color TEXT NOT NULL DEFAULT '#8fbc4a'",
         "ALTER TABLE action ADD COLUMN grid_x INTEGER",
         "ALTER TABLE action ADD COLUMN grid_y INTEGER",
+        "ALTER TABLE action ADD COLUMN solution TEXT",
     ];
     for sql in &adds {
         if let Err(e) = conn.execute(sql, []) {

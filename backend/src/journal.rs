@@ -49,6 +49,7 @@ pub struct Action {
     pub notes: Option<String>,
     pub grid_x: Option<i64>,
     pub grid_y: Option<i64>,
+    pub solution: Option<String>,
     pub created_at: String,
 }
 
@@ -62,6 +63,8 @@ pub struct ActionInput {
     pub notes: Option<String>,
     pub grid_x: Option<i64>,
     pub grid_y: Option<i64>,
+    #[serde(default)]
+    pub solution: Option<String>,
 }
 
 /// Types d'action acceptés.
@@ -216,7 +219,7 @@ pub struct ActionFilter {
 pub fn list_actions(db: &Db, f: &ActionFilter) -> Result<Vec<Action>, String> {
     let conn = db.lock().expect("DB mutex poisoned");
     let mut sql = String::from(
-        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, created_at FROM action WHERE 1=1",
+        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, created_at FROM action WHERE 1=1",
     );
     let mut args: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
     if let Some(p) = f.parcel_id {
@@ -257,7 +260,8 @@ pub fn list_actions(db: &Db, f: &ActionFilter) -> Result<Vec<Action>, String> {
                 notes: r.get(6)?,
                 grid_x: r.get(7)?,
                 grid_y: r.get(8)?,
-                created_at: r.get(9)?,
+                solution: r.get(9)?,
+                created_at: r.get(10)?,
             })
         })
         .map_err(|e| format!("query : {e}"))?;
@@ -271,13 +275,13 @@ pub fn insert_action(db: &Db, input: &ActionInput) -> Result<Action, String> {
     }
     let conn = db.lock().expect("DB mutex poisoned");
     conn.execute(
-        "INSERT INTO action (date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        params![input.date, input.parcel_id, input.species_id, input.kind, input.quantity_g, input.notes, input.grid_x, input.grid_y],
+        "INSERT INTO action (date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        params![input.date, input.parcel_id, input.species_id, input.kind, input.quantity_g, input.notes, input.grid_x, input.grid_y, input.solution],
     )
     .map_err(|e| format!("insert : {e}"))?;
     let id = conn.last_insert_rowid();
     conn.query_row(
-        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, created_at FROM action WHERE id = ?",
+        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, created_at FROM action WHERE id = ?",
         params![id],
         |r| {
             Ok(Action {
@@ -290,11 +294,55 @@ pub fn insert_action(db: &Db, input: &ActionInput) -> Result<Action, String> {
                 notes: r.get(6)?,
                 grid_x: r.get(7)?,
                 grid_y: r.get(8)?,
-                created_at: r.get(9)?,
+                solution: r.get(9)?,
+                created_at: r.get(10)?,
             })
         },
     )
     .map_err(|e| format!("fetch : {e}"))
+}
+
+pub fn insert_actions_bulk(db: &Db, inputs: &[ActionInput]) -> Result<Vec<Action>, String> {
+    for input in inputs {
+        if !ACTION_KINDS.contains(&input.kind.as_str()) {
+            return Err(format!("type d'action invalide : {}", input.kind));
+        }
+    }
+    let mut conn = db.lock().expect("DB mutex poisoned");
+    let tx = conn.transaction().map_err(|e| format!("tx : {e}"))?;
+    let mut results = Vec::with_capacity(inputs.len());
+    for input in inputs {
+        tx.execute(
+            "INSERT INTO action (date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![input.date, input.parcel_id, input.species_id, input.kind, input.quantity_g, input.notes, input.grid_x, input.grid_y, input.solution],
+        )
+        .map_err(|e| format!("insert : {e}"))?;
+        let id = tx.last_insert_rowid();
+        let action = tx
+            .query_row(
+                "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, created_at FROM action WHERE id = ?",
+                params![id],
+                |r| {
+                    Ok(Action {
+                        id: r.get(0)?,
+                        date: r.get(1)?,
+                        parcel_id: r.get(2)?,
+                        species_id: r.get(3)?,
+                        kind: r.get(4)?,
+                        quantity_g: r.get(5)?,
+                        notes: r.get(6)?,
+                        grid_x: r.get(7)?,
+                        grid_y: r.get(8)?,
+                        solution: r.get(9)?,
+                        created_at: r.get(10)?,
+                    })
+                },
+            )
+            .map_err(|e| format!("fetch : {e}"))?;
+        results.push(action);
+    }
+    tx.commit().map_err(|e| format!("commit : {e}"))?;
+    Ok(results)
 }
 
 pub fn update_action(db: &Db, id: i64, input: &ActionInput) -> Result<Action, String> {
@@ -304,15 +352,15 @@ pub fn update_action(db: &Db, id: i64, input: &ActionInput) -> Result<Action, St
     let conn = db.lock().expect("DB mutex poisoned");
     let n = conn
         .execute(
-            "UPDATE action SET date = ?, parcel_id = ?, species_id = ?, kind = ?, quantity_g = ?, notes = ?, grid_x = ?, grid_y = ? WHERE id = ?",
-            params![input.date, input.parcel_id, input.species_id, input.kind, input.quantity_g, input.notes, input.grid_x, input.grid_y, id],
+            "UPDATE action SET date = ?, parcel_id = ?, species_id = ?, kind = ?, quantity_g = ?, notes = ?, grid_x = ?, grid_y = ?, solution = COALESCE(?, solution) WHERE id = ?",
+            params![input.date, input.parcel_id, input.species_id, input.kind, input.quantity_g, input.notes, input.grid_x, input.grid_y, input.solution, id],
         )
         .map_err(|e| format!("update : {e}"))?;
     if n == 0 {
         return Err("action inconnue".into());
     }
     conn.query_row(
-        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, created_at FROM action WHERE id = ?",
+        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, created_at FROM action WHERE id = ?",
         params![id],
         |r| {
             Ok(Action {
@@ -325,7 +373,8 @@ pub fn update_action(db: &Db, id: i64, input: &ActionInput) -> Result<Action, St
                 notes: r.get(6)?,
                 grid_x: r.get(7)?,
                 grid_y: r.get(8)?,
-                created_at: r.get(9)?,
+                solution: r.get(9)?,
+                created_at: r.get(10)?,
             })
         },
     )
@@ -392,6 +441,7 @@ mod tests {
                 notes TEXT,
                 grid_x INTEGER,
                 grid_y INTEGER,
+                solution TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (parcel_id) REFERENCES parcel(id) ON DELETE SET NULL
             );
@@ -411,6 +461,7 @@ mod tests {
             notes: None,
             grid_x: x,
             grid_y: y,
+            solution: None,
         }
     }
 
