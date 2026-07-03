@@ -1,64 +1,124 @@
-/* Palette terre + verdure inspirée potager */
+/* ==========================================================================
+   Hortus — almanach botanique contemporain
+   Papier clair, encre végétale, vert mousse dominant, terracotta en accent.
+   Display : Fraunces (serif à empattements doux, italiques expressives)
+   Texte   : Hanken Grotesk (humaniste, chaleureuse)
+   Données : IBM Plex Mono (dates, mesures)
+   ========================================================================== */
+
 :root {
+    /* Surfaces */
+    --paper: #f4efe3;
+    --card: #fdfbf4;
+    --card-warm: #f8f2df;
+    --line: rgba(61, 52, 31, 0.14);
+    --line-strong: rgba(61, 52, 31, 0.28);
+
+    /* Encres */
+    --ink: #262215;
+    --ink-soft: #5a4c33;
+    --ink-faint: #8a7a5c;
+
+    /* Végétal */
+    --moss: #3e6b21;
+    --moss-bright: #679d3a;
+    --moss-pale: #e6efd8;
+
+    /* Accents */
+    --terracotta: #c05a33;
+    --terracotta-pale: #f7e3d7;
+    --gold: #d9a63d;
+    --gold-pale: #f6ecd2;
+    --sky: #5f8fb4;
+
+    /* Compat ancienne palette (styles inline Elm y font référence par valeur,
+       ces variables restent pour les règles ci-dessous) */
     --soil-dark: #3d2818;
     --soil: #5a3a22;
     --soil-light: #8b6e3d;
-    --green-dark: #3a5d2b;
-    --green: #6b9c47;
+    --green-dark: #3e6b21;
+    --green: #679d3a;
     --green-bright: #9bc55c;
     --leaf-yellow: #d4b85a;
-    --paper: #f5ecd6;
-    --paper-warm: #ede1bf;
-    --ink: #2a1f12;
-    --rust: #b85c1f;
-    --water-blue: #6695c4;
+    --paper-warm: var(--card-warm);
+    --rust: #c05a33;
+    --water-blue: #5f8fb4;
+
+    --shadow-card: 0 1px 2px rgba(48, 38, 16, 0.05), 0 4px 16px rgba(48, 38, 16, 0.06);
+    --shadow-lift: 0 2px 4px rgba(48, 38, 16, 0.08), 0 8px 24px rgba(48, 38, 16, 0.10);
+    --radius: 12px;
+
+    --font-display: "Fraunces", "EB Garamond", Georgia, serif;
+    --font-body: "Hanken Grotesk", "Inter", -apple-system, sans-serif;
+    --font-mono: "IBM Plex Mono", "Courier New", monospace;
 }
 
 * { box-sizing: border-box; }
 
-/* Empêche la sélection texte (highlight orange/bleu navigateur) pendant
-   un drag-and-drop sur le terrain ou l'abri. Les inputs/textarea gardent
-   la sélection normale via override plus bas. */
+/* Empêche la sélection texte (highlight navigateur) pendant un drag-and-drop
+   sur le terrain ou l'abri. Les inputs/textarea gardent la sélection normale. */
 .panel, .panel h2, .panel h3, .panel p, svg { user-select: none; -webkit-user-select: none; }
 input, textarea, select { user-select: text; -webkit-user-select: text; }
 
-/* Force le rendu couleur des emojis sur tous les OS (Linux notamment, où Inter+sans
-   n'inclut pas Noto Color Emoji par défaut → glyph fallback en bloc monochrome). */
+/* Force le rendu couleur des emojis (Linux : fallback monochrome sinon). */
 svg text { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif; }
+
+html { scrollbar-color: var(--line-strong) transparent; }
 
 body {
     margin: 0;
     padding: 0;
-    font-family: "Inter", -apple-system, sans-serif;
-    background: var(--paper);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
     color: var(--ink);
     min-height: 100vh;
+    background-color: var(--paper);
+    /* Atmosphère : halo de lumière en haut + trame de semis diagonale très légère */
     background-image:
+        radial-gradient(1200px 500px at 50% -100px, rgba(155, 197, 92, 0.16), transparent 70%),
+        radial-gradient(900px 400px at 90% 10%, rgba(217, 166, 61, 0.07), transparent 70%),
         repeating-linear-gradient(
             45deg,
             transparent 0,
-            transparent 24px,
-            rgba(58, 93, 43, 0.02) 24px,
-            rgba(58, 93, 43, 0.02) 25px
+            transparent 28px,
+            rgba(62, 107, 33, 0.025) 28px,
+            rgba(62, 107, 33, 0.025) 29px
         );
+    background-attachment: fixed;
 }
 
 .app {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 1.5rem;
+    padding: 1.5rem 1.5rem 4rem;
 }
+
+/* --------------------------------------------------------------------------
+   Typographie
+   -------------------------------------------------------------------------- */
 
 h1, h2, h3 {
-    font-family: "EB Garamond", Georgia, serif;
-    color: var(--soil-dark);
-    font-weight: 600;
+    font-family: var(--font-display);
+    color: var(--ink);
     margin-top: 0;
+    letter-spacing: 0.005em;
 }
 
-h1 { font-size: 1.8rem; letter-spacing: 0.02em; }
-h2 { font-size: 1.1rem; margin-bottom: 0.4rem; }
-h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
+h1 {
+    font-size: 2rem;
+    font-weight: 900;
+    font-style: italic;
+    color: var(--moss);
+    letter-spacing: -0.01em;
+}
+
+h2 { font-size: 1.2rem; font-weight: 650; margin-bottom: 0.5rem; }
+h3 { font-size: 1rem;  font-weight: 650; margin-bottom: 0.35rem; }
+
+/* --------------------------------------------------------------------------
+   Structure
+   -------------------------------------------------------------------------- */
 
 .header {
     display: flex;
@@ -66,18 +126,18 @@ h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
     align-items: center;
     flex-wrap: wrap;
     gap: 1rem;
-    border-bottom: 2px solid var(--soil-light);
-    padding-bottom: 0.8rem;
-    margin-bottom: 1.2rem;
+    border-bottom: 1px solid var(--line-strong);
+    padding-bottom: 0.9rem;
+    margin-bottom: 1.3rem;
 }
 
 .header .meta {
     display: flex;
     gap: 1.5rem;
     font-size: 0.85rem;
-    color: var(--soil);
+    color: var(--ink-soft);
 }
-.header .meta strong { color: var(--soil-dark); }
+.header .meta strong { color: var(--ink); }
 
 .layout {
     display: grid;
@@ -90,12 +150,35 @@ h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
 }
 
 .panel {
-    background: var(--paper-warm);
-    border: 1px solid rgba(90, 58, 34, 0.2);
-    border-radius: 6px;
-    padding: 1rem 1.2rem;
-    margin-bottom: 1rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.3rem;
+    margin-bottom: 1.1rem;
+    box-shadow: var(--shadow-card);
+    animation: panel-in 0.35s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
+
+/* Entrée en cascade discrète des cartes au chargement */
+.panel:nth-child(1) { animation-delay: 0.02s; }
+.panel:nth-child(2) { animation-delay: 0.06s; }
+.panel:nth-child(3) { animation-delay: 0.10s; }
+.panel:nth-child(4) { animation-delay: 0.14s; }
+.panel:nth-child(5) { animation-delay: 0.18s; }
+
+@keyframes panel-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panel { animation: none; }
+    * { transition-duration: 0.01ms !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Contrôles
+   -------------------------------------------------------------------------- */
 
 .controls {
     display: flex;
@@ -105,21 +188,74 @@ h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
 }
 
 button {
-    background: var(--soil);
-    color: var(--paper);
-    border: 1px solid var(--soil-dark);
-    border-radius: 4px;
-    padding: 6px 12px;
+    background: var(--card-warm);
+    color: var(--ink-soft);
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    padding: 6px 14px;
     font-family: inherit;
     font-size: 0.85rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background 0.15s, color 0.15s, transform 0.12s, box-shadow 0.15s, border-color 0.15s;
 }
-button:hover:not(:disabled) { background: var(--soil-dark); }
+button:hover:not(:disabled) {
+    background: var(--moss-pale);
+    color: var(--moss);
+    border-color: var(--moss-bright);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(62, 107, 33, 0.15);
+}
+button:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
+button:focus-visible { outline: 2px solid var(--moss-bright); outline-offset: 2px; }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
-button.primary { background: var(--green-dark); border-color: var(--green-dark); }
-button.primary:hover:not(:disabled) { background: var(--green); }
-button.danger { background: var(--rust); border-color: var(--rust); }
+
+button.primary {
+    background: linear-gradient(180deg, var(--moss-bright), var(--moss));
+    border-color: var(--moss);
+    color: #fdfbf4;
+    box-shadow: 0 1px 3px rgba(62, 107, 33, 0.35);
+}
+button.primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #74ad45, #47791f);
+    color: #ffffff;
+    border-color: var(--moss);
+}
+
+button.danger {
+    background: var(--terracotta);
+    border-color: var(--terracotta);
+    color: #fdf6ef;
+}
+button.danger:hover:not(:disabled) {
+    background: #a84a27;
+    color: #ffffff;
+    border-color: #a84a27;
+}
+
+input, select, textarea {
+    font-family: inherit;
+    font-size: 0.88rem;
+    color: var(--ink);
+    background: #fffef9;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    padding: 6px 10px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--moss-bright);
+    box-shadow: 0 0 0 3px rgba(103, 157, 58, 0.18);
+}
+textarea { resize: vertical; line-height: 1.45; }
+
+/* Dates et valeurs chiffrées en mono là où l'app les classe */
+.event .date, .stats-grid .value { font-family: var(--font-mono); }
+
+/* --------------------------------------------------------------------------
+   Listes espèces / stats (vue calendrier)
+   -------------------------------------------------------------------------- */
 
 .species-grid {
     display: grid;
@@ -130,20 +266,25 @@ button.danger { background: var(--rust); border-color: var(--rust); }
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.4rem 0.6rem;
-    border-radius: 4px;
+    padding: 0.45rem 0.7rem;
+    border-radius: 8px;
     border: 1px solid transparent;
     cursor: pointer;
-    background: rgba(255,255,255,0.4);
+    background: rgba(255, 255, 255, 0.55);
     font-size: 0.85rem;
+    transition: background 0.12s, border-color 0.12s, transform 0.12s;
 }
-.species-row:hover { background: rgba(255,255,255,0.7); }
+.species-row:hover {
+    background: #ffffff;
+    border-color: var(--line);
+    transform: translateX(2px);
+}
 .species-row.selected {
-    background: var(--green-bright);
-    border-color: var(--green-dark);
-    font-weight: 500;
+    background: var(--moss-pale);
+    border-color: var(--moss-bright);
+    font-weight: 600;
 }
-.species-row .latin { font-style: italic; opacity: 0.6; font-size: 0.8em; margin-left: 0.5em; }
+.species-row .latin { font-style: italic; opacity: 0.55; font-size: 0.8em; margin-left: 0.5em; }
 
 .stats-grid {
     display: grid;
@@ -151,7 +292,7 @@ button.danger { background: var(--rust); border-color: var(--rust); }
     gap: 0.4rem 1rem;
     font-size: 0.85rem;
 }
-.stats-grid .label { color: var(--soil); }
+.stats-grid .label { color: var(--ink-soft); }
 .stats-grid .value { font-weight: 600; text-align: right; }
 
 .pantry-list {
@@ -164,65 +305,81 @@ button.danger { background: var(--rust); border-color: var(--rust); }
     display: flex;
     justify-content: space-between;
     padding: 0.2rem 0;
-    border-bottom: 1px dotted rgba(90,58,34,0.2);
+    border-bottom: 1px dotted var(--line);
 }
 
 .events-list {
     max-height: 220px;
     overflow-y: auto;
     font-size: 0.78rem;
-    font-family: "Courier New", monospace;
-    line-height: 1.4;
+    font-family: var(--font-mono);
+    line-height: 1.5;
 }
 .event {
     padding: 0.15rem 0;
-    border-bottom: 1px dotted rgba(90,58,34,0.15);
+    border-bottom: 1px dotted var(--line);
 }
-.event .date { color: var(--soil); margin-right: 0.4rem; }
-.event.harvested { color: var(--green-dark); }
-.event.deficit { color: var(--rust); }
-.event.frost { color: var(--water-blue); font-weight: 600; }
+.event .date { color: var(--ink-faint); margin-right: 0.4rem; }
+.event.harvested { color: var(--moss); }
+.event.deficit { color: var(--terracotta); }
+.event.frost { color: var(--sky); font-weight: 600; }
 
 .weather-row {
     display: flex;
     gap: 1rem;
     font-size: 0.85rem;
     align-items: center;
-    color: var(--soil-dark);
+    color: var(--ink);
 }
-.weather-icon {
-    font-size: 1.4rem;
-    line-height: 1;
-}
+.weather-icon { font-size: 1.4rem; line-height: 1; }
+
+/* --------------------------------------------------------------------------
+   États
+   -------------------------------------------------------------------------- */
 
 .error {
-    background: #fde0d0;
-    color: #7a2a0a;
+    background: var(--terracotta-pale);
+    color: #6e2a10;
     padding: 0.6rem 1rem;
-    border-left: 4px solid var(--rust);
-    border-radius: 3px;
+    border-left: 4px solid var(--terracotta);
+    border-radius: 6px;
     font-size: 0.85rem;
     margin-bottom: 1rem;
 }
 
 .cell-info {
     font-size: 0.8rem;
-    background: rgba(255,255,255,0.5);
+    background: rgba(255, 255, 255, 0.6);
     padding: 0.5rem 0.7rem;
-    border-radius: 4px;
+    border-radius: 8px;
     margin-top: 0.5rem;
 }
 .cell-info dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.6rem; }
-.cell-info dt { color: var(--soil); }
+.cell-info dt { color: var(--ink-soft); }
 .cell-info dd { margin: 0; font-weight: 500; }
 
 .day-bar {
     display: flex;
     height: 16px;
     margin-top: 0.5rem;
-    border-radius: 3px;
+    border-radius: 4px;
     overflow: hidden;
-    border: 1px solid rgba(90,58,34,0.3);
+    border: 1px solid var(--line-strong);
 }
-.day-bar .ok { background: var(--green); }
-.day-bar .deficit { background: var(--rust); }
+.day-bar .ok { background: var(--moss-bright); }
+.day-bar .deficit { background: var(--terracotta); }
+
+/* --------------------------------------------------------------------------
+   Détails
+   -------------------------------------------------------------------------- */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border-radius: 6px;
+    border: 2px solid var(--paper);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
+
+::selection { background: var(--moss-pale); color: var(--ink); }
