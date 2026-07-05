@@ -210,7 +210,7 @@ server {
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript image/svg+xml;
 
     # ── Routes API → backend Rust ──
-    location ~ ^/(health|species|cities|calendar|forecast|historical-year|action-kinds|parcels|actions)(/|$) {
+    location ~ ^/(health|species|cities|calendar|forecast|historical-year|action-kinds|parcels|actions|problems)(/|$) {
         limit_req zone=hortus_api burst=40 nodelay;
         limit_req_status 429;
 

@@ -2659,7 +2659,9 @@ viewCoachTodo model cal =
             terrainPlants
                 |> List.filter
                     (\pl ->
-                        not (hasPaillage pl) && daysSinceSeed model pl > 14
+                        case pl.state of
+                            TileHarvested _ -> False
+                            _ -> not (hasPaillage pl) && daysSinceSeed model pl > 14
                     )
     in
     div [ A.class "panel" ]
@@ -4234,6 +4236,20 @@ type alias PlantOnTerrain =
     }
 
 
+-- Une action `kind` a-t-elle été enregistrée sur ce plant (mêmes coords)
+-- depuis son semis ? Dates ISO : comparaison lexicographique valide.
+plantEventSince : Model -> String -> String -> Int -> Int -> Bool
+plantEventSince model kind sinceDate x y =
+    model.actions
+        |> List.any
+            (\a ->
+                a.kind == kind
+                    && a.gridX == Just x
+                    && a.gridY == Just y
+                    && a.date >= sinceDate
+            )
+
+
 plantsFromActions : Model -> List PlantOnTerrain
 plantsFromActions model =
     let
@@ -4245,7 +4261,11 @@ plantsFromActions model =
             (\a ->
                 case ( a.speciesId, a.gridX, a.gridY ) of
                     ( Just sid, Just x, Just y ) ->
-                        if List.member a.kind [ "semis_direct", "repiquage" ] then
+                        if
+                            List.member a.kind [ "semis_direct", "repiquage" ]
+                                -- plant arraché → disparaît du terrain
+                                && not (plantEventSince model "arrachage" a.date x y)
+                        then
                             let
                                 days = daysSince a.date
                                 cycle =
@@ -4259,7 +4279,11 @@ plantsFromActions model =
                                         Nothing -> 90
                                 progress = clamp 0 1 (toFloat days / toFloat (max 1 cycle))
                                 state =
-                                    if progress < 0.05 then TileSown sid
+                                    -- récolte enregistrée → plant marqué récolté,
+                                    -- sort des suggestions « à récolter »
+                                    if plantEventSince model "recolte" a.date x y then
+                                        TileHarvested sid
+                                    else if progress < 0.05 then TileSown sid
                                     else if progress < 0.95 then TileGrowing sid progress
                                     else TileMature sid
                             in
