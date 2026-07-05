@@ -1,0 +1,118 @@
+name: Deploy to VPS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.claude/**'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Backend release binary ---
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: Build release binary
+        working-directory: backend
+        run: cargo build --release --bin hortus-backend
+
+      # --- Frontend (elm) → package/static ---
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          ./node_modules/.bin/elm make src/Main.elm --optimize --output=static/elm.js
+          mkdir -p ../package/static
+          cp static/elm.js static/style.css ../package/static/
+          # backendUrl relatif (nginx proxifie l'API sur le même domaine)
+          # + cache-bust par commit pour elm.js et style.css.
+          sed -e 's|backendUrl: *"http://localhost:[0-9]*"|backendUrl: ""|g' \
+              -e "s|elm\\.js\"|elm.js?v=${GITHUB_SHA}\"|g" \
+              -e "s|style\\.css\"|style.css?v=${GITHUB_SHA}\"|g" \
+              static/index.html > ../package/static/index.html
+
+      - name: Package species.json
+        run: |
+          mkdir -p package/data
+          cp backend/data/species.json package/data/
+
+      # --- Deploy to VPS ---
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+          ssh-keyscan -p 9999 VPS-779132.ssh.vps1euro.fr >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy
+        run: |
+          HOST="root@VPS-779132.ssh.vps1euro.fr"
+          OPTS="-o Port=9999 -i ~/.ssh/id_deploy -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=3"
+
+          # Retry : le SSH d'entrée (port 9999) coupe par intermittence ;
+          # on rejoue la même commande sans re-builder.
+          retry() {
+            local n=0 max=8 delay=8
+            until "$@"; do
+              n=$((n+1))
+              if [ "$n" -ge "$max" ]; then echo "::error::échec après $max essais: $*"; return 1; fi
+              echo "::warning::essai $n/$max échoué, retry dans ${delay}s..."
+              sleep "$delay"
+            done
+          }
+
+          # 1. Binaire en staging (.new) — service encore up, évite "text file busy".
+          retry scp $OPTS backend/target/release/hortus-backend "$HOST:/opt/hortus/hortus-backend.new"
+          # 2. Statique + catalogue espèces.
+          retry scp $OPTS -r package/static "$HOST:/opt/hortus/static.new"
+          retry scp $OPTS package/data/species.json "$HOST:/opt/hortus/species.json.new"
+
+          # 3. Finalisation en une connexion. La DB SQLite (/opt/hortus/data/
+          #    hortus.db) n'est jamais touchée, sauvegarde .bak avant restart.
+          REMOTE=$(cat <<'FINALIZE'
+          set -e
+          systemctl stop hortus || true
+          [ -f /opt/hortus/data/hortus.db ] && cp -f /opt/hortus/data/hortus.db /opt/hortus/data/hortus.db.bak || true
+          mv -f /opt/hortus/hortus-backend.new /opt/hortus/hortus-backend
+          rm -rf /opt/hortus/static
+          mv /opt/hortus/static.new /opt/hortus/static
+          mv -f /opt/hortus/species.json.new /opt/hortus/data/species.json
+          chmod 750 /opt/hortus/hortus-backend
+          chown -R hortus:hortus /opt/hortus
+          chmod 755 /opt/hortus /opt/hortus/static
+          find /opt/hortus/static -type f -exec chmod 644 {} \;
+          chmod -R o+rX /opt/hortus/static
+          chmod o+x /opt/hortus
+          systemctl start hortus
+          sleep 2
+          systemctl is-active hortus
+          echo "=== SERVICE ===" && systemctl status hortus --no-pager | head -6
+          FINALIZE
+          )
+          retry ssh $OPTS "$HOST" "$REMOTE"
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_deploy
+
+      - name: Smoke test
+        run: |
+          sleep 3
+          curl -sf https://hortus.eigenplay.com/health
+          curl -sf -o /dev/null https://hortus.eigenplay.com/
+          echo "Site OK"
