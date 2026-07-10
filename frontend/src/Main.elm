@@ -955,7 +955,14 @@ update msg model =
         SelectSpeciesRow id ->
             ( { model | selectedSpecies = if model.selectedSpecies == Just id then Nothing else Just id }, Cmd.none )
 
-        SetViewMode vm -> ( { model | viewMode = vm }, Cmd.none )
+        SetViewMode vm ->
+            ( { model | viewMode = vm }
+            , if vm == AlmanacView then
+                -- la liste peut avoir changé depuis le chargement (autre onglet, autre appareil)
+                Cmd.batch [ fetchProblems model.backendUrl, fetchActions model.backendUrl ]
+              else
+                Cmd.none
+            )
 
         GotParcels (Ok ps) -> ( { model | parcels = ps }, Cmd.none )
         GotParcels (Err e) -> ( { model | error = Just (httpErr e) }, Cmd.none )
