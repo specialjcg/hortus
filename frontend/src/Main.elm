@@ -4270,8 +4270,9 @@ plantsFromActions model =
                     ( Just sid, Just x, Just y ) ->
                         if
                             List.member a.kind [ "semis_direct", "repiquage" ]
-                                -- plant arraché → disparaît du terrain
+                                -- plant arraché ou récolté → disparaît du terrain
                                 && not (plantEventSince model "arrachage" a.date x y)
+                                && not (plantEventSince model "recolte" a.date x y)
                         then
                             let
                                 days = daysSince a.date
@@ -4286,11 +4287,7 @@ plantsFromActions model =
                                         Nothing -> 90
                                 progress = clamp 0 1 (toFloat days / toFloat (max 1 cycle))
                                 state =
-                                    -- récolte enregistrée → plant marqué récolté,
-                                    -- sort des suggestions « à récolter »
-                                    if plantEventSince model "recolte" a.date x y then
-                                        TileHarvested sid
-                                    else if progress < 0.05 then TileSown sid
+                                    if progress < 0.05 then TileSown sid
                                     else if progress < 0.95 then TileGrowing sid progress
                                     else TileMature sid
                             in
