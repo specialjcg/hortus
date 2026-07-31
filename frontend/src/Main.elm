@@ -182,6 +182,7 @@ type alias Species =
     , notes : List String
     , friends : List String
     , foes : List String
+    , multiHarvest : Bool
     }
 
 
@@ -1649,6 +1650,12 @@ findSpecies sid model =
         Nothing -> Nothing
 
 
+-- Récolte échelonnée (tomate, courgette…) : une récolte ne retire pas le plant.
+isMultiHarvest : Model -> String -> Bool
+isMultiHarvest model sid =
+    findSpecies sid model |> Maybe.map .multiHarvest |> Maybe.withDefault False
+
+
 distanceTo : Int -> Int -> PlantOnTerrain -> Int
 distanceTo px py pl =
     let
@@ -1800,6 +1807,7 @@ speciesDecoder =
         |> andMap (D.field "notes" (D.list D.string))
         |> andMap (D.field "friends" (D.list D.string))
         |> andMap (D.field "foes" (D.list D.string))
+        |> andMap (D.oneOf [ D.field "multi_harvest" D.bool, D.succeed False ])
 
 
 andMap : Decoder a -> Decoder (a -> b) -> Decoder b
@@ -2680,7 +2688,7 @@ viewCoachTodo model cal =
         , if not (List.isEmpty harvestSuggestions) then
             div [ A.style "margin-bottom" "0.6rem" ]
                 [ h3 [] [ text "🌾 À récolter" ]
-                , div [] (List.map viewHarvestSuggestion harvestSuggestions)
+                , div [] (List.map (viewHarvestSuggestion model) harvestSuggestions)
                 ]
           else text ""
         , if not (List.isEmpty waterSuggestions) then
@@ -2752,8 +2760,11 @@ viewMaintenanceSuggestion kind icon pl =
         ]
 
 
-viewHarvestSuggestion : ( PlantOnTerrain, String ) -> Html Msg
-viewHarvestSuggestion ( pl, sp ) =
+viewHarvestSuggestion : Model -> ( PlantOnTerrain, String ) -> Html Msg
+viewHarvestSuggestion model ( pl, sp ) =
+    let
+        multi = isMultiHarvest model sp
+    in
     div
         [ A.class "pantry-row"
         , A.style "padding" "0.4rem 0"
@@ -2763,6 +2774,10 @@ viewHarvestSuggestion ( pl, sp ) =
             [ text (speciesEmoji sp ++ " ")
             , Html.strong [] [ text (speciesShortName sp) ]
             , text (" (" ++ String.fromInt pl.x ++ "," ++ String.fromInt pl.y ++ ")")
+            , if multi then
+                span [ A.style "font-size" "0.72rem", A.style "color" "#8a7040" ]
+                    [ text " · en récolte, cueille ce qui est mûr" ]
+              else text ""
             ]
         , button
             [ E.onClick (QuickAction pl.id "recolte")
@@ -2770,7 +2785,7 @@ viewHarvestSuggestion ( pl, sp ) =
             , A.style "background" "#d4a033", A.style "color" "white"
             , A.style "border" "none", A.style "border-radius" "3px", A.style "cursor" "pointer"
             ]
-            [ text "🌾 récolter" ]
+            [ text (if multi then "🌾 noter une récolte" else "🌾 récolter") ]
         ]
 
 
@@ -4270,9 +4285,12 @@ plantsFromActions model =
                     ( Just sid, Just x, Just y ) ->
                         if
                             List.member a.kind [ "semis_direct", "repiquage" ]
-                                -- plant arraché ou récolté → disparaît du terrain
+                                -- arrachage → disparaît toujours ; récolte ne retire
+                                -- que les espèces à récolte unique (carotte, laitue…)
                                 && not (plantEventSince model "arrachage" a.date x y)
-                                && not (plantEventSince model "recolte" a.date x y)
+                                && (isMultiHarvest model sid
+                                        || not (plantEventSince model "recolte" a.date x y)
+                                   )
                         then
                             let
                                 days = daysSince a.date

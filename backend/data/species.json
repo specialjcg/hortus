@@ -14,6 +14,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 60,
     "days_to_harvest": 80,
+    "multi_harvest": true,
     "notes": [
       "Exposition plein soleil, au moins 6h/jour.",
       "Pincer les gourmands des variétés indéterminées.",
@@ -39,6 +40,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 50,
     "days_to_harvest": 70,
+    "multi_harvest": true,
     "notes": [
       "Plus facile que la tomate classique, moins sensible aux maladies.",
       "Parfaite en pot sur balcon.",
@@ -62,6 +64,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 50,
     "days_to_harvest": 90,
+    "multi_harvest": true,
     "notes": [
       "Germination lente, chauffer le terreau (22-25°C).",
       "Craint le gel absolument. Sortir après mi-mai.",
@@ -85,6 +88,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 60,
     "days_to_harvest": 100,
+    "multi_harvest": true,
     "notes": [
       "La plus exigeante en chaleur des solanacées.",
       "Tuteurer — plant cassant.",
@@ -109,6 +113,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 100,
     "days_to_harvest": 60,
+    "multi_harvest": true,
     "notes": [
       "Très productive — 2-3 plants suffisent pour un foyer.",
       "Arrosage copieux et régulier.",
@@ -133,6 +138,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 150,
     "days_to_harvest": 100,
+    "multi_harvest": true,
     "notes": [
       "Prévoir 2-3 m² par pied — coureuse.",
       "Récolter avant les gelées, pédoncule bien sec.",
@@ -157,6 +163,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 200,
     "days_to_harvest": 110,
+    "multi_harvest": true,
     "notes": [
       "Très gourmand en eau et en compost.",
       "Rondouillard, préfère les sols riches.",
@@ -180,6 +187,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 40,
     "days_to_harvest": 60,
+    "multi_harvest": true,
     "notes": [
       "Palisser pour gagner de la place et éviter les attaques au sol.",
       "Récolter tous les 2-3 jours pour stimuler la production."
@@ -202,6 +210,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 100,
     "days_to_harvest": 110,
+    "multi_harvest": true,
     "notes": [
       "Exige beaucoup de chaleur — chassis ou voile recommandé.",
       "Tailler à 2 feuilles après le 2e fruit pour concentrer la sève.",
@@ -456,6 +465,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 15,
     "days_to_harvest": 50,
+    "multi_harvest": true,
     "notes": [
       "Culture de printemps et d'automne, monte à graines en été.",
       "Couper les feuilles au fur et à mesure.",
@@ -479,6 +489,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 10,
     "days_to_harvest": 40,
+    "multi_harvest": true,
     "notes": [
       "Cycle très court — semer tous les 10 jours.",
       "Goût plus piquant si stress hydrique."
@@ -501,6 +512,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 40,
     "days_to_harvest": 60,
+    "multi_harvest": true,
     "notes": [
       "Récolter feuille à feuille pour production longue.",
       "Rustique, passe l'hiver dans les régions tempérées."
@@ -523,6 +535,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 50,
     "days_to_harvest": 90,
+    "multi_harvest": true,
     "notes": [
       "Très rustique, supporte -15°C.",
       "Le goût s'améliore après les premières gelées.",
@@ -591,6 +604,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 50,
     "days_to_harvest": 90,
+    "multi_harvest": true,
     "notes": [
       "Après la pomme centrale, les rejets latéraux donnent des mini-brocolis.",
       "Récolter avant floraison (bourgeons encore verts)."
@@ -613,6 +627,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 60,
     "days_to_harvest": 180,
+    "multi_harvest": true,
     "notes": [
       "Culture longue (6 mois) mais peu exigeante.",
       "Pincer la tête en septembre pour grossir les bourgeons.",
@@ -636,6 +651,7 @@
     "depth_cm": 3.0,
     "spacing_cm": 10,
     "days_to_harvest": 60,
+    "multi_harvest": true,
     "notes": [
       "Semer quand sol > 12°C (après mi-mai).",
       "Variétés naines (plus rapides) ou à rames (plus productives).",
@@ -683,6 +699,7 @@
     "depth_cm": 3.0,
     "spacing_cm": 5,
     "days_to_harvest": 90,
+    "multi_harvest": true,
     "notes": [
       "Rustique — semis dès fin février possible.",
       "Rames obligatoires pour variétés à rames.",
@@ -706,6 +723,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 20,
     "days_to_harvest": 180,
+    "multi_harvest": true,
     "notes": [
       "Semis d'automne (octobre-novembre) pour récolte de mai-juin.",
       "Rustique jusqu'à -10°C.",
@@ -822,6 +840,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 20,
     "days_to_harvest": 90,
+    "multi_harvest": true,
     "notes": [
       "Vivace — une plantation dure 4-5 ans.",
       "Couper à 2 cm du sol pour stimuler.",
@@ -845,6 +864,7 @@
     "depth_cm": 0.3,
     "spacing_cm": 25,
     "days_to_harvest": 60,
+    "multi_harvest": true,
     "notes": [
       "Germination exige 20-25°C.",
       "Pincer les fleurs pour prolonger la feuillaison.",
@@ -868,6 +888,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 15,
     "days_to_harvest": 80,
+    "multi_harvest": true,
     "notes": [
       "Germination longue (3 semaines) — tremper les graines 24h.",
       "Monte à graines en 2e année.",
@@ -891,6 +912,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 15,
     "days_to_harvest": 45,
+    "multi_harvest": true,
     "notes": [
       "Monte à graines rapidement en été — semer étalé.",
       "Les graines sont aussi utilisées (épice).",
@@ -914,6 +936,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 20,
     "days_to_harvest": 60,
+    "multi_harvest": true,
     "notes": [
       "Pas de repiquage — semis direct seulement.",
       "Compagnon du concombre, éloigne certains ravageurs."
@@ -936,6 +959,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 15,
     "days_to_harvest": 50,
+    "multi_harvest": true,
     "notes": [
       "Préfère la mi-ombre en été.",
       "Se ressème d'elle-même.",
@@ -959,6 +983,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 40,
     "days_to_harvest": 60,
+    "multi_harvest": true,
     "notes": [
       "Très envahissante — cantonner (pot enterré).",
       "Division de touffe au printemps.",
@@ -982,6 +1007,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 40,
     "days_to_harvest": 90,
+    "multi_harvest": true,
     "notes": [
       "Sol drainé, pauvre, calcaire — méditerranéen.",
       "Résiste au sec, déteste l'excès d'eau.",
@@ -1005,6 +1031,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 80,
     "days_to_harvest": 180,
+    "multi_harvest": true,
     "notes": [
       "Persistant, récoltable toute l'année.",
       "Craint le gel prolongé (-10°C max).",
@@ -1028,6 +1055,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 60,
     "days_to_harvest": 90,
+    "multi_harvest": true,
     "notes": [
       "Aime le soleil et les sols drainés.",
       "Rabattre au printemps pour garder compact.",
@@ -1051,6 +1079,7 @@
     "depth_cm": 0.3,
     "spacing_cm": 30,
     "days_to_harvest": 90,
+    "multi_harvest": true,
     "notes": [
       "Méditerranéen, supporte la sécheresse.",
       "Récolter avant floraison pour arôme maximal."
@@ -1073,6 +1102,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 40,
     "days_to_harvest": 90,
+    "multi_harvest": true,
     "notes": [
       "Variété 'français' non disponible en graines — toujours boutures.",
       "Déplacer tous les 3-4 ans (épuise le sol)."
@@ -1095,6 +1125,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 30,
     "days_to_harvest": 90,
+    "multi_harvest": true,
     "notes": [
       "Vivace, une plantation dure des années.",
       "Goût acidulé, riche en vitamine C.",
@@ -1118,6 +1149,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 30,
     "days_to_harvest": 270,
+    "multi_harvest": true,
     "notes": [
       "Plantation idéale en septembre — bonne reprise avant hiver.",
       "Pailler avec de la paille pour protéger les fruits.",
@@ -1142,6 +1174,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 80,
     "days_to_harvest": 365,
+    "multi_harvest": true,
     "notes": [
       "Variétés non-remontantes : récolte juin-juillet.",
       "Variétés remontantes : 2 récoltes (juin et septembre).",
@@ -1166,6 +1199,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 120,
     "days_to_harvest": 730,
+    "multi_harvest": true,
     "notes": [
       "Riche en vitamine C (plus que l'orange).",
       "Tailler chaque hiver pour renouveler le bois.",
@@ -1189,6 +1223,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 120,
     "days_to_harvest": 730,
+    "multi_harvest": true,
     "notes": [
       "Préfère mi-ombre et sol frais.",
       "Tailler en gobelet (3-5 branches principales)."
@@ -1211,6 +1246,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 150,
     "days_to_harvest": 730,
+    "multi_harvest": true,
     "notes": [
       "Exige un sol acide (pH 4.5-5.5) — terre de bruyère.",
       "Planter au moins 2 variétés pour la pollinisation.",
@@ -1234,6 +1270,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1460,
+    "multi_harvest": true,
     "notes": [
       "Plantation en racines nues de novembre à mars (hors gel).",
       "Choisir 2 variétés compatibles pour la pollinisation.",
@@ -1258,6 +1295,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1825,
+    "multi_harvest": true,
     "notes": [
       "Emplacement ensoleillé, abrité des vents du nord.",
       "Récolter avant maturité complète (finit de mûrir au fruitier)."
@@ -1280,6 +1318,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 500,
     "days_to_harvest": 1460,
+    "multi_harvest": true,
     "notes": [
       "Ne pas tailler — le cerisier n'apprécie pas (gomme).",
       "Filet obligatoire si étourneaux dans la région."
@@ -1302,6 +1341,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1095,
+    "multi_harvest": true,
     "notes": [
       "Rustique, peu exigeant.",
       "Variétés Quetsche, Mirabelle, Reine-Claude selon les goûts."
@@ -1324,6 +1364,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1095,
+    "multi_harvest": true,
     "notes": [
       "Floraison précoce — sensible au gel tardif.",
       "Exposition sud chaude, abritée.",
@@ -1347,6 +1388,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1095,
+    "multi_harvest": true,
     "notes": [
       "Rustique jusqu'à -15°C une fois établi.",
       "Taille modérée, préfère pousser librement.",
@@ -1370,6 +1412,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1095,
+    "multi_harvest": true,
     "notes": [
       "Planter au moins 2 variétés différentes pour la pollinisation.",
       "Rustique et peu exigeant.",
@@ -1393,6 +1436,7 @@
     "depth_cm": 60.0,
     "spacing_cm": 1000,
     "days_to_harvest": 2555,
+    "multi_harvest": true,
     "notes": [
       "Grand arbre — prévoir 10m en tous sens.",
       "Ne plante rien en dessous (allélopathie par la juglone).",
@@ -1416,6 +1460,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 50,
     "days_to_harvest": 70,
+    "multi_harvest": true,
     "notes": [
       "Épinard d'été qui ne monte pas à graines.",
       "Tremper les graines 24h pour germination.",
@@ -1439,6 +1484,7 @@
     "depth_cm": 0.3,
     "spacing_cm": 15,
     "days_to_harvest": 40,
+    "multi_harvest": true,
     "notes": [
       "Riche en oméga-3, salade estivale résistante à la chaleur.",
       "Se ressème spontanément.",
@@ -1462,6 +1508,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 100,
     "days_to_harvest": 180,
+    "multi_harvest": true,
     "notes": [
       "Vivace qui dure 4-5 ans.",
       "Protéger du gel en hiver (paillage épais).",
@@ -1485,6 +1532,7 @@
     "depth_cm": 20.0,
     "spacing_cm": 50,
     "days_to_harvest": 730,
+    "multi_harvest": true,
     "notes": [
       "Patience : première récolte 2-3 ans après plantation.",
       "Plantation en griffes dans tranchée profonde.",
@@ -1509,6 +1557,7 @@
     "depth_cm": 10.0,
     "spacing_cm": 100,
     "days_to_harvest": 365,
+    "multi_harvest": true,
     "notes": [
       "Feuilles toxiques (oxalates) — ne consommer que les pétioles.",
       "Supprimer les hampes florales pour prolonger la production.",

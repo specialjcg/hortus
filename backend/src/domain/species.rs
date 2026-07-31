@@ -115,6 +115,10 @@ pub struct Species {
     /// Espèces antagonistes (ids).
     #[serde(default)]
     pub foes: Vec<String>,
+    /// Récolte échelonnée : le plant continue de produire après une récolte
+    /// (tomate, courgette…) et ne disparaît qu'à l'arrachage.
+    #[serde(default)]
+    pub multi_harvest: bool,
 }
 
 impl Species {
