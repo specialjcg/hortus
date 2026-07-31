@@ -444,6 +444,7 @@ type Msg
     | OpenPlantMenu Int
     | ClosePlantMenu
     | QuickAction Int String -- plant id, kind
+    | FinishHarvest Int -- plant id : dernière récolte + arrachage
     | SetNoteDraft String
     | SaveObservation Int -- plant id
     | SetAlmanacSearch String
@@ -682,6 +683,14 @@ update msg model =
         QuickAction plantId kind ->
             ( { model | plantMenu = Nothing }
             , quickActionCmd model plantId kind
+            )
+
+        FinishHarvest plantId ->
+            ( { model | plantMenu = Nothing }
+            , Cmd.batch
+                [ quickActionCmd model plantId "recolte"
+                , quickActionCmd model plantId "arrachage"
+                ]
             )
 
         SetNoteDraft s ->
@@ -2779,13 +2788,25 @@ viewHarvestSuggestion model ( pl, sp ) =
                     [ text " · en récolte, cueille ce qui est mûr" ]
               else text ""
             ]
-        , button
-            [ E.onClick (QuickAction pl.id "recolte")
-            , A.style "padding" "3px 8px", A.style "font-size" "0.75rem"
-            , A.style "background" "#d4a033", A.style "color" "white"
-            , A.style "border" "none", A.style "border-radius" "3px", A.style "cursor" "pointer"
+        , span []
+            [ button
+                [ E.onClick (QuickAction pl.id "recolte")
+                , A.style "padding" "3px 8px", A.style "font-size" "0.75rem"
+                , A.style "background" "#d4a033", A.style "color" "white"
+                , A.style "border" "none", A.style "border-radius" "3px", A.style "cursor" "pointer"
+                ]
+                [ text (if multi then "🌾 noter une récolte" else "🌾 récolter") ]
+            , if multi then
+                button
+                    [ E.onClick (FinishHarvest pl.id)
+                    , A.style "padding" "3px 8px", A.style "font-size" "0.75rem"
+                    , A.style "margin-left" "0.3rem"
+                    , A.style "background" "#8b6e3d", A.style "color" "white"
+                    , A.style "border" "none", A.style "border-radius" "3px", A.style "cursor" "pointer"
+                    ]
+                    [ text "🧺 finir la récolte" ]
+              else text ""
             ]
-            [ text (if multi then "🌾 noter une récolte" else "🌾 récolter") ]
         ]
 
 
@@ -3483,13 +3504,26 @@ viewPlantContextMenu model =
                         , p [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ]
                             [ text ("Semé le " ++ a.date ++ " — enregistrement daté d'aujourd'hui (" ++ model.today ++ ")") ]
                         , div [ A.style "display" "flex", A.style "flex-wrap" "wrap" ]
-                            [ btn "arrosage" "💧" "Arroser"
-                            , btn "paillage" "🍂" "Pailler"
-                            , btn "compost" "🌱" "Compost"
-                            , btn "traitement" "💊" "Traiter"
-                            , btn "recolte" "🌾" "Récolter"
-                            , btn "arrachage" "🗑" "Arracher"
-                            ]
+                            ([ btn "arrosage" "💧" "Arroser"
+                             , btn "paillage" "🍂" "Pailler"
+                             , btn "compost" "🌱" "Compost"
+                             , btn "traitement" "💊" "Traiter"
+                             , btn "recolte" "🌾" (if isMultiHarvest model sid then "Noter une récolte" else "Récolter")
+                             ]
+                                ++ (if isMultiHarvest model sid then
+                                        [ button
+                                            [ E.onClick (FinishHarvest id)
+                                            , A.style "margin" "0.2rem", A.style "padding" "6px 10px"
+                                            , A.style "background" "#8b6e3d", A.style "color" "white"
+                                            , A.style "border" "none", A.style "border-radius" "4px"
+                                            , A.style "cursor" "pointer", A.style "font-size" "0.85rem"
+                                            ]
+                                            [ text "🧺 Finir la récolte" ]
+                                        ]
+                                    else []
+                                   )
+                                ++ [ btn "arrachage" "🗑" "Arracher" ]
+                            )
                         , div [ A.style "margin-top" "0.6rem" ]
                             [ div [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22", A.style "font-weight" "600" ]
                                 [ text "📝 Observation" ]
