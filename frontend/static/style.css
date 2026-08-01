@@ -114,6 +114,20 @@ h1 {
 }
 
 h2 { font-size: 1.2rem; font-weight: 650; margin-bottom: 0.5rem; }
+
+/* Filet éditorial après les titres de panneaux (hors en-têtes repliables) */
+.panel > h2 {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+}
+.panel > h2::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--line-strong), transparent);
+    transform: translateY(-0.2em);
+}
 h3 { font-size: 1rem;  font-weight: 650; margin-bottom: 0.35rem; }
 
 /* --------------------------------------------------------------------------
@@ -368,6 +382,112 @@ textarea { resize: vertical; line-height: 1.45; }
 }
 .day-bar .ok { background: var(--moss-bright); }
 .day-bar .deficit { background: var(--terracotta); }
+
+/* --------------------------------------------------------------------------
+   Détails
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   Composants éditoriaux (migration des styles inline Elm)
+   -------------------------------------------------------------------------- */
+
+/* Étiquette de champ : petites capitales espacées, encre pâle */
+.field-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+}
+
+/* Chip : bouton d'action compact, fond coloré posé en inline (kindColor) */
+button.chip {
+    border: none;
+    color: #fdfbf4;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+    box-shadow: 0 1px 2px rgba(38, 34, 21, 0.18);
+    white-space: nowrap;
+}
+button.chip:hover:not(:disabled) {
+    color: #ffffff;
+    border: none;
+    filter: brightness(1.08) saturate(1.05);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(38, 34, 21, 0.22);
+    background: none;
+}
+
+/* Badge de type d'action (journal) : pastille, fond inline via kindColor */
+.kind-badge {
+    display: inline-block;
+    color: #fdfbf4;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: 1px;
+}
+
+/* Ligne du journal */
+.journal-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.5rem 0.4rem;
+    border-bottom: 1px solid var(--line);
+    border-radius: 6px;
+    transition: background 0.12s;
+}
+.journal-row:hover { background: rgba(255, 255, 255, 0.65); }
+.row-date {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    margin-right: 0.5rem;
+}
+.coords {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    margin-left: 0.4rem;
+}
+.row-note {
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin-top: 0.25rem;
+    padding-left: 0.2rem;
+    border-left: 2px solid var(--gold);
+    font-style: italic;
+}
+
+/* Indication contextuelle discrète (coach : « en récolte… ») */
+.hint { font-size: 0.72rem; color: var(--ink-faint); font-style: italic; }
+
+/* En-tête repliable (journal) */
+.collapse-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    border-radius: 8px;
+    margin: -0.2rem -0.3rem;
+    padding: 0.2rem 0.3rem;
+    transition: background 0.12s;
+}
+.collapse-header:hover { background: var(--moss-pale); }
+.collapse-header h2 { margin: 0; }
+.collapse-toggle {
+    font-size: 0.78rem;
+    font-weight: 650;
+    color: var(--moss);
+    letter-spacing: 0.02em;
+}
 
 /* --------------------------------------------------------------------------
    Détails

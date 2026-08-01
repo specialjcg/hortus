@@ -2804,10 +2804,8 @@ viewHarvestSuggestion model ( pl, sp ) =
         actionBtn msg bg lbl =
             button
                 [ E.onClick msg
-                , A.style "padding" "4px 8px", A.style "font-size" "0.72rem"
-                , A.style "background" bg, A.style "color" "white"
-                , A.style "border" "none", A.style "border-radius" "3px"
-                , A.style "cursor" "pointer", A.style "white-space" "nowrap"
+                , A.class "chip"
+                , A.style "background" bg
                 , A.style "width" "100%"
                 ]
                 [ text lbl ]
@@ -2825,11 +2823,11 @@ viewHarvestSuggestion model ( pl, sp ) =
             [ div []
                 [ text (speciesEmoji sp ++ " ")
                 , Html.strong [] [ text (speciesShortName sp) ]
-                , span [ A.style "font-size" "0.72rem", A.style "color" "#8a7040" ]
-                    [ text (" (" ++ String.fromInt pl.x ++ "," ++ String.fromInt pl.y ++ ")") ]
+                , span [ A.class "coords" ]
+                    [ text ("(" ++ String.fromInt pl.x ++ "," ++ String.fromInt pl.y ++ ")") ]
                 ]
             , if multi then
-                div [ A.style "font-size" "0.7rem", A.style "color" "#8a7040" ]
+                div [ A.class "hint" ]
                     [ text "en récolte, cueille ce qui est mûr" ]
               else text ""
             ]
@@ -3233,7 +3231,7 @@ viewControls model =
     div [ A.class "panel" ]
         [ div [ A.style "display" "flex", A.style "gap" "0.6rem", A.style "flex-wrap" "wrap", A.style "align-items" "flex-end" ]
             [ div [ A.style "display" "flex", A.style "flex-direction" "column" ]
-                [ Html.label [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ] [ text "Ville" ]
+                [ Html.label [ A.class "field-label" ] [ text "Ville" ]
                 , select
                     [ E.onInput SetCity, A.style "padding" "4px"
                     , A.style "border" "1px solid #d4b85a", A.style "border-radius" "3px"
@@ -3242,7 +3240,7 @@ viewControls model =
                     (List.map (\c -> option [ A.value c.slug, A.selected (c.slug == model.selectedCity) ] [ text c.name ]) model.cities)
                 ]
             , div [ A.style "display" "flex", A.style "flex-direction" "column" ]
-                [ Html.label [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ] [ text "Catégorie" ]
+                [ Html.label [ A.class "field-label" ] [ text "Catégorie" ]
                 , select
                     [ E.onInput SetFilterCategory, A.style "padding" "4px"
                     , A.style "border" "1px solid #d4b85a", A.style "border-radius" "3px"
@@ -3251,7 +3249,7 @@ viewControls model =
                     (List.map (categoryOption model.filterCategory) categoryOptions)
                 ]
             , div [ A.style "display" "flex", A.style "flex-direction" "column" ]
-                [ Html.label [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ] [ text "Difficulté" ]
+                [ Html.label [ A.class "field-label" ] [ text "Difficulté" ]
                 , select
                     [ E.onInput SetFilterDifficulty, A.style "padding" "4px"
                     , A.style "border" "1px solid #d4b85a", A.style "border-radius" "3px"
@@ -3264,7 +3262,7 @@ viewControls model =
                     ]
                 ]
             , div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "flex" "1 1 150px" ]
-                [ Html.label [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ] [ text "Rechercher" ]
+                [ Html.label [ A.class "field-label" ] [ text "Rechercher" ]
                 , input
                     [ A.type_ "text", A.value model.search, E.onInput SetSearch
                     , A.placeholder "nom, latin..."
@@ -3539,10 +3537,9 @@ viewPlantContextMenu model =
                         btn kind icon label =
                             button
                                 [ E.onClick (QuickAction id kind)
-                                , A.style "margin" "0.2rem", A.style "padding" "6px 10px"
-                                , A.style "background" (kindColor kind), A.style "color" "white"
-                                , A.style "border" "none", A.style "border-radius" "4px"
-                                , A.style "cursor" "pointer", A.style "font-size" "0.85rem"
+                                , A.class "chip"
+                                , A.style "margin" "0.2rem"
+                                , A.style "background" (kindColor kind)
                                 ]
                                 [ text (icon ++ " " ++ label) ]
                     in
@@ -3560,10 +3557,9 @@ viewPlantContextMenu model =
                                 ++ (if isMultiHarvest model sid then
                                         [ button
                                             [ E.onClick (FinishHarvest id)
-                                            , A.style "margin" "0.2rem", A.style "padding" "6px 10px"
-                                            , A.style "background" "#8b6e3d", A.style "color" "white"
-                                            , A.style "border" "none", A.style "border-radius" "4px"
-                                            , A.style "cursor" "pointer", A.style "font-size" "0.85rem"
+                                            , A.class "chip"
+                                            , A.style "margin" "0.2rem"
+                                            , A.style "background" "#8b6e3d"
                                             ]
                                             [ text "🧺 Finir la récolte" ]
                                         ]
@@ -3572,10 +3568,9 @@ viewPlantContextMenu model =
                                 ++ [ btn "arrachage" "🗑" "Arracher"
                                    , button
                                         [ E.onClick ToggleDeathPicker
-                                        , A.style "margin" "0.2rem", A.style "padding" "6px 10px"
-                                        , A.style "background" (kindColor "plant_mort"), A.style "color" "white"
-                                        , A.style "border" "none", A.style "border-radius" "4px"
-                                        , A.style "cursor" "pointer", A.style "font-size" "0.85rem"
+                                        , A.class "chip"
+                                        , A.style "margin" "0.2rem"
+                                        , A.style "background" (kindColor "plant_mort")
                                         ]
                                         [ text "☠ Plant mort" ]
                                    ]
@@ -3591,20 +3586,16 @@ viewPlantContextMenu model =
                                         (\( cause, lbl ) ->
                                             button
                                                 [ E.onClick (PlantDead id cause)
-                                                , A.style "padding" "5px 9px", A.style "font-size" "0.78rem"
-                                                , A.style "background" "#7a6a50", A.style "color" "white"
-                                                , A.style "border" "none", A.style "border-radius" "4px"
-                                                , A.style "cursor" "pointer"
+                                                , A.class "chip"
+                                                , A.style "background" "#7a6a50"
                                                 ]
                                                 [ text lbl ]
                                         )
                                         deathCauses
                                         ++ [ button
                                                 [ E.onClick OpenDeathNote
-                                                , A.style "padding" "5px 9px", A.style "font-size" "0.78rem"
-                                                , A.style "background" "#5a5a5a", A.style "color" "white"
-                                                , A.style "border" "none", A.style "border-radius" "4px"
-                                                , A.style "cursor" "pointer"
+                                                , A.class "chip"
+                                                , A.style "background" "#5a5a5a"
                                                 ]
                                                 [ text "❓ Inconnue / autre" ]
                                            ]
@@ -3627,10 +3618,9 @@ viewPlantContextMenu model =
                                                     (PlantDead id
                                                         (if String.trim draft == "" then "cause inconnue" else draft)
                                                     )
-                                                , A.style "margin-top" "0.25rem", A.style "padding" "5px 10px"
-                                                , A.style "background" "#5a5a5a", A.style "color" "white"
-                                                , A.style "border" "none", A.style "border-radius" "4px"
-                                                , A.style "cursor" "pointer", A.style "font-size" "0.8rem"
+                                                , A.class "chip"
+                                                , A.style "margin-top" "0.25rem"
+                                                , A.style "background" "#5a5a5a"
                                                 ]
                                                 [ text "💾 Enregistrer" ]
                                             ]
@@ -5332,7 +5322,7 @@ viewParcels model =
                 , labeledInput "Hauteur" f.gridH SetParcelGridH "2"
                 ]
             , div [ A.style "display" "flex", A.style "gap" "0.3rem", A.style "align-items" "center" ]
-                [ Html.label [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ] [ text "Couleur" ]
+                [ Html.label [ A.class "field-label" ] [ text "Couleur" ]
                 , input [ A.type_ "color", A.value f.color, E.onInput SetParcelColor ] []
                 ]
             , div [ A.class "controls" ]
@@ -5460,20 +5450,17 @@ viewActionsTimeline model =
     in
     div [ A.class "panel" ]
         [ div
-            [ A.style "display" "flex", A.style "justify-content" "space-between"
-            , A.style "align-items" "center", A.style "cursor" "pointer"
-            , E.onClick ToggleJournal
-            ]
-            [ h2 [ A.style "margin" "0" ]
+            [ A.class "collapse-header", E.onClick ToggleJournal ]
+            [ h2 []
                 [ text ("Journal (" ++ String.fromInt (List.length filtered) ++ " / " ++ String.fromInt (List.length model.actions) ++ ")") ]
-            , span [ A.style "font-size" "0.85rem", A.style "color" "#8b6e3d" ]
+            , span [ A.class "collapse-toggle" ]
                 [ text (if model.journalOpen then "▼ masquer" else "▶ afficher") ]
             ]
         , if not model.journalOpen then text ""
           else div []
         [ div [ A.style "display" "flex", A.style "gap" "0.6rem", A.style "flex-wrap" "wrap", A.style "margin-bottom" "0.6rem", A.style "margin-top" "0.6rem" ]
             [ div [ A.style "display" "flex", A.style "flex-direction" "column" ]
-                [ Html.label [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ] [ text "Parcelle" ]
+                [ Html.label [ A.class "field-label" ] [ text "Parcelle" ]
                 , select
                     [ E.onInput SetFilterActionParcel
                     , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
@@ -5484,7 +5471,7 @@ viewActionsTimeline model =
                     )
                 ]
             , div [ A.style "display" "flex", A.style "flex-direction" "column" ]
-                [ Html.label [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ] [ text "Type" ]
+                [ Html.label [ A.class "field-label" ] [ text "Type" ]
                 , select
                     [ E.onInput SetFilterActionKind
                     , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
@@ -5512,15 +5499,13 @@ viewActionRow _ a =
                 ( Just c, Just r ) -> "(" ++ String.fromInt c ++ "," ++ String.fromInt r ++ ")"
                 _ -> "—"
     in
-    div [ A.class "pantry-row", A.style "padding" "0.5rem 0", A.style "border-bottom" "1px solid #e2d2a8", A.style "flex-direction" "column", A.style "align-items" "stretch" ]
+    div [ A.class "journal-row" ]
         [ div [ A.style "display" "flex", A.style "justify-content" "space-between" ]
             [ div []
-                [ span [ A.style "color" "#8b6e3d", A.style "font-size" "0.8rem", A.style "margin-right" "0.4rem" ] [ text a.date ]
-                , span [ A.class "kind-badge", A.style "background" (kindColor a.kind), A.style "color" "white"
-                        , A.style "padding" "2px 6px", A.style "border-radius" "3px", A.style "font-size" "0.72rem"
-                        ]
+                [ span [ A.class "row-date" ] [ text a.date ]
+                , span [ A.class "kind-badge", A.style "background" (kindColor a.kind) ]
                     [ text (actionKindLabel a.kind) ]
-                , span [ A.style "margin-left" "0.4rem", A.style "color" "#8b6e3d", A.style "font-size" "0.78rem" ] [ text tileLabel ]
+                , span [ A.class "coords" ] [ text tileLabel ]
                 , case a.speciesId of
                     Just sp -> span [ A.style "margin-left" "0.4rem" ] [ text (speciesEmoji sp ++ " " ++ sp) ]
                     Nothing -> text ""
@@ -5534,7 +5519,7 @@ viewActionRow _ a =
                 ]
             ]
         , case a.notes of
-            Just n -> div [ A.style "font-size" "0.82rem", A.style "color" "#5a3a22", A.style "margin-top" "0.2rem" ] [ text n ]
+            Just n -> div [ A.class "row-note" ] [ text n ]
             Nothing -> text ""
         ]
 
@@ -5582,7 +5567,7 @@ kindColor k =
 labeledInput : String -> String -> (String -> Msg) -> String -> Html Msg
 labeledInput label value toMsg placeholder =
     div [ A.style "display" "flex", A.style "flex-direction" "column" ]
-        [ Html.label [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ] [ text label ]
+        [ Html.label [ A.class "field-label" ] [ text label ]
         , input
             [ A.type_ "text", A.value value, E.onInput toMsg, A.placeholder placeholder
             , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
@@ -5595,7 +5580,7 @@ labeledInput label value toMsg placeholder =
 labeledTextarea : String -> String -> (String -> Msg) -> String -> Html Msg
 labeledTextarea label value toMsg placeholder =
     div [ A.style "display" "flex", A.style "flex-direction" "column" ]
-        [ Html.label [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ] [ text label ]
+        [ Html.label [ A.class "field-label" ] [ text label ]
         , textarea
             [ A.value value, E.onInput toMsg, A.placeholder placeholder, A.rows 2
             , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
@@ -5609,7 +5594,7 @@ labeledTextarea label value toMsg placeholder =
 labeledSelect : String -> String -> (String -> Msg) -> List ( String, String ) -> Html Msg
 labeledSelect label value toMsg options =
     div [ A.style "display" "flex", A.style "flex-direction" "column" ]
-        [ Html.label [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ] [ text label ]
+        [ Html.label [ A.class "field-label" ] [ text label ]
         , select
             [ E.onInput toMsg
             , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
