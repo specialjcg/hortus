@@ -96,6 +96,7 @@ type alias Model =
     , dragging : Maybe DragState
     , plantMenu : Maybe Int -- id du plant avec menu ouvert
     , deathPicker : Bool -- sélecteur de cause « plant mort » ouvert
+    , deathDraft : Maybe String -- observation libre pour cause inconnue (Nothing = champ fermé)
     , noteDraft : String -- texte observation en cours de saisie
     , almanacSearch : String -- filtre texte de l'almanach
     , solutionDraft : Maybe ( Int, String ) -- (id note, texte solution en édition)
@@ -350,6 +351,7 @@ init flags =
       , dragging = Nothing
       , plantMenu = Nothing
       , deathPicker = False
+      , deathDraft = Nothing
       , noteDraft = ""
       , almanacSearch = ""
       , solutionDraft = Nothing
@@ -448,6 +450,8 @@ type Msg
     | QuickAction Int String -- plant id, kind
     | FinishHarvest Int -- plant id : dernière récolte + arrachage
     | ToggleDeathPicker
+    | OpenDeathNote -- cause inconnue → saisie d'une observation libre
+    | SetDeathDraft String
     | PlantDead Int String -- plant id, cause de la mort
     | SetNoteDraft String
     | SaveObservation Int -- plant id
@@ -698,10 +702,16 @@ update msg model =
             )
 
         ToggleDeathPicker ->
-            ( { model | deathPicker = not model.deathPicker }, Cmd.none )
+            ( { model | deathPicker = not model.deathPicker, deathDraft = Nothing }, Cmd.none )
+
+        OpenDeathNote ->
+            ( { model | deathDraft = Just "" }, Cmd.none )
+
+        SetDeathDraft s ->
+            ( { model | deathDraft = Just s }, Cmd.none )
 
         PlantDead plantId cause ->
-            ( { model | plantMenu = Nothing, deathPicker = False }
+            ( { model | plantMenu = Nothing, deathPicker = False, deathDraft = Nothing }
             , quickActionCmd model plantId "plant_mort" cause
             )
 
@@ -3507,7 +3517,6 @@ deathCauses =
     , ( "sécheresse / canicule", "🥵 Sécheresse" )
     , ( "maladie", "🍄 Maladie" )
     , ( "ravageurs", "🐌 Ravageurs" )
-    , ( "cause inconnue", "❓ Inconnue" )
     ]
 
 
@@ -3584,7 +3593,41 @@ viewPlantContextMenu model =
                                                 [ text lbl ]
                                         )
                                         deathCauses
+                                        ++ [ button
+                                                [ E.onClick OpenDeathNote
+                                                , A.style "padding" "5px 9px", A.style "font-size" "0.78rem"
+                                                , A.style "background" "#5a5a5a", A.style "color" "white"
+                                                , A.style "border" "none", A.style "border-radius" "4px"
+                                                , A.style "cursor" "pointer"
+                                                ]
+                                                [ text "❓ Inconnue / autre" ]
+                                           ]
                                     )
+                                , case model.deathDraft of
+                                    Nothing -> text ""
+                                    Just draft ->
+                                        div [ A.style "margin-top" "0.35rem" ]
+                                            [ textarea
+                                                [ A.value draft
+                                                , E.onInput SetDeathDraft
+                                                , A.placeholder "Observation : ex. jauni d'un coup après l'orage…"
+                                                , A.rows 2
+                                                , A.style "width" "100%", A.style "box-sizing" "border-box"
+                                                , A.style "font-size" "0.8rem"
+                                                ]
+                                                []
+                                            , button
+                                                [ E.onClick
+                                                    (PlantDead id
+                                                        (if String.trim draft == "" then "cause inconnue" else draft)
+                                                    )
+                                                , A.style "margin-top" "0.25rem", A.style "padding" "5px 10px"
+                                                , A.style "background" "#5a5a5a", A.style "color" "white"
+                                                , A.style "border" "none", A.style "border-radius" "4px"
+                                                , A.style "cursor" "pointer", A.style "font-size" "0.8rem"
+                                                ]
+                                                [ text "💾 Enregistrer" ]
+                                            ]
                                 ]
                           else text ""
                         , div [ A.style "margin-top" "0.6rem" ]
