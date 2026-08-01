@@ -2800,11 +2800,9 @@ viewMaintenanceSuggestion kind icon pl =
             ]
         , button
             [ E.onClick (QuickAction pl.id kind)
-            , A.style "padding" "4px 10px", A.style "font-size" "0.78rem"
-            , A.style "background" bgColor, A.style "color" "white"
-            , A.style "border" "none"
-            , A.style "border-radius" "3px", A.style "cursor" "pointer"
-            , A.style "font-weight" "600"
+            , A.class "chip"
+            , A.classList [ ( "aqua", kind == "arrosage" ) ]
+            , A.style "background" bgColor
             ]
             [ text label ]
         ]
@@ -3585,6 +3583,7 @@ viewPlantContextMenu model =
                             button
                                 [ E.onClick (QuickAction id kind)
                                 , A.class "chip"
+                                , A.classList [ ( "aqua", kind == "arrosage" ) ]
                                 , A.style "margin" "0.2rem"
                                 , A.style "background" (kindColor kind)
                                 ]
@@ -5572,7 +5571,11 @@ viewActionRow _ a =
         [ div [ A.style "display" "flex", A.style "justify-content" "space-between" ]
             [ div []
                 [ span [ A.class "row-date" ] [ text a.date ]
-                , span [ A.class "kind-badge", A.style "background" (kindColor a.kind) ]
+                , span
+                    [ A.class "kind-badge"
+                    , A.classList [ ( "aqua", a.kind == "arrosage" ) ]
+                    , A.style "background" (kindColor a.kind)
+                    ]
                     [ text (actionKindLabel a.kind) ]
                 , span [ A.class "coords" ] [ text tileLabel ]
                 , case a.speciesId of

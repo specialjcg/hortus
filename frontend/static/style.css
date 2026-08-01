@@ -589,6 +589,21 @@ button.chip:hover:not(:disabled) {
     background: none;
 }
 
+/* Eau irisée (Mermaidcore, réservé à l'arrosage) : dégradé sarcelle nacré
+   qui ondule comme la lumière sur l'eau. !important : prime sur le fond inline. */
+.chip.aqua, .kind-badge.aqua {
+    background: linear-gradient(115deg, #2f86b8, #4fb3c9 30%, #8fdbd4 50%, #5aa8d6 72%, #3d95c9) !important;
+    background-size: 220% 100% !important;
+    animation: aqua-shimmer 7s ease-in-out infinite;
+}
+@keyframes aqua-shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .chip.aqua, .kind-badge.aqua { animation: none; }
+}
+
 /* Badge de type d'action (journal) : pastille, fond inline via kindColor */
 .kind-badge {
     display: inline-block;
