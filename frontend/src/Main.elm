@@ -1999,7 +1999,10 @@ viewSeasonBanner model _ =
 viewHeader : Model -> Html Msg
 viewHeader model =
     div [ A.class "header" ]
-        [ h1 [] [ text "🌱 Hortus" ]
+        [ div []
+            [ h1 [] [ text "🌱 Hortus" ]
+            , div [ A.class "tagline" ] [ text "Almanach du jardin, au rythme de ton climat" ]
+            ]
         , div [ A.class "meta" ]
             [ case model.calendar of
                 Just c ->
@@ -2064,7 +2067,7 @@ viewCoachObservations model =
                 |> List.reverse
                 |> List.take 12
     in
-    div [ A.class "panel" ]
+    div [ A.class "panel accent-gold" ]
         [ h2 [] [ text "📝 Mes observations" ]
         , if List.isEmpty observations then
             p [ A.style "color" "#5a3a22", A.style "font-size" "0.85rem" ]
@@ -2709,7 +2712,7 @@ viewCoachTodo model cal =
                             _ -> not (hasPaillage pl) && daysSinceSeed model pl > 14
                     )
     in
-    div [ A.class "panel" ]
+    div [ A.class "panel accent-moss" ]
         [ h2 [] [ text "🎯 À faire aujourd'hui" ]
         , if List.isEmpty sowSuggestions && List.isEmpty harvestSuggestions && List.isEmpty waterSuggestions && List.isEmpty mulchSuggestions then
             p [ A.style "color" "#5a3a22", A.style "font-size" "0.88rem" ]
@@ -2944,7 +2947,7 @@ viewCoachWeek model =
                     )
                 |> List.length
     in
-    div [ A.class "panel" ]
+    div [ A.class "panel accent-gold" ]
         [ h2 [] [ text "✅ Ta semaine" ]
         , div [ A.style "display" "grid", A.style "grid-template-columns" "auto auto", A.style "gap" "0.4rem 1rem", A.style "font-size" "0.9rem" ]
             [ span [ A.style "color" "#5a3a22" ] [ text "Actions notées (7 j)" ]
@@ -3049,7 +3052,7 @@ viewCoachWatch model _ =
             else
                 "⚠ À surveiller (météo J+7)"
     in
-    div [ A.class "panel" ]
+    div [ A.class "panel accent-terracotta" ]
         [ h2 [] [ text title ]
         , if (viewOffset model) > 7 && List.isEmpty model.historical then
             p [ A.style "color" "#8b6e3d", A.style "font-size" "0.82rem" ]
@@ -3119,7 +3122,7 @@ viewCoachTip model =
         season = seasonOf today
         tip = seasonalTip season (isoToDoy today)
     in
-    div [ A.class "panel" ]
+    div [ A.class "panel accent-sky" ]
         [ h2 [] [ text "🎓 Conseil" ]
         , p [ A.style "font-size" "0.92rem", A.style "line-height" "1.5" ] [ text tip ]
         ]

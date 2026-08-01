@@ -121,6 +121,18 @@ h1 {
     to   { opacity: 1; transform: translateY(0); clip-path: inset(0 0 -20% 0); }
 }
 
+h1 { transition: letter-spacing 0.4s cubic-bezier(0.2, 0.8, 0.3, 1); }
+h1:hover { letter-spacing: 0.02em; }
+
+.tagline {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 0.92rem;
+    color: var(--ink-faint);
+    margin-top: 0.15rem;
+    animation: title-in 0.6s 0.15s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
 h2 { font-size: 1.2rem; font-weight: 650; margin-bottom: 0.5rem; }
 
 /* Filet éditorial après les titres de panneaux (hors en-têtes repliables) */
@@ -192,6 +204,16 @@ h3 { font-size: 1rem;  font-weight: 650; margin-bottom: 0.35rem; }
     from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
 }
+
+/* Tableau de bord : léger relief au survol des cartes */
+.panel { transition: box-shadow 0.2s, transform 0.2s; }
+.panel:hover { box-shadow: var(--shadow-lift); transform: translateY(-1px); }
+
+/* Accents catégoriels des cartes du Coach : liseré supérieur coloré */
+.panel.accent-moss       { border-top: 3px solid var(--moss-bright); }
+.panel.accent-terracotta { border-top: 3px solid var(--terracotta); }
+.panel.accent-gold       { border-top: 3px solid var(--gold); }
+.panel.accent-sky        { border-top: 3px solid var(--sky); }
 
 @media (prefers-reduced-motion: reduce) {
     .panel { animation: none; }
