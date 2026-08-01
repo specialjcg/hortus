@@ -3558,17 +3558,11 @@ viewJournalPage model =
         coachPanels =
             case model.calendar of
                 Just cal ->
-                    div
-                        [ A.style "display" "grid"
-                        , A.style "grid-template-columns" "repeat(auto-fit, minmax(280px, 1fr))"
-                        , A.style "gap" "0.6rem"
-                        , A.style "margin-bottom" "0.6rem"
-                        , A.style "align-items" "start"
-                        ]
-                        [ viewCoachTodo model cal
-                        , viewCoachWatch model cal
-                        , viewCoachWeek model
-                        , viewCoachTip model
+                    div [ A.class "bento4" ]
+                        [ div [ A.class "bento-main" ] [ viewCoachTodo model cal ]
+                        , div [ A.class "bento-side" ] [ viewCoachWatch model cal ]
+                        , div [ A.class "bento-a" ] [ viewCoachWeek model ]
+                        , div [ A.class "bento-b" ] [ viewCoachTip model ]
                         ]
                 Nothing ->
                     text ""
