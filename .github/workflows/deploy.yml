@@ -16,7 +16,7 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # --- Backend release binary ---
       - uses: dtolnay/rust-toolchain@stable
@@ -28,9 +28,9 @@ jobs:
         run: cargo build --release --bin hortus-backend
 
       # --- Frontend (elm) → package/static ---
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Build frontend
         working-directory: frontend
         run: |
@@ -64,10 +64,11 @@ jobs:
           HOST="root@VPS-779132.ssh.vps1euro.fr"
           OPTS="-o Port=9999 -i ~/.ssh/id_deploy -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=3"
 
-          # Retry : le SSH d'entrée (port 9999) coupe par intermittence ;
-          # on rejoue la même commande sans re-builder.
+          # Retry : le SSH d'entrée (port 9999) coupe par intermittence et
+          # bloque parfois les IP des runners plusieurs minutes ; on rejoue
+          # la même commande sans re-builder, fenêtre ~7 min.
           retry() {
-            local n=0 max=8 delay=8
+            local n=0 max=15 delay=30
             until "$@"; do
               n=$((n+1))
               if [ "$n" -ge "$max" ]; then echo "::error::échec après $max essais: $*"; return 1; fi
