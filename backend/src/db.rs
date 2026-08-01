@@ -71,6 +71,7 @@ pub fn run_additive_migrations(conn: &rusqlite::Connection) -> Result<(), String
         "ALTER TABLE action ADD COLUMN grid_x INTEGER",
         "ALTER TABLE action ADD COLUMN grid_y INTEGER",
         "ALTER TABLE action ADD COLUMN solution TEXT",
+        "ALTER TABLE action ADD COLUMN photo_path TEXT",
     ];
     for sql in &adds {
         if let Err(e) = conn.execute(sql, []) {

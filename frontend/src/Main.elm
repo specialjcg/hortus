@@ -10,6 +10,8 @@ Deux vues :
 
 import Browser
 import Browser.Events
+import File exposing (File)
+import File.Select
 import Html exposing (Html, button, div, h1, h2, h3, input, option, p, select, span, text, textarea)
 import Html.Attributes as A
 import Html.Events as E
@@ -292,6 +294,7 @@ type alias ActionEntry =
     , gridX : Maybe Int
     , gridY : Maybe Int
     , solution : Maybe String
+    , photoPath : Maybe String
     }
 
 
@@ -458,6 +461,9 @@ type Msg
     | ConfirmHarvest -- enregistre la récolte (poids optionnel), + arrachage si finish
     | ToggleDeathPicker
     | ToggleJournal
+    | PickPhoto Int
+    | GotPhotoFile Int File
+    | PhotoUploaded (Result Http.Error ())
     | OpenDeathNote -- cause inconnue → saisie d'une observation libre
     | SetDeathDraft String
     | PlantDead Int String -- plant id, cause de la mort
@@ -730,6 +736,30 @@ update msg model =
 
         ToggleJournal ->
             ( { model | journalOpen = not model.journalOpen }, Cmd.none )
+
+        PickPhoto actionId ->
+            ( model
+            , File.Select.file [ "image/jpeg", "image/png", "image/webp" ] (GotPhotoFile actionId)
+            )
+
+        GotPhotoFile actionId file ->
+            ( model
+            , Http.request
+                { method = "POST"
+                , headers = []
+                , url = model.backendUrl ++ "/actions/" ++ String.fromInt actionId ++ "/photo"
+                , body = Http.fileBody file
+                , expect = Http.expectWhatever PhotoUploaded
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+            )
+
+        PhotoUploaded (Ok _) ->
+            ( model, fetchActions model.backendUrl )
+
+        PhotoUploaded (Err e) ->
+            ( { model | error = Just (httpErr e) }, Cmd.none )
 
         OpenDeathNote ->
             ( { model | deathDraft = Just "" }, Cmd.none )
@@ -1928,6 +1958,7 @@ actionDecoder =
         |> andMap (D.field "grid_x" (D.nullable D.int))
         |> andMap (D.field "grid_y" (D.nullable D.int))
         |> andMap (D.field "solution" (D.nullable D.string))
+        |> andMap (D.oneOf [ D.field "photo_path" (D.nullable D.string), D.succeed Nothing ])
 
 
 
@@ -5560,7 +5591,7 @@ viewActionsTimeline model =
 
 
 viewActionRow : Model -> ActionEntry -> Html Msg
-viewActionRow _ a =
+viewActionRow model a =
     let
         tileLabel =
             case ( a.gridX, a.gridY ) of
@@ -5586,13 +5617,29 @@ viewActionRow _ a =
                     Nothing -> text ""
                 ]
             , div [ A.style "display" "flex", A.style "gap" "0.3rem" ]
-                [ button [ E.onClick (EditAction a), A.style "padding" "3px 6px", A.style "font-size" "0.75rem" ] [ text "✎" ]
+                [ button
+                    [ E.onClick (PickPhoto a.id)
+                    , A.style "padding" "3px 6px", A.style "font-size" "0.75rem"
+                    , A.title (if a.photoPath == Nothing then "Joindre une photo" else "Remplacer la photo")
+                    ]
+                    [ text "📷" ]
+                , button [ E.onClick (EditAction a), A.style "padding" "3px 6px", A.style "font-size" "0.75rem" ] [ text "✎" ]
                 , button [ E.onClick (DeleteAction a.id), A.class "danger", A.style "padding" "3px 6px", A.style "font-size" "0.75rem" ] [ text "🗑" ]
                 ]
             ]
         , case a.notes of
             Just n -> div [ A.class "row-note" ] [ text n ]
             Nothing -> text ""
+        , case a.photoPath of
+            Just name ->
+                let
+                    url = model.backendUrl ++ "/photos/" ++ name
+                in
+                Html.a [ A.href url, A.target "_blank", A.class "row-photo-link" ]
+                    [ Html.img [ A.src url, A.class "row-photo", A.alt "photo du journal" ] [] ]
+
+            Nothing ->
+                text ""
         ]
 
 

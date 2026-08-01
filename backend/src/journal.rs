@@ -50,6 +50,7 @@ pub struct Action {
     pub grid_x: Option<i64>,
     pub grid_y: Option<i64>,
     pub solution: Option<String>,
+    pub photo_path: Option<String>,
     pub created_at: String,
 }
 
@@ -220,7 +221,7 @@ pub struct ActionFilter {
 pub fn list_actions(db: &Db, f: &ActionFilter) -> Result<Vec<Action>, String> {
     let conn = db.lock().expect("DB mutex poisoned");
     let mut sql = String::from(
-        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, created_at FROM action WHERE 1=1",
+        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, photo_path, created_at FROM action WHERE 1=1",
     );
     let mut args: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
     if let Some(p) = f.parcel_id {
@@ -262,7 +263,8 @@ pub fn list_actions(db: &Db, f: &ActionFilter) -> Result<Vec<Action>, String> {
                 grid_x: r.get(7)?,
                 grid_y: r.get(8)?,
                 solution: r.get(9)?,
-                created_at: r.get(10)?,
+                photo_path: r.get(10)?,
+                created_at: r.get(11)?,
             })
         })
         .map_err(|e| format!("query : {e}"))?;
@@ -282,7 +284,7 @@ pub fn insert_action(db: &Db, input: &ActionInput) -> Result<Action, String> {
     .map_err(|e| format!("insert : {e}"))?;
     let id = conn.last_insert_rowid();
     conn.query_row(
-        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, created_at FROM action WHERE id = ?",
+        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, photo_path, created_at FROM action WHERE id = ?",
         params![id],
         |r| {
             Ok(Action {
@@ -296,7 +298,8 @@ pub fn insert_action(db: &Db, input: &ActionInput) -> Result<Action, String> {
                 grid_x: r.get(7)?,
                 grid_y: r.get(8)?,
                 solution: r.get(9)?,
-                created_at: r.get(10)?,
+                photo_path: r.get(10)?,
+                created_at: r.get(11)?,
             })
         },
     )
@@ -321,7 +324,7 @@ pub fn insert_actions_bulk(db: &Db, inputs: &[ActionInput]) -> Result<Vec<Action
         let id = tx.last_insert_rowid();
         let action = tx
             .query_row(
-                "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, created_at FROM action WHERE id = ?",
+                "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, photo_path, created_at FROM action WHERE id = ?",
                 params![id],
                 |r| {
                     Ok(Action {
@@ -335,7 +338,8 @@ pub fn insert_actions_bulk(db: &Db, inputs: &[ActionInput]) -> Result<Vec<Action
                         grid_x: r.get(7)?,
                         grid_y: r.get(8)?,
                         solution: r.get(9)?,
-                        created_at: r.get(10)?,
+                        photo_path: r.get(10)?,
+                        created_at: r.get(11)?,
                     })
                 },
             )
@@ -361,7 +365,7 @@ pub fn update_action(db: &Db, id: i64, input: &ActionInput) -> Result<Action, St
         return Err("action inconnue".into());
     }
     conn.query_row(
-        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, created_at FROM action WHERE id = ?",
+        "SELECT id, date, parcel_id, species_id, kind, quantity_g, notes, grid_x, grid_y, solution, photo_path, created_at FROM action WHERE id = ?",
         params![id],
         |r| {
             Ok(Action {
@@ -375,7 +379,8 @@ pub fn update_action(db: &Db, id: i64, input: &ActionInput) -> Result<Action, St
                 grid_x: r.get(7)?,
                 grid_y: r.get(8)?,
                 solution: r.get(9)?,
-                created_at: r.get(10)?,
+                photo_path: r.get(10)?,
+                created_at: r.get(11)?,
             })
         },
     )
@@ -387,6 +392,31 @@ pub fn delete_action(db: &Db, id: i64) -> Result<(), String> {
     let n = conn
         .execute("DELETE FROM action WHERE id = ?", params![id])
         .map_err(|e| format!("delete : {e}"))?;
+    if n == 0 {
+        return Err("action inconnue".into());
+    }
+    Ok(())
+}
+
+/// Nom de fichier photo associé à une action (None si aucune).
+pub fn get_action_photo(db: &Db, id: i64) -> Result<Option<String>, String> {
+    let conn = db.lock().expect("DB mutex poisoned");
+    conn.query_row(
+        "SELECT photo_path FROM action WHERE id = ?",
+        params![id],
+        |r| r.get::<_, Option<String>>(0),
+    )
+    .optional()
+    .map(|o| o.flatten())
+    .map_err(|e| format!("photo : {e}"))
+}
+
+/// Associe (ou retire, avec None) une photo à une action.
+pub fn set_action_photo(db: &Db, id: i64, path: Option<&str>) -> Result<(), String> {
+    let conn = db.lock().expect("DB mutex poisoned");
+    let n = conn
+        .execute("UPDATE action SET photo_path = ? WHERE id = ?", params![path, id])
+        .map_err(|e| format!("update photo : {e}"))?;
     if n == 0 {
         return Err("action inconnue".into());
     }
@@ -443,6 +473,7 @@ mod tests {
                 grid_x INTEGER,
                 grid_y INTEGER,
                 solution TEXT,
+                photo_path TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (parcel_id) REFERENCES parcel(id) ON DELETE SET NULL
             );

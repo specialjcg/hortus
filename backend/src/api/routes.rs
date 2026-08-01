@@ -1,8 +1,10 @@
 //! Routes HTTP — calendrier des plantations (stateless).
 
 use axum::{
-    extract::{Path, Query, State},
-    http::StatusCode,
+    body::Bytes,
+    extract::{DefaultBodyLimit, Path, Query, State},
+    http::{header, HeaderMap, StatusCode},
+    response::IntoResponse,
     routing::{get, post, put},
     Json, Router,
 };
@@ -24,6 +26,89 @@ use crate::problems::{self, EntryInput, Problem, ProblemInput, ProblemUpdate};
 pub struct AppState {
     pub species: Arc<Vec<Species>>,
     pub db: Db,
+}
+
+/// Répertoire des photos du journal (jamais touché par le déploiement,
+/// comme la DB — il vit à côté dans data/).
+const PHOTOS_DIR: &str = "data/photos";
+
+/// Associe une photo (corps brut jpeg/png/webp) à une action. Remplace
+/// l'ancienne photo le cas échéant.
+async fn upload_action_photo(
+    State(s): State<AppState>,
+    Path(id): Path<i64>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let ext = match headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+    {
+        "image/jpeg" => "jpg",
+        "image/png" => "png",
+        "image/webp" => "webp",
+        other => {
+            return Err((
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                format!("type non supporté : {other} (jpeg/png/webp)"),
+            ))
+        }
+    };
+    if body.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "corps vide".into()));
+    }
+    // L'ancienne photo est remplacée (nom horodaté = cache-bust naturel).
+    let old = journal::get_action_photo(&s.db, id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    std::fs::create_dir_all(PHOTOS_DIR)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("mkdir : {e}")))?;
+    let name = format!("{}-{}.{}", id, chrono::Local::now().format("%Y%m%d%H%M%S"), ext);
+    std::fs::write(std::path::Path::new(PHOTOS_DIR).join(&name), &body)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("write : {e}")))?;
+    journal::set_action_photo(&s.db, id, Some(&name)).map_err(|e| {
+        let _ = std::fs::remove_file(std::path::Path::new(PHOTOS_DIR).join(&name));
+        if e == "action inconnue" {
+            (StatusCode::NOT_FOUND, e)
+        } else {
+            (StatusCode::INTERNAL_SERVER_ERROR, e)
+        }
+    })?;
+    if let Some(old_name) = old {
+        let _ = std::fs::remove_file(std::path::Path::new(PHOTOS_DIR).join(old_name));
+    }
+    Ok(Json(serde_json::json!({ "photo_path": name })))
+}
+
+/// Sert une photo du journal. Nom strictement alphanumérique + [._-] :
+/// pas de traversée de répertoire possible.
+async fn serve_photo(Path(name): Path<String>) -> impl IntoResponse {
+    if name.is_empty()
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_')
+    {
+        return (StatusCode::BAD_REQUEST, "nom invalide").into_response();
+    }
+    let content_type = if name.ends_with(".png") {
+        "image/png"
+    } else if name.ends_with(".webp") {
+        "image/webp"
+    } else {
+        "image/jpeg"
+    };
+    match tokio::fs::read(std::path::Path::new(PHOTOS_DIR).join(&name)).await {
+        Ok(bytes) => (
+            StatusCode::OK,
+            [
+                (header::CONTENT_TYPE, content_type.to_string()),
+                (header::CACHE_CONTROL, "public, max-age=31536000, immutable".to_string()),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => (StatusCode::NOT_FOUND, "photo introuvable").into_response(),
+    }
 }
 
 pub fn router() -> Router {
@@ -64,10 +149,13 @@ pub fn router() -> Router {
         .route("/actions", get(get_actions).post(create_action).delete(del_all_actions))
         .route("/actions/bulk", post(create_actions_bulk))
         .route("/actions/{id}", put(put_action).delete(del_action))
+        .route("/actions/{id}/photo", post(upload_action_photo))
+        .route("/photos/{name}", get(serve_photo))
         .route("/problems", get(get_problems).post(create_problem))
         .route("/problems/{id}", put(put_problem).delete(del_problem))
         .route("/problems/{id}/entries", post(create_problem_entry))
         .with_state(state)
+        .layer(DefaultBodyLimit::max(8 * 1024 * 1024))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
 }
@@ -319,6 +407,10 @@ async fn del_action(
     State(s): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    // La photo associée part avec l'action.
+    if let Ok(Some(name)) = journal::get_action_photo(&s.db, id) {
+        let _ = std::fs::remove_file(std::path::Path::new(PHOTOS_DIR).join(name));
+    }
     journal::delete_action(&s.db, id)
         .map(|_| StatusCode::NO_CONTENT)
         .map_err(|e| {

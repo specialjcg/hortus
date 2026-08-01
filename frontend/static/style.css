@@ -651,6 +651,19 @@ button.chip:hover:not(:disabled) {
     border-left: 2px solid var(--gold);
 }
 
+/* Photo jointe à une entrée du journal */
+.row-photo-link { display: inline-block; margin-top: 0.35rem; line-height: 0; }
+.row-photo {
+    height: 84px;
+    max-width: 200px;
+    object-fit: cover;
+    border-radius: 14px 6px 14px 6px;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-card);
+    transition: transform 0.18s, box-shadow 0.18s;
+}
+.row-photo:hover { transform: scale(1.04) rotate(-0.5deg); box-shadow: var(--shadow-lift); }
+
 /* Indication contextuelle discrète (coach : « en récolte… ») */
 .hint { font-size: 0.72rem; color: var(--sage); font-style: italic; }
 
