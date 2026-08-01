@@ -2063,16 +2063,12 @@ viewCoachPage model =
             div [ A.class "panel" ] [ text "Chargement du catalogue..." ]
 
         Just cal ->
-            div [ A.class "layout" ]
-                [ div []
-                    [ viewCoachTodo model cal
-                    , viewCoachWeek model
-                    ]
-                , div []
-                    [ viewCoachWatch model cal
-                    , viewCoachObservations model
-                    , viewCoachTip model
-                    ]
+            div [ A.class "bento" ]
+                [ div [ A.class "bento-main" ] [ viewCoachTodo model cal ]
+                , div [ A.class "bento-side" ] [ viewCoachWatch model cal ]
+                , div [ A.class "bento-a" ] [ viewCoachWeek model ]
+                , div [ A.class "bento-b" ] [ viewCoachObservations model ]
+                , div [ A.class "bento-c" ] [ viewCoachTip model ]
                 ]
 
 

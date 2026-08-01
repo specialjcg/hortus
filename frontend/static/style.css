@@ -51,6 +51,7 @@
     --font-display: "Fraunces", "EB Garamond", Georgia, serif;
     --font-body: "Hanken Grotesk", "Inter", -apple-system, sans-serif;
     --font-mono: "IBM Plex Mono", "Courier New", monospace;
+    --font-hand: "Caveat", "Segoe Script", cursive;
 }
 
 * { box-sizing: border-box; }
@@ -181,6 +182,39 @@ h3 { font-size: 1rem;  font-weight: 650; margin-bottom: 0.35rem; }
 
 @media (max-width: 900px) {
     .layout { grid-template-columns: 1fr; }
+}
+
+/* Bento grid du Coach : cases de tailles variées, hiérarchie scannable */
+.bento {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr;
+    grid-template-areas:
+        "main main side"
+        "a    b    c";
+    gap: 1.1rem;
+    align-items: stretch;
+}
+.bento-main { grid-area: main; }
+.bento-side { grid-area: side; }
+.bento-a { grid-area: a; }
+.bento-b { grid-area: b; }
+.bento-c { grid-area: c; }
+.bento > div > .panel { height: 100%; margin-bottom: 0; }
+
+@media (max-width: 1000px) {
+    .bento {
+        grid-template-columns: 1fr;
+        grid-template-areas: "main" "side" "a" "b" "c";
+    }
+}
+
+/* Révélation au défilement (CSS pur, ignoré par les anciens navigateurs) */
+@supports (animation-timeline: view()) {
+    .bento > div > .panel, .layout .panel {
+        animation: panel-in linear both;
+        animation-timeline: view();
+        animation-range: entry 0% entry 40%;
+    }
 }
 
 .panel {
@@ -538,13 +572,15 @@ button.chip:hover:not(:disabled) {
     color: var(--ink-faint);
     margin-left: 0.4rem;
 }
+/* Notes du jardinier : touche manuscrite « wabi-sabi » */
 .row-note {
-    font-size: 0.82rem;
+    font-family: var(--font-hand);
+    font-size: 1.05rem;
+    line-height: 1.25;
     color: var(--ink-soft);
     margin-top: 0.25rem;
-    padding-left: 0.2rem;
+    padding-left: 0.4rem;
     border-left: 2px solid var(--gold);
-    font-style: italic;
 }
 
 /* Indication contextuelle discrète (coach : « en récolte… ») */
