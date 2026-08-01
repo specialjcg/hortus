@@ -7,45 +7,45 @@
    ========================================================================== */
 
 :root {
-    /* Surfaces */
-    --paper: #f4efe3;
-    --card: #fdfbf4;
-    --card-warm: #f8f2df;
-    --line: rgba(61, 52, 31, 0.14);
-    --line-strong: rgba(61, 52, 31, 0.28);
+    /* Surfaces — « verger frais » : blanc verdi, cartes blanches */
+    --paper: #f4f7f2;
+    --card: #ffffff;
+    --card-warm: #f8faf6;
+    --line: rgba(31, 43, 34, 0.10);
+    --line-strong: rgba(31, 43, 34, 0.22);
 
     /* Encres */
-    --ink: #262215;
-    --ink-soft: #5a4c33;
-    --ink-faint: #8a7a5c;
+    --ink: #1f2b22;
+    --ink-soft: #46584c;
+    --ink-faint: #7d8f83;
 
     /* Végétal */
-    --moss: #3e6b21;
-    --moss-bright: #679d3a;
-    --moss-pale: #e6efd8;
+    --moss: #2e7d4f;
+    --moss-bright: #45a06b;
+    --moss-pale: #e3f1e7;
 
     /* Accents */
-    --terracotta: #c05a33;
-    --terracotta-pale: #f7e3d7;
-    --gold: #d9a63d;
-    --gold-pale: #f6ecd2;
-    --sky: #5f8fb4;
+    --terracotta: #e8603c;
+    --terracotta-pale: #fdeae3;
+    --gold: #f0a832;
+    --gold-pale: #fdf3dd;
+    --sky: #3d95c9;
 
     /* Compat ancienne palette (styles inline Elm y font référence par valeur,
        ces variables restent pour les règles ci-dessous) */
-    --soil-dark: #3d2818;
-    --soil: #5a3a22;
-    --soil-light: #8b6e3d;
-    --green-dark: #3e6b21;
-    --green: #679d3a;
-    --green-bright: #9bc55c;
-    --leaf-yellow: #d4b85a;
+    --soil-dark: #2b3a30;
+    --soil: #46584c;
+    --soil-light: #7d8f83;
+    --green-dark: #2e7d4f;
+    --green: #45a06b;
+    --green-bright: #7cc98f;
+    --leaf-yellow: #f0a832;
     --paper-warm: var(--card-warm);
-    --rust: #c05a33;
-    --water-blue: #5f8fb4;
+    --rust: #e8603c;
+    --water-blue: #3d95c9;
 
-    --shadow-card: 0 1px 2px rgba(48, 38, 16, 0.05), 0 4px 16px rgba(48, 38, 16, 0.06);
-    --shadow-lift: 0 2px 4px rgba(48, 38, 16, 0.08), 0 8px 24px rgba(48, 38, 16, 0.10);
+    --shadow-card: 0 1px 2px rgba(20, 40, 28, 0.05), 0 4px 16px rgba(20, 40, 28, 0.07);
+    --shadow-lift: 0 2px 4px rgba(20, 40, 28, 0.08), 0 8px 24px rgba(20, 40, 28, 0.11);
     --radius: 12px;
 
     --font-display: "Fraunces", "EB Garamond", Georgia, serif;
@@ -76,14 +76,14 @@ body {
     background-color: var(--paper);
     /* Atmosphère : halo de lumière en haut + trame de semis diagonale très légère */
     background-image:
-        radial-gradient(1200px 500px at 50% -100px, rgba(155, 197, 92, 0.16), transparent 70%),
-        radial-gradient(900px 400px at 90% 10%, rgba(217, 166, 61, 0.07), transparent 70%),
+        radial-gradient(1200px 500px at 50% -100px, rgba(69, 160, 107, 0.10), transparent 70%),
+        radial-gradient(900px 400px at 90% 10%, rgba(61, 149, 201, 0.05), transparent 70%),
         repeating-linear-gradient(
             45deg,
             transparent 0,
             transparent 28px,
-            rgba(62, 107, 33, 0.025) 28px,
-            rgba(62, 107, 33, 0.025) 29px
+            rgba(46, 125, 79, 0.02) 28px,
+            rgba(46, 125, 79, 0.02) 29px
         );
     background-attachment: fixed;
 }
@@ -257,11 +257,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 button.primary {
     background: linear-gradient(180deg, var(--moss-bright), var(--moss));
     border-color: var(--moss);
-    color: #fdfbf4;
+    color: #ffffff;
     box-shadow: 0 1px 3px rgba(62, 107, 33, 0.35);
 }
 button.primary:hover:not(:disabled) {
-    background: linear-gradient(180deg, #74ad45, #47791f);
+    background: linear-gradient(180deg, #4fae76, #266b43);
     color: #ffffff;
     border-color: var(--moss);
 }
@@ -269,19 +269,19 @@ button.primary:hover:not(:disabled) {
 button.danger {
     background: var(--terracotta);
     border-color: var(--terracotta);
-    color: #fdf6ef;
+    color: #ffffff;
 }
 button.danger:hover:not(:disabled) {
-    background: #a84a27;
+    background: #cc4e2c;
     color: #ffffff;
-    border-color: #a84a27;
+    border-color: #cc4e2c;
 }
 
 input, select, textarea {
     font-family: inherit;
     font-size: 0.88rem;
     color: var(--ink);
-    background: #fffef9;
+    background: #ffffff;
     border: 1px solid var(--line-strong);
     border-radius: 8px;
     padding: 6px 10px;
@@ -389,7 +389,7 @@ textarea { resize: vertical; line-height: 1.45; }
 
 .error {
     background: var(--terracotta-pale);
-    color: #6e2a10;
+    color: #8a2f12;
     padding: 0.6rem 1rem;
     border-left: 4px solid var(--terracotta);
     border-radius: 6px;
@@ -462,7 +462,7 @@ textarea { resize: vertical; line-height: 1.45; }
 }
 .tabbar .tab.active {
     background: linear-gradient(180deg, var(--moss-bright), var(--moss));
-    color: #fdfbf4;
+    color: #ffffff;
     box-shadow: 0 2px 8px rgba(62, 107, 33, 0.35);
 }
 .tabbar .tab .tab-icon { font-size: 1rem; line-height: 1; }
@@ -484,7 +484,7 @@ textarea { resize: vertical; line-height: 1.45; }
 /* Chip : bouton d'action compact, fond coloré posé en inline (kindColor) */
 button.chip {
     border: none;
-    color: #fdfbf4;
+    color: #ffffff;
     padding: 5px 12px;
     border-radius: 999px;
     font-size: 0.78rem;
@@ -505,7 +505,7 @@ button.chip:hover:not(:disabled) {
 /* Badge de type d'action (journal) : pastille, fond inline via kindColor */
 .kind-badge {
     display: inline-block;
-    color: #fdfbf4;
+    color: #ffffff;
     padding: 2px 9px;
     border-radius: 999px;
     font-size: 0.68rem;

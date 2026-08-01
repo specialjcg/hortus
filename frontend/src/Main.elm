@@ -237,7 +237,7 @@ type alias ParcelForm =
 emptyParcelForm : ParcelForm
 emptyParcelForm =
     { name = "", surface = "", exposition = "", soilNotes = ""
-    , gridX = "0", gridY = "0", gridW = "2", gridH = "2", color = "#8fbc4a"
+    , gridX = "0", gridY = "0", gridW = "2", gridH = "2", color = "#63b06f"
     }
 
 
@@ -1955,15 +1955,15 @@ viewSeasonBanner model _ =
         [ div [ A.style "display" "flex", A.style "align-items" "center", A.style "gap" "0.6rem", A.style "margin-bottom" "0.3rem" ]
             [ span [ A.style "font-size" "1.5rem" ] [ text (seasonIcon viewSeason) ]
             , Html.strong [] [ text (seasonLabel viewSeason) ]
-            , span [ A.style "color" "#8b6e3d" ] [ text "·" ]
+            , span [ A.style "color" "#7d8f83" ] [ text "·" ]
             , Html.strong [] [ text viewDate ]
-            , span [ A.style "color" "#8b6e3d", A.style "font-size" "0.82rem" ]
+            , span [ A.style "color" "#7d8f83", A.style "font-size" "0.82rem" ]
                 [ text ("(" ++ offsetLabel ++ ")") ]
-            , span [ A.style "margin-left" "auto", A.style "font-size" "0.82rem", A.style "color" "#5a3a22" ]
+            , span [ A.style "margin-left" "auto", A.style "font-size" "0.82rem", A.style "color" "#46584c" ]
                 [ text (String.fromInt activeCount ++ " espèces actives") ]
             ]
         , div [ A.style "display" "flex", A.style "align-items" "center", A.style "gap" "0.5rem" ]
-            [ span [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22", A.style "min-width" "60px" ]
+            [ span [ A.style "font-size" "0.78rem", A.style "color" "#46584c", A.style "min-width" "60px" ]
                 [ text "1 janv" ]
             , Html.input
                 [ A.type_ "range"
@@ -1974,7 +1974,7 @@ viewSeasonBanner model _ =
                 , A.style "flex" "1"
                 ]
                 []
-            , span [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22", A.style "min-width" "60px", A.style "text-align" "right" ]
+            , span [ A.style "font-size" "0.78rem", A.style "color" "#46584c", A.style "min-width" "60px", A.style "text-align" "right" ]
                 [ text "31 déc" ]
             , button
                 [ E.onClick ResetViewDoy
@@ -2070,7 +2070,7 @@ viewCoachObservations model =
     div [ A.class "panel accent-gold" ]
         [ h2 [] [ text "📝 Mes observations" ]
         , if List.isEmpty observations then
-            p [ A.style "color" "#5a3a22", A.style "font-size" "0.85rem" ]
+            p [ A.style "color" "#46584c", A.style "font-size" "0.85rem" ]
                 [ text "Aucune observation. Clique un plant → écris ce que tu constates." ]
           else
             div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.4rem" ]
@@ -2092,7 +2092,7 @@ viewObservationItem a =
         [ A.style "padding" "0.4rem 0.55rem", A.style "background" "#f5f0e0"
         , A.style "border-left" "3px solid #5a7a22", A.style "border-radius" "4px"
         ]
-        [ div [ A.style "font-size" "0.74rem", A.style "color" "#5a3a22", A.style "font-weight" "600" ]
+        [ div [ A.style "font-size" "0.74rem", A.style "color" "#46584c", A.style "font-weight" "600" ]
             [ text head ]
         , div [ A.style "font-size" "0.85rem", A.style "margin-top" "0.15rem" ]
             [ text (a.notes |> Maybe.withDefault "") ]
@@ -2195,12 +2195,12 @@ viewAlmanacPage model =
     div []
         [ div [ A.class "panel" ]
             [ h2 [] [ text "📖 Almanach du jardin" ]
-            , p [ A.style "font-size" "0.85rem", A.style "color" "#5a3a22" ]
+            , p [ A.style "font-size" "0.85rem", A.style "color" "#46584c" ]
                 [ text "Suivi méthodique des problèmes : une fiche par souci, avec observations, traitements testés et résultats datés. Clos la fiche avec ta conclusion pour la retrouver les saisons suivantes." ]
             , div [ A.style "display" "flex", A.style "gap" "0.6rem", A.style "align-items" "center", A.style "flex-wrap" "wrap" ]
                 [ button
                     [ E.onClick (OpenProblemForm Nothing Nothing)
-                    , A.style "padding" "6px 12px", A.style "background" "#5a7a22"
+                    , A.style "padding" "6px 12px", A.style "background" "#2e7d4f"
                     , A.style "color" "white", A.style "border" "none"
                     , A.style "border-radius" "4px", A.style "cursor" "pointer"
                     , A.style "font-size" "0.85rem"
@@ -2223,7 +2223,7 @@ viewAlmanacPage model =
         , div [ A.class "panel" ]
             [ sectionTitle "🔴" "Problèmes en cours" (List.length openProbs)
             , if List.isEmpty openProbs then
-                p [ A.style "font-size" "0.84rem", A.style "color" "#5a3a22" ]
+                p [ A.style "font-size" "0.84rem", A.style "color" "#46584c" ]
                     [ text "Aucun problème ouvert — le jardin se porte bien 🌞" ]
               else
                 div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.8rem" ]
@@ -2232,7 +2232,7 @@ viewAlmanacPage model =
         , div [ A.class "panel" ]
             [ sectionTitle "✅" "Problèmes résolus" (List.length resolvedProbs)
             , if List.isEmpty resolvedProbs then
-                p [ A.style "font-size" "0.84rem", A.style "color" "#5a3a22" ]
+                p [ A.style "font-size" "0.84rem", A.style "color" "#46584c" ]
                     [ text "Les fiches closes avec leur conclusion apparaîtront ici." ]
               else
                 div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.8rem" ]
@@ -2241,7 +2241,7 @@ viewAlmanacPage model =
         , div [ A.class "panel" ]
             [ sectionTitle "📝" "Notes libres" (List.length notes)
             , if List.isEmpty notes then
-                p [ A.style "font-size" "0.84rem", A.style "color" "#5a3a22" ]
+                p [ A.style "font-size" "0.84rem", A.style "color" "#46584c" ]
                     [ text "Les observations rapides saisies sur un plant apparaissent ici." ]
               else
                 div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "1rem" ]
@@ -2267,12 +2267,12 @@ viewNewProblemForm model draft =
                 Nothing -> []
 
         lbl t =
-            div [ A.style "font-size" "0.76rem", A.style "color" "#5a3a22", A.style "font-weight" "600", A.style "margin-top" "0.5rem" ]
+            div [ A.style "font-size" "0.76rem", A.style "color" "#46584c", A.style "font-weight" "600", A.style "margin-top" "0.5rem" ]
                 [ text t ]
     in
     div
         [ A.style "margin-top" "0.7rem", A.style "padding" "0.7rem"
-        , A.style "background" "#fff6de", A.style "border" "2px solid #d4a033"
+        , A.style "background" "#ffffff", A.style "border" "2px solid #d4a033"
         , A.style "border-radius" "6px"
         ]
         [ h3 [ A.style "margin" "0" ] [ text "🔬 Nouvelle fiche problème" ]
@@ -2317,7 +2317,7 @@ viewNewProblemForm model draft =
         , div [ A.style "margin-top" "0.5rem", A.style "display" "flex", A.style "gap" "0.4rem" ]
             [ button
                 [ E.onClick SubmitProblem
-                , A.style "padding" "6px 12px", A.style "background" "#5a7a22"
+                , A.style "padding" "6px 12px", A.style "background" "#2e7d4f"
                 , A.style "color" "white", A.style "border" "none"
                 , A.style "border-radius" "4px", A.style "cursor" "pointer"
                 , A.style "font-size" "0.85rem"
@@ -2343,7 +2343,7 @@ viewProblemCard model p =
 
         entryLine e =
             div [ A.style "display" "flex", A.style "gap" "0.5rem", A.style "font-size" "0.84rem", A.style "padding" "0.2rem 0" ]
-                [ span [ A.style "color" "#5a3a22", A.style "font-size" "0.76rem", A.style "white-space" "nowrap", A.style "font-weight" "600" ]
+                [ span [ A.style "color" "#46584c", A.style "font-size" "0.76rem", A.style "white-space" "nowrap", A.style "font-weight" "600" ]
                     [ text e.date ]
                 , span [] [ text (entryKindIcon e.kind ++ " " ++ e.text) ]
                 ]
@@ -2352,7 +2352,7 @@ viewProblemCard model p =
             button
                 [ E.onClick (StartEntry p.id kind)
                 , A.style "padding" "3px 9px", A.style "font-size" "0.76rem"
-                , A.style "background" "#fff6de", A.style "border" "1px solid #d4a033"
+                , A.style "background" "#ffffff", A.style "border" "1px solid #d4a033"
                 , A.style "border-radius" "4px", A.style "cursor" "pointer"
                 ]
                 [ text label ]
@@ -2378,7 +2378,7 @@ viewProblemCard model p =
                         , div [ A.style "margin-top" "0.3rem", A.style "display" "flex", A.style "gap" "0.4rem" ]
                             [ button
                                 [ E.onClick SubmitEntry
-                                , A.style "padding" "4px 10px", A.style "background" "#5a7a22"
+                                , A.style "padding" "4px 10px", A.style "background" "#2e7d4f"
                                 , A.style "color" "white", A.style "border" "none"
                                 , A.style "border-radius" "4px", A.style "cursor" "pointer"
                                 , A.style "font-size" "0.8rem"
@@ -2425,13 +2425,13 @@ viewProblemCard model p =
     div
         [ A.style "padding" "0.6rem 0.8rem"
         , A.style "background" (if resolved then "#eef5e0" else "#fdf3e3")
-        , A.style "border-left" ("4px solid " ++ (if resolved then "#4a9b3c" else "#c0392b"))
+        , A.style "border-left" ("4px solid " ++ (if resolved then "#4a9b3c" else "#d64545"))
         , A.style "border-radius" "5px"
         ]
         ([ div [ A.style "display" "flex", A.style "justify-content" "space-between", A.style "align-items" "baseline", A.style "flex-wrap" "wrap", A.style "gap" "0.3rem" ]
             [ div [ A.style "font-weight" "700", A.style "font-size" "0.95rem" ]
                 [ text ((if resolved then "✅ " else "🔴 ") ++ p.title) ]
-            , div [ A.style "font-size" "0.76rem", A.style "color" "#5a3a22" ]
+            , div [ A.style "font-size" "0.76rem", A.style "color" "#46584c" ]
                 [ text (speciesLabel ++ " · " ++ categoryLabel p.category) ]
             ]
          , div [ A.style "margin-top" "0.4rem", A.style "border-left" "2px solid #d4b85a", A.style "padding-left" "0.6rem" ]
@@ -2541,10 +2541,10 @@ viewAlmanacEntry model a =
     div
         [ A.style "padding" "0.5rem 0.7rem"
         , A.style "background" (if resolved then "#eef5e0" else "#f5f0e0")
-        , A.style "border-left" ("3px solid " ++ (if resolved then "#4a9b3c" else "#d4a033"))
+        , A.style "border-left" ("3px solid " ++ (if resolved then "#4a9b3c" else "#f0a832"))
         , A.style "border-radius" "4px"
         ]
-        ([ div [ A.style "font-size" "0.74rem", A.style "color" "#5a3a22", A.style "font-weight" "600" ]
+        ([ div [ A.style "font-size" "0.74rem", A.style "color" "#46584c", A.style "font-weight" "600" ]
             [ text (a.date ++ (if resolved then " · ✅ résolu" else "")) ]
          , div [ A.style "font-size" "0.88rem", A.style "margin-top" "0.15rem" ]
             [ text (a.notes |> Maybe.withDefault "") ]
@@ -2594,7 +2594,7 @@ viewAlmanacEntry model a =
                                 [ button
                                     [ E.onClick (EditSolution a.id "")
                                     , A.style "padding" "3px 9px", A.style "font-size" "0.78rem"
-                                    , A.style "background" "#fff6de", A.style "border" "1px solid #d4a033"
+                                    , A.style "background" "#ffffff", A.style "border" "1px solid #d4a033"
                                     , A.style "border-radius" "4px", A.style "cursor" "pointer"
                                     ]
                                     [ text "💡 Ajouter la solution" ]
@@ -2715,7 +2715,7 @@ viewCoachTodo model cal =
     div [ A.class "panel accent-moss" ]
         [ h2 [] [ text "🎯 À faire aujourd'hui" ]
         , if List.isEmpty sowSuggestions && List.isEmpty harvestSuggestions && List.isEmpty waterSuggestions && List.isEmpty mulchSuggestions then
-            p [ A.style "color" "#5a3a22", A.style "font-size" "0.88rem" ]
+            p [ A.style "color" "#46584c", A.style "font-size" "0.88rem" ]
                 [ text "Rien d'urgent. Profite ☕" ]
           else text ""
         , if not (List.isEmpty harvestSuggestions) then
@@ -2727,7 +2727,7 @@ viewCoachTodo model cal =
         , if not (List.isEmpty waterSuggestions) then
             div [ A.style "margin-bottom" "0.6rem" ]
                 [ h3 [] [ text "💧 À arroser" ]
-                , p [ A.style "font-size" "0.76rem", A.style "color" "#5a3a22", A.style "margin" "0 0 0.3rem 0" ]
+                , p [ A.style "font-size" "0.76rem", A.style "color" "#46584c", A.style "margin" "0 0 0.3rem 0" ]
                     [ text "Plus de 4 jours sans arrosage et pas de pluie >5 mm prévue demain." ]
                 , div [] (List.map (viewMaintenanceSuggestion "arrosage" "💧") waterSuggestions)
                 ]
@@ -2735,7 +2735,7 @@ viewCoachTodo model cal =
         , if not (List.isEmpty mulchSuggestions) then
             div [ A.style "margin-bottom" "0.6rem" ]
                 [ h3 [] [ text "🍂 À pailler" ]
-                , p [ A.style "font-size" "0.76rem", A.style "color" "#5a3a22", A.style "margin" "0 0 0.3rem 0" ]
+                , p [ A.style "font-size" "0.76rem", A.style "color" "#46584c", A.style "margin" "0 0 0.3rem 0" ]
                     [ text "Plants installés depuis +14 jours sans paillage." ]
                 , div [] (List.map (viewMaintenanceSuggestion "paillage" "🍂") mulchSuggestions)
                 ]
@@ -2767,8 +2767,8 @@ viewMaintenanceSuggestion kind icon pl =
         ( label, bgColor ) =
             case kind of
                 "arrosage" -> ( "💧 Arroser", "#5a8ab8" )
-                "paillage" -> ( "🍂 Pailler", "#8b6e3d" )
-                _ -> ( "✓ Noter", "#5a3a22" )
+                "paillage" -> ( "🍂 Pailler", "#7d8f83" )
+                _ -> ( "✓ Noter", "#46584c" )
     in
     div
         [ A.class "pantry-row"
@@ -2832,11 +2832,11 @@ viewHarvestSuggestion model ( pl, sp ) =
             , A.style "gap" "3px", A.style "flex-shrink" "0", A.style "width" "9.5rem"
             ]
             (if multi then
-                [ actionBtn (QuickAction pl.id "recolte") "#d4a033" "🌾 noter une récolte"
-                , actionBtn (FinishHarvest pl.id) "#8b6e3d" "🧺 finir la récolte"
+                [ actionBtn (QuickAction pl.id "recolte") "#f0a832" "🌾 noter une récolte"
+                , actionBtn (FinishHarvest pl.id) "#2e7d4f" "🧺 finir la récolte"
                 ]
              else
-                [ actionBtn (QuickAction pl.id "recolte") "#d4a033" "🌾 récolter" ]
+                [ actionBtn (QuickAction pl.id "recolte") "#f0a832" "🌾 récolter" ]
             )
         ]
 
@@ -2857,7 +2857,7 @@ viewSowSuggestion s =
         ]
         [ div [ A.style "display" "flex", A.style "justify-content" "space-between" ]
             [ span [] [ text (speciesEmoji s.species.id ++ " "), Html.strong [] [ text s.species.nameFr ] ]
-            , span [ A.style "font-size" "0.78rem", A.style "color" "#8b6e3d" ]
+            , span [ A.style "font-size" "0.78rem", A.style "color" "#7d8f83" ]
                 [ text
                     (if s.daysLeft > 0 then
                         "fenêtre " ++ String.fromInt s.daysLeft ++ " j restants"
@@ -2866,7 +2866,7 @@ viewSowSuggestion s =
                     )
                 ]
             ]
-        , div [ A.style "font-size" "0.76rem", A.style "color" "#5a3a22" ]
+        , div [ A.style "font-size" "0.76rem", A.style "color" "#46584c" ]
             [ text (String.join " · " tags) ]
         ]
 
@@ -2950,13 +2950,13 @@ viewCoachWeek model =
     div [ A.class "panel accent-gold" ]
         [ h2 [] [ text "✅ Ta semaine" ]
         , div [ A.style "display" "grid", A.style "grid-template-columns" "auto auto", A.style "gap" "0.4rem 1rem", A.style "font-size" "0.9rem" ]
-            [ span [ A.style "color" "#5a3a22" ] [ text "Actions notées (7 j)" ]
+            [ span [ A.style "color" "#46584c" ] [ text "Actions notées (7 j)" ]
             , span [] [ Html.strong [] [ text (String.fromInt (List.length weekActions)) ] ]
-            , span [ A.style "color" "#5a3a22" ] [ text "Récolté (7 j)" ]
+            , span [ A.style "color" "#46584c" ] [ text "Récolté (7 j)" ]
             , span [] [ Html.strong [] [ text (formatQty weekHarvestG) ] ]
-            , span [ A.style "color" "#5a3a22" ] [ text "Espèces cette année" ]
+            , span [ A.style "color" "#46584c" ] [ text "Espèces cette année" ]
             , span [] [ Html.strong [] [ text (String.fromInt speciesThisYear) ] ]
-            , span [ A.style "color" "#5a3a22" ] [ text "Parcelles actives" ]
+            , span [ A.style "color" "#46584c" ] [ text "Parcelles actives" ]
             , span [] [ Html.strong [] [ text (String.fromInt activeParcels ++ " / " ++ String.fromInt (List.length model.parcels)) ] ]
             ]
         ]
@@ -3055,13 +3055,13 @@ viewCoachWatch model _ =
     div [ A.class "panel accent-terracotta" ]
         [ h2 [] [ text title ]
         , if (viewOffset model) > 7 && List.isEmpty model.historical then
-            p [ A.style "color" "#8b6e3d", A.style "font-size" "0.82rem" ]
+            p [ A.style "color" "#7d8f83", A.style "font-size" "0.82rem" ]
                 [ text "Charge la météo 5 ans (📊 dans le bandeau) pour des alertes au-delà de J+7." ]
           else if List.isEmpty model.forecast && (viewOffset model) <= 7 then
-            p [ A.style "color" "#8b6e3d", A.style "font-size" "0.82rem" ]
+            p [ A.style "color" "#7d8f83", A.style "font-size" "0.82rem" ]
                 [ text "Prévisions non chargées (réseau ?). Retente dans un moment." ]
           else if List.isEmpty alertsByDay then
-            p [ A.style "color" "#5a3a22", A.style "font-size" "0.88rem" ]
+            p [ A.style "color" "#46584c", A.style "font-size" "0.88rem" ]
                 [ text "RAS sur 7 jours — pas de gel, canicule ou orage attendu." ]
           else
             div [] (List.map (viewDayAlerts model activeParcelsBy) alertsByDay)
@@ -3074,7 +3074,7 @@ viewDayAlerts model activeParcelsBy ( date, alerts ) =
         [ A.style "padding" "0.5rem 0"
         , A.style "border-bottom" "1px dashed #e2d2a8"
         ]
-        [ div [ A.style "font-size" "0.82rem", A.style "color" "#5a3a22", A.style "margin-bottom" "0.3rem" ]
+        [ div [ A.style "font-size" "0.82rem", A.style "color" "#46584c", A.style "margin-bottom" "0.3rem" ]
             [ Html.strong [] [ text date ] ]
         , div [] (List.map (viewAlertDetail activeParcelsBy) alerts)
         ]
@@ -3202,7 +3202,7 @@ viewSeasonColumn model cal season =
     div
         [ A.style "padding" "0.5rem"
         , A.style "border-radius" "5px"
-        , A.style "background" (if isCurrent then "#fff6de" else "#f5ecd6aa")
+        , A.style "background" (if isCurrent then "#ffffff" else "#f5ecd6aa")
         , A.style "border" (if isCurrent then "2px solid #d4a033" else "1px solid #d4b85a")
         ]
         [ div [ A.style "font-weight" "bold", A.style "margin-bottom" "0.3rem" ]
@@ -3231,7 +3231,7 @@ viewControls model =
                 , select
                     [ E.onInput SetCity, A.style "padding" "4px"
                     , A.style "border" "1px solid #d4b85a", A.style "border-radius" "3px"
-                    , A.style "background" "#fff6de"
+                    , A.style "background" "#ffffff"
                     ]
                     (List.map (\c -> option [ A.value c.slug, A.selected (c.slug == model.selectedCity) ] [ text c.name ]) model.cities)
                 ]
@@ -3240,7 +3240,7 @@ viewControls model =
                 , select
                     [ E.onInput SetFilterCategory, A.style "padding" "4px"
                     , A.style "border" "1px solid #d4b85a", A.style "border-radius" "3px"
-                    , A.style "background" "#fff6de"
+                    , A.style "background" "#ffffff"
                     ]
                     (List.map (categoryOption model.filterCategory) categoryOptions)
                 ]
@@ -3249,7 +3249,7 @@ viewControls model =
                 , select
                     [ E.onInput SetFilterDifficulty, A.style "padding" "4px"
                     , A.style "border" "1px solid #d4b85a", A.style "border-radius" "3px"
-                    , A.style "background" "#fff6de"
+                    , A.style "background" "#ffffff"
                     ]
                     [ option [ A.value "", A.selected (model.filterDifficulty == Nothing) ] [ text "(toutes)" ]
                     , option [ A.value "Beginner", A.selected (model.filterDifficulty == Just "Beginner") ] [ text "Débutant" ]
@@ -3263,7 +3263,7 @@ viewControls model =
                     [ A.type_ "text", A.value model.search, E.onInput SetSearch
                     , A.placeholder "nom, latin..."
                     , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
-                    , A.style "border-radius" "3px", A.style "background" "#fff6de"
+                    , A.style "border-radius" "3px", A.style "background" "#ffffff"
                     ]
                     []
                 ]
@@ -3297,7 +3297,7 @@ categoryOption current ( value, label ) =
 
 viewCalendarInfo : CalendarResponse -> Html Msg
 viewCalendarInfo cal =
-    div [ A.class "panel", A.style "font-size" "0.82rem", A.style "color" "#5a3a22" ]
+    div [ A.class "panel", A.style "font-size" "0.82rem", A.style "color" "#46584c" ]
         [ text ("Climat : " ++ cal.climateSource ++ " · " ++ String.fromInt (List.length cal.species) ++ " espèces") ]
 
 
@@ -3313,7 +3313,7 @@ viewCalendar model cal =
     in
     div [ A.class "panel" ]
         [ h2 [] [ text "Calendrier annuel" ]
-        , p [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ]
+        , p [ A.style "font-size" "0.78rem", A.style "color" "#46584c" ]
             [ text "🟠 Semis sous abri · 🟢 Semis direct · 🔵 Repiquage · 🟡 Récolte" ]
         , Svg.svg
             [ SA.viewBox ("0 0 " ++ String.fromInt totalW ++ " " ++ String.fromInt totalH)
@@ -3354,7 +3354,7 @@ monthsHeader labelX barWidth =
             let x = labelX + round (toFloat barWidth * toFloat i / 12.0) in
             Svg.text_
                 [ SA.x (String.fromInt (x + 6)), SA.y "18", SA.fontSize "11"
-                , SA.fill "#5a3a22", SA.fontFamily "monospace"
+                , SA.fill "#46584c", SA.fontFamily "monospace"
                 ]
                 [ Svg.text lbl ]
         )
@@ -3376,14 +3376,14 @@ viewCalendarRow model labelX barWidth rowHeight i sl =
         indoorBands = mkBand "#c66339" sl.indoorSowLocal
         directBands = mkBand "#6b9c47" sl.directSowLocal
         transplantBands = mkBand "#5a8ab8" sl.transplantLocal
-        harvestBands = windowBands labelX barWidth barY barH "#d4a033" sl.harvestLocal
+        harvestBands = windowBands labelX barWidth barY barH "#f0a832" sl.harvestLocal
     in
     Svg.g [ SE.onClick (SelectSpeciesRow sp.id), SA.style "cursor:pointer" ]
         ([ Svg.rect
             [ SA.x "0", SA.y (String.fromInt (y + 1)), SA.width (String.fromInt (labelX + barWidth))
             , SA.height (String.fromInt (rowHeight - 2))
             , SA.fill (if isSelected then "#fff0c8" else "transparent")
-            , SA.stroke (if isSelected then "#d4b85a" else "none")
+            , SA.stroke (if isSelected then "#c8d6cc" else "none")
             ]
             []
          , Svg.text_
@@ -3392,7 +3392,7 @@ viewCalendarRow model labelX barWidth rowHeight i sl =
          , Svg.rect
             [ SA.x (String.fromInt labelX), SA.y (String.fromInt barY)
             , SA.width (String.fromInt barWidth), SA.height (String.fromInt barH)
-            , SA.fill "#fff6de", SA.stroke "#e2d2a8"
+            , SA.fill "#ffffff", SA.stroke "#dde7de"
             ]
             []
          ]
@@ -3442,7 +3442,7 @@ viewSelectedSpecies model cal =
                     let sp = sl.species in
                     div [ A.class "panel" ]
                         [ h2 [] [ text sp.nameFr ]
-                        , p [ A.style "font-style" "italic", A.style "color" "#5a3a22" ] [ text sp.nameLatin ]
+                        , p [ A.style "font-style" "italic", A.style "color" "#46584c" ] [ text sp.nameLatin ]
                         , div [ A.style "display" "grid", A.style "grid-template-columns" "auto 1fr", A.style "gap" "0.3rem 0.8rem", A.style "font-size" "0.85rem" ]
                             [ detailRow "Famille" sp.family
                             , detailRow "Cycle" sp.lifeCycle
@@ -3464,7 +3464,7 @@ viewSelectedSpecies model cal =
 detailRow : String -> String -> Html Msg
 detailRow label value =
     Html.node "fragment" []
-        [ span [ A.style "color" "#5a3a22" ] [ text label ]
+        [ span [ A.style "color" "#46584c" ] [ text label ]
         , span [] [ text value ]
         ]
 
@@ -3539,9 +3539,9 @@ viewPlantContextMenu model =
                                 ]
                                 [ text (icon ++ " " ++ label) ]
                     in
-                    div [ A.class "panel", A.style "background" "#fff6de", A.style "border" "2px solid #d4a033" ]
+                    div [ A.class "panel", A.style "background" "#ffffff", A.style "border" "2px solid #d4a033" ]
                         [ h3 [] [ text ("Actions rapides · " ++ speciesEmoji sid ++ " " ++ speciesShortName sid) ]
-                        , p [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ]
+                        , p [ A.style "font-size" "0.78rem", A.style "color" "#46584c" ]
                             [ text ("Semé le " ++ a.date ++ " — enregistrement daté d'aujourd'hui (" ++ model.today ++ ")") ]
                         , div [ A.style "display" "flex", A.style "flex-wrap" "wrap" ]
                             ([ btn "arrosage" "💧" "Arroser"
@@ -3555,7 +3555,7 @@ viewPlantContextMenu model =
                                             [ E.onClick (FinishHarvest id)
                                             , A.class "chip"
                                             , A.style "margin" "0.2rem"
-                                            , A.style "background" "#8b6e3d"
+                                            , A.style "background" "#2e7d4f"
                                             ]
                                             [ text "🧺 Finir la récolte" ]
                                         ]
@@ -3573,8 +3573,8 @@ viewPlantContextMenu model =
                             )
                         , if model.deathPicker then
                             div [ A.style "margin-top" "0.4rem", A.style "padding" "0.4rem"
-                                , A.style "background" "#f0e8d0", A.style "border-radius" "4px" ]
-                                [ div [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22"
+                                , A.style "background" "#eef4ee", A.style "border-radius" "4px" ]
+                                [ div [ A.style "font-size" "0.78rem", A.style "color" "#46584c"
                                       , A.style "font-weight" "600", A.style "margin-bottom" "0.3rem" ]
                                     [ text "Cause de la mort ?" ]
                                 , div [ A.style "display" "flex", A.style "flex-wrap" "wrap", A.style "gap" "0.25rem" ]
@@ -3583,7 +3583,7 @@ viewPlantContextMenu model =
                                             button
                                                 [ E.onClick (PlantDead id cause)
                                                 , A.class "chip"
-                                                , A.style "background" "#7a6a50"
+                                                , A.style "background" "#6b7f72"
                                                 ]
                                                 [ text lbl ]
                                         )
@@ -3591,7 +3591,7 @@ viewPlantContextMenu model =
                                         ++ [ button
                                                 [ E.onClick OpenDeathNote
                                                 , A.class "chip"
-                                                , A.style "background" "#5a5a5a"
+                                                , A.style "background" "#66716a"
                                                 ]
                                                 [ text "❓ Inconnue / autre" ]
                                            ]
@@ -3616,14 +3616,14 @@ viewPlantContextMenu model =
                                                     )
                                                 , A.class "chip"
                                                 , A.style "margin-top" "0.25rem"
-                                                , A.style "background" "#5a5a5a"
+                                                , A.style "background" "#66716a"
                                                 ]
                                                 [ text "💾 Enregistrer" ]
                                             ]
                                 ]
                           else text ""
                         , div [ A.style "margin-top" "0.6rem" ]
-                            [ div [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22", A.style "font-weight" "600" ]
+                            [ div [ A.style "font-size" "0.78rem", A.style "color" "#46584c", A.style "font-weight" "600" ]
                                 [ text "📝 Observation" ]
                             , textarea
                                 [ A.value model.noteDraft
@@ -3637,7 +3637,7 @@ viewPlantContextMenu model =
                             , button
                                 [ E.onClick (SaveObservation id)
                                 , A.style "margin-top" "0.3rem", A.style "padding" "6px 10px"
-                                , A.style "background" "#5a7a22", A.style "color" "white"
+                                , A.style "background" "#2e7d4f", A.style "color" "white"
                                 , A.style "border" "none", A.style "border-radius" "4px"
                                 , A.style "cursor" "pointer", A.style "font-size" "0.85rem"
                                 ]
@@ -3646,7 +3646,7 @@ viewPlantContextMenu model =
                         , div [ A.style "margin-top" "0.5rem" ]
                             [ button
                                 [ E.onClick (OpenProblemForm a.speciesId (Just id))
-                                , A.style "padding" "5px 10px", A.style "background" "#c0392b"
+                                , A.style "padding" "5px 10px", A.style "background" "#d64545"
                                 , A.style "color" "white", A.style "border" "none"
                                 , A.style "border-radius" "4px", A.style "cursor" "pointer"
                                 , A.style "font-size" "0.8rem"
@@ -3669,7 +3669,7 @@ viewPastNotesForSpecies model sid =
                 |> List.take 3
 
         problemLine p =
-            div [ A.style "font-size" "0.78rem", A.style "margin-top" "0.25rem", A.style "padding-left" "0.4rem", A.style "border-left" ("2px solid " ++ (if p.status == "resolved" then "#4a9b3c" else "#c0392b")) ]
+            div [ A.style "font-size" "0.78rem", A.style "margin-top" "0.25rem", A.style "padding-left" "0.4rem", A.style "border-left" ("2px solid " ++ (if p.status == "resolved" then "#4a9b3c" else "#d64545")) ]
                 [ div [] [ text ((if p.status == "resolved" then "✅ " else "🔴 ") ++ p.title) ]
                 , case p.conclusion |> Maybe.map String.trim of
                     Just c ->
@@ -3682,7 +3682,7 @@ viewPastNotesForSpecies model sid =
             if List.isEmpty pastProblems then
                 []
             else
-                div [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22", A.style "font-weight" "600", A.style "margin-top" "0.6rem" ]
+                div [ A.style "font-size" "0.78rem", A.style "color" "#46584c", A.style "font-weight" "600", A.style "margin-top" "0.6rem" ]
                     [ text "🔬 Fiches problème de cette espèce" ]
                     :: List.map problemLine pastProblems
 
@@ -3705,7 +3705,7 @@ viewPastNotesForSpecies model sid =
 viewPastNotesOnly : List ActionEntry -> Html Msg
 viewPastNotesOnly past =
         div [ A.style "margin-top" "0.6rem" ]
-            (div [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22", A.style "font-weight" "600" ]
+            (div [ A.style "font-size" "0.78rem", A.style "color" "#46584c", A.style "font-weight" "600" ]
                 [ text "📖 Déjà noté sur cette espèce" ]
                 :: List.map
                     (\a ->
@@ -3736,7 +3736,7 @@ viewBulkPanel model =
     in
     div [ A.class "panel" ]
         [ h2 [] [ text "🎛 Actions en lot" ]
-        , p [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ]
+        , p [ A.style "font-size" "0.78rem", A.style "color" "#46584c" ]
             [ text "Applique une action à tous les plants correspondant au filtre." ]
         , div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.4rem" ]
             [ labeledSelect "Action"
@@ -3771,7 +3771,7 @@ viewBulkPanel model =
                     []
                 , text "Matures uniquement"
                 ]
-            , div [ A.style "padding" "0.4rem", A.style "background" "#fff6de", A.style "border-radius" "4px", A.style "font-size" "0.82rem" ]
+            , div [ A.style "padding" "0.4rem", A.style "background" "#ffffff", A.style "border-radius" "4px", A.style "font-size" "0.82rem" ]
                 [ Html.strong [] [ text (String.fromInt (List.length selected)) ]
                 , text " plant(s) sélectionné(s)"
                 ]
@@ -3807,7 +3807,7 @@ viewBulkPanel model =
             button
                 [ E.onClick RequestClearAll
                 , A.disabled (List.isEmpty model.actions)
-                , A.style "background" "#fff6de", A.style "border" "1px solid #a03030"
+                , A.style "background" "#ffffff", A.style "border" "1px solid #a03030"
                 , A.style "color" "#a03030", A.style "padding" "5px 10px"
                 , A.style "border-radius" "4px", A.style "cursor" "pointer"
                 , A.style "font-size" "0.85rem"
@@ -3832,7 +3832,7 @@ viewShelter model =
     in
     div [ A.class "panel" ]
         [ h3 [] [ text ("🌡 Abri / pépinière · " ++ String.fromFloat areaM2 ++ " m²") ]
-        , p [ A.style "font-size" "0.76rem", A.style "color" "#5a3a22", A.style "margin" "0 0 0.3rem 0" ]
+        , p [ A.style "font-size" "0.76rem", A.style "color" "#46584c", A.style "margin" "0 0 0.3rem 0" ]
             [ text hint ]
         , Svg.svg
             [ SA.viewBox ("0 0 " ++ String.fromInt w ++ " " ++ String.fromInt h)
@@ -4054,7 +4054,7 @@ shelterPatterns =
                 [ SA.cx (String.fromInt cx)
                 , SA.cy "75"
                 , SA.r "2"
-                , SA.fill "#5a3a22"
+                , SA.fill "#46584c"
                 , SA.opacity "0.15"
                 ]
                 []
@@ -4124,7 +4124,7 @@ viewShelterPlant model p =
             , SA.r (String.fromInt (size // 2 + 3))
             , SA.fill (if ready then "#c5e1a5" else "#e8d8c0")
             , SA.opacity "0.9"
-            , SA.stroke (if ready then "#4a9b3c" else "#8b6e3d")
+            , SA.stroke (if ready then "#4a9b3c" else "#7d8f83")
             , SA.strokeWidth (if ready then "2" else "1.5")
             ]
             []
@@ -4288,15 +4288,15 @@ viewTerrain model =
         [ h2 []
             [ text ("🌾 Mon jardin · " ++ String.fromFloat widthM ++ " m × " ++ String.fromFloat heightM ++ " m = " ++ String.fromFloat areaM2 ++ " m²")
             ]
-        , p [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ]
+        , p [ A.style "font-size" "0.78rem", A.style "color" "#46584c" ]
             [ text (hint ++ " · " ++ String.fromInt plantCount ++ " plant(s) installé(s) · molette = zoom · Alt+drag = pan") ]
         , div [ A.style "display" "flex", A.style "gap" "0.4rem", A.style "margin-bottom" "0.3rem", A.style "font-size" "0.76rem", A.style "align-items" "center" ]
-            [ span [ A.style "color" "#5a3a22" ]
+            [ span [ A.style "color" "#46584c" ]
                 [ text ("zoom " ++ String.fromInt (round (gv.zoom * 100)) ++ "%") ]
             , button
                 [ E.onClick GardenZoomReset
                 , A.style "padding" "2px 8px", A.style "font-size" "0.72rem"
-                , A.style "background" "#fff6de", A.style "color" "#5a3a22"
+                , A.style "background" "#ffffff", A.style "color" "#46584c"
                 , A.style "border" "1px solid #d4b85a", A.style "border-radius" "3px"
                 , A.style "cursor" "pointer"
                 ]
@@ -4468,10 +4468,10 @@ viewPlantOnTerrain model p =
         opacity = if isMoving then "0.35" else "1"
         bgColor =
             case p.state of
-                TileSown _ -> "#d4e2b8"
-                TileGrowing _ _ -> "#aed581"
-                TileMature _ -> "#f3c04a"
-                _ -> "#e8d39a"
+                TileSown _ -> "#d7e8cc"
+                TileGrowing _ _ -> "#a5d18e"
+                TileMature _ -> "#f5c24b"
+                _ -> "#e6e0cd"
         paillage = hasRecentPaillage model p
         spacingRadius =
             case findSpecies p.speciesId model of
@@ -4515,7 +4515,7 @@ viewPlantOnTerrain model p =
             , SA.cy (String.fromInt p.y)
             , SA.r (String.fromInt (size // 2 + 4))
             , SA.fill "none"
-            , SA.stroke (if paillage then "#8b6e3d" else "none")
+            , SA.stroke (if paillage then "#7d8f83" else "none")
             , SA.strokeWidth "1.5"
             , SA.strokeDasharray "3,2"
             , SA.opacity (if paillage then "0.7" else "0")
@@ -4567,7 +4567,7 @@ hoverOverlayTerrain p size =
         , SA.y (String.fromInt (p.y - size // 2 - 28))
         , SA.width (String.fromInt labelW)
         , SA.height "16"
-        , SA.fill "#fff6de", SA.stroke "#5a3a22", SA.rx "3"
+        , SA.fill "#ffffff", SA.stroke "#46584c", SA.rx "3"
         , SA.opacity "0.97"
         , SA.style "pointer-events:none"
         ]
@@ -4629,7 +4629,7 @@ viewPalette model =
     in
     div [ A.class "panel" ]
         [ h2 [] [ text "🌱 Palette" ]
-        , p [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ]
+        , p [ A.style "font-size" "0.78rem", A.style "color" "#46584c" ]
             [ text "Sélectionne une espèce, clique l'abri 🌡 ou le terrain 🌱." ]
         , case model.movingPlant of
             Just _ ->
@@ -4654,7 +4654,7 @@ viewPalette model =
                     (List.map (paletteItem model) recoDirect)
                 ]
           else text ""
-        , div [ A.style "font-size" "0.75rem", A.style "color" "#8b6e3d", A.style "margin" "0.3rem 0 0.2rem 0" ]
+        , div [ A.style "font-size" "0.75rem", A.style "color" "#7d8f83", A.style "margin" "0.3rem 0 0.2rem 0" ]
             [ text ("Autres espèces (" ++ String.fromInt (List.length other) ++ ")") ]
         , div
             [ A.style "display" "flex", A.style "flex-wrap" "wrap", A.style "gap" "0.3rem"
@@ -4663,7 +4663,7 @@ viewPalette model =
             (List.map (paletteItem model) other)
         , case model.paletteSpecies of
             Just sid ->
-                div [ A.style "margin-top" "0.6rem", A.style "padding" "0.4rem", A.style "background" "#fff6de", A.style "border-radius" "4px", A.style "font-size" "0.82rem" ]
+                div [ A.style "margin-top" "0.6rem", A.style "padding" "0.4rem", A.style "background" "#ffffff", A.style "border-radius" "4px", A.style "font-size" "0.82rem" ]
                     [ text ("Sélection : " ++ speciesEmoji sid ++ " " ++ speciesShortName sid ++ " ")
                     , button [ E.onClick ClearPalette, A.style "margin-left" "0.4rem", A.style "font-size" "0.72rem" ] [ text "✕" ]
                     ]
@@ -4684,7 +4684,7 @@ paletteItem model sl =
         , A.style "align-items" "center", A.style "justify-content" "center"
         , A.style "cursor" "pointer"
         , A.style "border-radius" "6px"
-        , A.style "background" (if selected then "#d4a033" else "#fff6de")
+        , A.style "background" (if selected then "#f0a832" else "#ffffff")
         , A.style "border" (if selected then "2px solid #a03030" else "1px solid #d4b85a")
         , A.style "transition" "all 0.15s"
         , A.style "padding" "2px"
@@ -5290,12 +5290,12 @@ stateLabel st =
 stateBackground : TileState -> String
 stateBackground st =
     case st of
-        TileEmpty -> "#c9a66b"
-        TileTilled -> "#8b6e3d"
-        TileSown _ -> "#a8c379"
-        TileGrowing _ _ -> "#8fbc4a"
-        TileMature _ -> "#d4a033"
-        TileHarvested _ -> "#a08048"
+        TileEmpty -> "#d9d2bd"
+        TileTilled -> "#7d8f83"
+        TileSown _ -> "#9ecb8a"
+        TileGrowing _ _ -> "#63b06f"
+        TileMature _ -> "#f0a832"
+        TileHarvested _ -> "#9aa392"
 
 
 viewParcels : Model -> Html Msg
@@ -5330,7 +5330,7 @@ viewParcels model =
                 ]
             ]
         , if List.isEmpty model.parcels then
-            p [ A.style "color" "#5a3a22", A.style "font-size" "0.85rem" ]
+            p [ A.style "color" "#46584c", A.style "font-size" "0.85rem" ]
                 [ text "Aucune parcelle. Crée-en une pour démarrer." ]
           else
             div [] (List.map viewParcelRow model.parcels)
@@ -5342,7 +5342,7 @@ viewParcelRow p =
     div [ A.class "pantry-row", A.style "padding" "0.5rem 0", A.style "border-bottom" "1px solid #e2d2a8" ]
         [ div [ A.style "flex" "1" ]
             [ div [] [ Html.strong [] [ text p.name ] ]
-            , div [ A.style "font-size" "0.76rem", A.style "color" "#5a3a22" ]
+            , div [ A.style "font-size" "0.76rem", A.style "color" "#46584c" ]
                 [ text
                     (String.join " · "
                         (List.filterMap identity
@@ -5375,7 +5375,7 @@ viewActionForm model =
     in
     div [ A.class "panel" ]
         [ h2 [] [ text (if isEditing then "Modifier action" else "+ Nouvelle action") ]
-        , p [ A.style "font-size" "0.82rem", A.style "color" "#5a3a22", A.style "margin-bottom" "0.5rem" ]
+        , p [ A.style "font-size" "0.82rem", A.style "color" "#46584c", A.style "margin-bottom" "0.5rem" ]
             [ text tileLabel ]
         , div [ A.style "display" "grid", A.style "grid-template-columns" "1fr 1fr", A.style "gap" "0.4rem" ]
             [ labeledInput "Date" f.date SetActionDate "2026-04-24"
@@ -5460,7 +5460,7 @@ viewActionsTimeline model =
                 , select
                     [ E.onInput SetFilterActionParcel
                     , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
-                    , A.style "border-radius" "3px", A.style "background" "#fff6de"
+                    , A.style "border-radius" "3px", A.style "background" "#ffffff"
                     ]
                     (option [ A.value "" ] [ text "(toutes)" ]
                         :: List.map (\p -> option [ A.value (String.fromInt p.id) ] [ text p.name ]) model.parcels
@@ -5471,7 +5471,7 @@ viewActionsTimeline model =
                 , select
                     [ E.onInput SetFilterActionKind
                     , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
-                    , A.style "border-radius" "3px", A.style "background" "#fff6de"
+                    , A.style "border-radius" "3px", A.style "background" "#ffffff"
                     ]
                     (option [ A.value "" ] [ text "(tous)" ]
                         :: List.map (\k -> option [ A.value k ] [ text (actionKindLabel k) ]) model.actionKinds
@@ -5479,7 +5479,7 @@ viewActionsTimeline model =
                 ]
             ]
         , if List.isEmpty filtered then
-            p [ A.style "color" "#5a3a22", A.style "font-size" "0.85rem" ]
+            p [ A.style "color" "#46584c", A.style "font-size" "0.85rem" ]
                 [ text "Aucune action enregistrée. Ajoute-en une." ]
           else
             div [] (List.map (viewActionRow model) filtered)
@@ -5546,17 +5546,17 @@ actionKindLabel k =
 kindColor : String -> String
 kindColor k =
     case k of
-        "semis_direct" -> "#6b9c47"
-        "semis_abri" -> "#c66339"
-        "repiquage" -> "#5a8ab8"
-        "arrosage" -> "#5a9bc5"
-        "paillage" -> "#8b6e3d"
-        "compost" -> "#6b5030"
-        "recolte" -> "#d4a033"
-        "traitement" -> "#a05a5a"
-        "arrachage" -> "#8b4a2a"
-        "plant_mort" -> "#5a5a5a"
-        "note" -> "#8b6e3d"
+        "semis_direct" -> "#45a06b"
+        "semis_abri" -> "#e8824a"
+        "repiquage" -> "#5b8fc4"
+        "arrosage" -> "#3d95c9"
+        "paillage" -> "#b08944"
+        "compost" -> "#7a5c3e"
+        "recolte" -> "#f0a832"
+        "traitement" -> "#c95c55"
+        "arrachage" -> "#a3543a"
+        "plant_mort" -> "#66716a"
+        "note" -> "#7d8f83"
         _ -> "#888"
 
 
@@ -5567,7 +5567,7 @@ labeledInput label value toMsg placeholder =
         , input
             [ A.type_ "text", A.value value, E.onInput toMsg, A.placeholder placeholder
             , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
-            , A.style "border-radius" "3px", A.style "background" "#fff6de"
+            , A.style "border-radius" "3px", A.style "background" "#ffffff"
             ]
             []
         ]
@@ -5580,7 +5580,7 @@ labeledTextarea label value toMsg placeholder =
         , textarea
             [ A.value value, E.onInput toMsg, A.placeholder placeholder, A.rows 2
             , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
-            , A.style "border-radius" "3px", A.style "background" "#fff6de"
+            , A.style "border-radius" "3px", A.style "background" "#ffffff"
             , A.style "font-family" "inherit"
             ]
             []
@@ -5594,7 +5594,7 @@ labeledSelect label value toMsg options =
         , select
             [ E.onInput toMsg
             , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
-            , A.style "border-radius" "3px", A.style "background" "#fff6de"
+            , A.style "border-radius" "3px", A.style "background" "#ffffff"
             ]
             (List.map (\( v, lbl ) -> option [ A.value v, A.selected (v == value) ] [ text lbl ]) options)
         ]
