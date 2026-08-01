@@ -2769,7 +2769,10 @@ viewCoachTodo model cal =
         , if not (List.isEmpty harvestSuggestions) then
             div [ A.style "margin-bottom" "0.6rem" ]
                 [ h3 [] [ text "🌾 À récolter" ]
-                , div [] (List.map (viewHarvestSuggestion model) harvestSuggestions)
+                , p [ A.class "hint", A.style "margin" "0 0 0.3rem 0" ]
+                    [ text "Plants en récolte : cueille ce qui est mûr, note chaque cueillette." ]
+                , div [ A.class "scrollbox scrollbox-sm" ]
+                    (List.map (viewHarvestSuggestion model) harvestSuggestions)
                 ]
           else text ""
         , if not (List.isEmpty waterSuggestions) then
@@ -2843,14 +2846,6 @@ viewHarvestSuggestion : Model -> ( PlantOnTerrain, String ) -> Html Msg
 viewHarvestSuggestion model ( pl, sp ) =
     let
         multi = isMultiHarvest model sp
-        actionBtn msg bg lbl =
-            button
-                [ E.onClick msg
-                , A.class "chip"
-                , A.style "background" bg
-                , A.style "width" "100%"
-                ]
-                [ text lbl ]
     in
     div
         [ A.class "pantry-row"
@@ -2858,45 +2853,49 @@ viewHarvestSuggestion model ( pl, sp ) =
         , A.style "justify-content" "space-between"
         , A.style "align-items" "center"
         , A.style "gap" "0.5rem"
-        , A.style "padding" "0.4rem 0"
-        , A.style "border-bottom" "1px dashed #e2d2a8"
+        , A.style "padding" "0.25rem 0"
+        , A.style "border-bottom" "1px dashed #dde7de"
         ]
-        [ div [ A.style "min-width" "0" ]
-            [ div []
-                [ text (speciesEmoji sp ++ " ")
-                , Html.strong [] [ text (speciesShortName sp) ]
-                , span [ A.class "coords" ]
-                    [ text ("(" ++ String.fromInt pl.x ++ "," ++ String.fromInt pl.y ++ ")") ]
-                ]
-            , if multi then
-                div [ A.class "hint" ]
-                    [ text "en récolte, cueille ce qui est mûr" ]
-              else text ""
+        [ span
+            [ A.style "min-width" "0", A.style "white-space" "nowrap"
+            , A.style "overflow" "hidden", A.style "text-overflow" "ellipsis"
+            ]
+            [ text (speciesEmoji sp ++ " ")
+            , Html.strong [] [ text (speciesShortName sp) ]
+            , span [ A.class "coords" ]
+                [ text ("(" ++ String.fromInt pl.x ++ "," ++ String.fromInt pl.y ++ ")") ]
             ]
         , case model.harvestDraft of
             Just d ->
                 if d.plantId == pl.id then
                     viewHarvestWeightForm d
                 else
-                    viewHarvestButtons multi pl.id actionBtn
+                    viewHarvestButtons multi pl.id
 
             Nothing ->
-                viewHarvestButtons multi pl.id actionBtn
+                viewHarvestButtons multi pl.id
         ]
 
 
-viewHarvestButtons : Bool -> Int -> (Msg -> String -> String -> Html Msg) -> Html Msg
-viewHarvestButtons multi plantId actionBtn =
-    div
-        [ A.style "display" "flex", A.style "flex-direction" "column"
-        , A.style "gap" "3px", A.style "flex-shrink" "0", A.style "width" "9.5rem"
-        ]
+viewHarvestButtons : Bool -> Int -> Html Msg
+viewHarvestButtons multi plantId =
+    let
+        actionBtn msg bg lbl title =
+            button
+                [ E.onClick msg
+                , A.class "chip"
+                , A.title title
+                , A.style "background" bg
+                ]
+                [ text lbl ]
+    in
+    div [ A.style "display" "flex", A.style "gap" "0.3rem", A.style "flex-shrink" "0" ]
         (if multi then
-            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 noter une récolte"
-            , actionBtn (StartHarvest plantId True) "#2e7d4f" "🧺 finir la récolte"
+            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 noter" "Noter une récolte — le plant reste en place"
+            , actionBtn (StartHarvest plantId True) "#2e7d4f" "🧺 finir" "Dernière récolte + arrachage du plant"
             ]
          else
-            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 récolter" ]
+            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 récolter" "Récolter (le plant disparaît)" ]
         )
 
 
