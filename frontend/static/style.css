@@ -106,11 +106,19 @@ h1, h2, h3 {
 }
 
 h1 {
-    font-size: 2rem;
+    font-size: 2.6rem;
     font-weight: 900;
     font-style: italic;
     color: var(--moss);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
+    line-height: 1.05;
+    margin-bottom: 0;
+    animation: title-in 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes title-in {
+    from { opacity: 0; transform: translateY(10px); clip-path: inset(0 0 100% 0); }
+    to   { opacity: 1; transform: translateY(0); clip-path: inset(0 0 -20% 0); }
 }
 
 h2 { font-size: 1.2rem; font-weight: 650; margin-bottom: 0.5rem; }
@@ -307,7 +315,13 @@ textarea { resize: vertical; line-height: 1.45; }
     font-size: 0.85rem;
 }
 .stats-grid .label { color: var(--ink-soft); }
-.stats-grid .value { font-weight: 600; text-align: right; }
+.stats-grid .value {
+    font-weight: 700;
+    text-align: right;
+    font-size: 1.05rem;
+    color: var(--moss);
+    font-variant-numeric: tabular-nums;
+}
 
 .pantry-list {
     display: flex;
@@ -386,6 +400,51 @@ textarea { resize: vertical; line-height: 1.45; }
 /* --------------------------------------------------------------------------
    Détails
    -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   Navigation principale : contrôle segmenté en pilule
+   -------------------------------------------------------------------------- */
+
+.tabbar {
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.3rem;
+    margin-bottom: 1.1rem;
+    background: var(--card-warm);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    box-shadow: var(--shadow-card);
+    flex-wrap: wrap;
+}
+
+.tabbar .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-size: 0.88rem;
+    font-weight: 650;
+    color: var(--ink-soft);
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.12s;
+}
+.tabbar .tab:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.7);
+    color: var(--moss);
+    border: none;
+    transform: none;
+    box-shadow: none;
+}
+.tabbar .tab.active {
+    background: linear-gradient(180deg, var(--moss-bright), var(--moss));
+    color: #fdfbf4;
+    box-shadow: 0 2px 8px rgba(62, 107, 33, 0.35);
+}
+.tabbar .tab .tab-icon { font-size: 1rem; line-height: 1; }
+.tabbar .tab.active .tab-icon { transform: scale(1.1); }
 
 /* --------------------------------------------------------------------------
    Composants éditoriaux (migration des styles inline Elm)

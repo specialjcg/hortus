@@ -2013,29 +2013,22 @@ viewHeader model =
 
 viewViewSwitch : Model -> Html Msg
 viewViewSwitch model =
-    div [ A.class "panel", A.style "padding" "0.5rem" ]
-        [ div [ A.class "controls" ]
-            [ button
-                [ E.onClick (SetViewMode CoachView)
-                , A.classList [ ( "primary", model.viewMode == CoachView ) ]
+    let
+        tab mode icon label =
+            button
+                [ E.onClick (SetViewMode mode)
+                , A.class "tab"
+                , A.classList [ ( "active", model.viewMode == mode ) ]
                 ]
-                [ text "🎯 Coach" ]
-            , button
-                [ E.onClick (SetViewMode CalendarView)
-                , A.classList [ ( "primary", model.viewMode == CalendarView ) ]
+                [ span [ A.class "tab-icon" ] [ text icon ]
+                , text label
                 ]
-                [ text "📅 Calendrier" ]
-            , button
-                [ E.onClick (SetViewMode JournalView)
-                , A.classList [ ( "primary", model.viewMode == JournalView ) ]
-                ]
-                [ text "📓 Mon jardin" ]
-            , button
-                [ E.onClick (SetViewMode AlmanacView)
-                , A.classList [ ( "primary", model.viewMode == AlmanacView ) ]
-                ]
-                [ text "📖 Almanach" ]
-            ]
+    in
+    Html.nav [ A.class "tabbar" ]
+        [ tab CoachView "🎯" "Coach"
+        , tab CalendarView "📅" "Calendrier"
+        , tab JournalView "📓" "Mon jardin"
+        , tab AlmanacView "📖" "Almanach"
         ]
 
 
