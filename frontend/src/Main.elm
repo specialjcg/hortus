@@ -95,6 +95,7 @@ type alias Model =
     , movingPlant : Maybe Int -- id action en cours de déplacement (click-move)
     , dragging : Maybe DragState
     , plantMenu : Maybe Int -- id du plant avec menu ouvert
+    , deathPicker : Bool -- sélecteur de cause « plant mort » ouvert
     , noteDraft : String -- texte observation en cours de saisie
     , almanacSearch : String -- filtre texte de l'almanach
     , solutionDraft : Maybe ( Int, String ) -- (id note, texte solution en édition)
@@ -348,6 +349,7 @@ init flags =
       , movingPlant = Nothing
       , dragging = Nothing
       , plantMenu = Nothing
+      , deathPicker = False
       , noteDraft = ""
       , almanacSearch = ""
       , solutionDraft = Nothing
@@ -445,6 +447,8 @@ type Msg
     | ClosePlantMenu
     | QuickAction Int String -- plant id, kind
     | FinishHarvest Int -- plant id : dernière récolte + arrachage
+    | ToggleDeathPicker
+    | PlantDead Int String -- plant id, cause de la mort
     | SetNoteDraft String
     | SaveObservation Int -- plant id
     | SetAlmanacSearch String
@@ -661,7 +665,7 @@ update msg model =
                 Just d ->
                     if not d.moved then
                         -- clic simple sans drag → ouvre le menu contextuel
-                        ( { model | dragging = Nothing, plantMenu = Just d.id }, Cmd.none )
+                        ( { model | dragging = Nothing, plantMenu = Just d.id, deathPicker = False }, Cmd.none )
                     else
                         let
                             cmd =
@@ -675,22 +679,30 @@ update msg model =
                 Nothing -> ( model, Cmd.none )
 
         OpenPlantMenu id ->
-            ( { model | plantMenu = Just id }, Cmd.none )
+            ( { model | plantMenu = Just id, deathPicker = False }, Cmd.none )
 
         ClosePlantMenu ->
-            ( { model | plantMenu = Nothing, noteDraft = "" }, Cmd.none )
+            ( { model | plantMenu = Nothing, noteDraft = "", deathPicker = False }, Cmd.none )
 
         QuickAction plantId kind ->
-            ( { model | plantMenu = Nothing }
-            , quickActionCmd model plantId kind
+            ( { model | plantMenu = Nothing, deathPicker = False }
+            , quickActionCmd model plantId kind ""
             )
 
         FinishHarvest plantId ->
             ( { model | plantMenu = Nothing }
             , Cmd.batch
-                [ quickActionCmd model plantId "recolte"
-                , quickActionCmd model plantId "arrachage"
+                [ quickActionCmd model plantId "recolte" ""
+                , quickActionCmd model plantId "arrachage" ""
                 ]
+            )
+
+        ToggleDeathPicker ->
+            ( { model | deathPicker = not model.deathPicker }, Cmd.none )
+
+        PlantDead plantId cause ->
+            ( { model | plantMenu = Nothing, deathPicker = False }
+            , quickActionCmd model plantId "plant_mort" cause
             )
 
         SetNoteDraft s ->
@@ -1674,8 +1686,8 @@ distanceTo px py pl =
     round (sqrt (dx * dx + dy * dy))
 
 
-quickActionCmd : Model -> Int -> String -> Cmd Msg
-quickActionCmd model plantId kind =
+quickActionCmd : Model -> Int -> String -> String -> Cmd Msg
+quickActionCmd model plantId kind notes =
     case model.actions |> List.filter (\a -> a.id == plantId) |> List.head of
         Just a ->
             let
@@ -1685,7 +1697,7 @@ quickActionCmd model plantId kind =
                     , speciesId = a.speciesId |> Maybe.withDefault ""
                     , kind = kind
                     , quantity = ""
-                    , notes = ""
+                    , notes = notes
                     , gridX = a.gridX |> Maybe.map String.fromInt |> Maybe.withDefault ""
                     , gridY = a.gridY |> Maybe.map String.fromInt |> Maybe.withDefault ""
                     }
@@ -2773,40 +2785,49 @@ viewHarvestSuggestion : Model -> ( PlantOnTerrain, String ) -> Html Msg
 viewHarvestSuggestion model ( pl, sp ) =
     let
         multi = isMultiHarvest model sp
+        actionBtn msg bg lbl =
+            button
+                [ E.onClick msg
+                , A.style "padding" "4px 8px", A.style "font-size" "0.72rem"
+                , A.style "background" bg, A.style "color" "white"
+                , A.style "border" "none", A.style "border-radius" "3px"
+                , A.style "cursor" "pointer", A.style "white-space" "nowrap"
+                , A.style "width" "100%"
+                ]
+                [ text lbl ]
     in
     div
         [ A.class "pantry-row"
+        , A.style "display" "flex"
+        , A.style "justify-content" "space-between"
+        , A.style "align-items" "center"
+        , A.style "gap" "0.5rem"
         , A.style "padding" "0.4rem 0"
         , A.style "border-bottom" "1px dashed #e2d2a8"
         ]
-        [ span []
-            [ text (speciesEmoji sp ++ " ")
-            , Html.strong [] [ text (speciesShortName sp) ]
-            , text (" (" ++ String.fromInt pl.x ++ "," ++ String.fromInt pl.y ++ ")")
-            , if multi then
-                span [ A.style "font-size" "0.72rem", A.style "color" "#8a7040" ]
-                    [ text " · en récolte, cueille ce qui est mûr" ]
-              else text ""
-            ]
-        , span []
-            [ button
-                [ E.onClick (QuickAction pl.id "recolte")
-                , A.style "padding" "3px 8px", A.style "font-size" "0.75rem"
-                , A.style "background" "#d4a033", A.style "color" "white"
-                , A.style "border" "none", A.style "border-radius" "3px", A.style "cursor" "pointer"
+        [ div [ A.style "min-width" "0" ]
+            [ div []
+                [ text (speciesEmoji sp ++ " ")
+                , Html.strong [] [ text (speciesShortName sp) ]
+                , span [ A.style "font-size" "0.72rem", A.style "color" "#8a7040" ]
+                    [ text (" (" ++ String.fromInt pl.x ++ "," ++ String.fromInt pl.y ++ ")") ]
                 ]
-                [ text (if multi then "🌾 noter une récolte" else "🌾 récolter") ]
             , if multi then
-                button
-                    [ E.onClick (FinishHarvest pl.id)
-                    , A.style "padding" "3px 8px", A.style "font-size" "0.75rem"
-                    , A.style "margin-left" "0.3rem"
-                    , A.style "background" "#8b6e3d", A.style "color" "white"
-                    , A.style "border" "none", A.style "border-radius" "3px", A.style "cursor" "pointer"
-                    ]
-                    [ text "🧺 finir la récolte" ]
+                div [ A.style "font-size" "0.7rem", A.style "color" "#8a7040" ]
+                    [ text "en récolte, cueille ce qui est mûr" ]
               else text ""
             ]
+        , div
+            [ A.style "display" "flex", A.style "flex-direction" "column"
+            , A.style "gap" "3px", A.style "flex-shrink" "0", A.style "width" "9.5rem"
+            ]
+            (if multi then
+                [ actionBtn (QuickAction pl.id "recolte") "#d4a033" "🌾 noter une récolte"
+                , actionBtn (FinishHarvest pl.id) "#8b6e3d" "🧺 finir la récolte"
+                ]
+             else
+                [ actionBtn (QuickAction pl.id "recolte") "#d4a033" "🌾 récolter" ]
+            )
         ]
 
 
@@ -3479,6 +3500,17 @@ viewJournalPage model =
         ]
 
 
+-- Causes proposées quand un plant meurt (valeur stockée en notes, libellé bouton).
+deathCauses : List ( String, String )
+deathCauses =
+    [ ( "gel", "🥶 Gel" )
+    , ( "sécheresse / canicule", "🥵 Sécheresse" )
+    , ( "maladie", "🍄 Maladie" )
+    , ( "ravageurs", "🐌 Ravageurs" )
+    , ( "cause inconnue", "❓ Inconnue" )
+    ]
+
+
 viewPlantContextMenu : Model -> Html Msg
 viewPlantContextMenu model =
     case model.plantMenu of
@@ -3522,8 +3554,39 @@ viewPlantContextMenu model =
                                         ]
                                     else []
                                    )
-                                ++ [ btn "arrachage" "🗑" "Arracher" ]
+                                ++ [ btn "arrachage" "🗑" "Arracher"
+                                   , button
+                                        [ E.onClick ToggleDeathPicker
+                                        , A.style "margin" "0.2rem", A.style "padding" "6px 10px"
+                                        , A.style "background" (kindColor "plant_mort"), A.style "color" "white"
+                                        , A.style "border" "none", A.style "border-radius" "4px"
+                                        , A.style "cursor" "pointer", A.style "font-size" "0.85rem"
+                                        ]
+                                        [ text "☠ Plant mort" ]
+                                   ]
                             )
+                        , if model.deathPicker then
+                            div [ A.style "margin-top" "0.4rem", A.style "padding" "0.4rem"
+                                , A.style "background" "#f0e8d0", A.style "border-radius" "4px" ]
+                                [ div [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22"
+                                      , A.style "font-weight" "600", A.style "margin-bottom" "0.3rem" ]
+                                    [ text "Cause de la mort ?" ]
+                                , div [ A.style "display" "flex", A.style "flex-wrap" "wrap", A.style "gap" "0.25rem" ]
+                                    (List.map
+                                        (\( cause, lbl ) ->
+                                            button
+                                                [ E.onClick (PlantDead id cause)
+                                                , A.style "padding" "5px 9px", A.style "font-size" "0.78rem"
+                                                , A.style "background" "#7a6a50", A.style "color" "white"
+                                                , A.style "border" "none", A.style "border-radius" "4px"
+                                                , A.style "cursor" "pointer"
+                                                ]
+                                                [ text lbl ]
+                                        )
+                                        deathCauses
+                                    )
+                                ]
+                          else text ""
                         , div [ A.style "margin-top" "0.6rem" ]
                             [ div [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22", A.style "font-weight" "600" ]
                                 [ text "📝 Observation" ]
@@ -4319,9 +4382,10 @@ plantsFromActions model =
                     ( Just sid, Just x, Just y ) ->
                         if
                             List.member a.kind [ "semis_direct", "repiquage" ]
-                                -- arrachage → disparaît toujours ; récolte ne retire
-                                -- que les espèces à récolte unique (carotte, laitue…)
+                                -- arrachage ou mort → disparaît toujours ; récolte ne
+                                -- retire que les espèces à récolte unique (carotte, laitue…)
                                 && not (plantEventSince model "arrachage" a.date x y)
+                                && not (plantEventSince model "plant_mort" a.date x y)
                                 && (isMultiHarvest model sid
                                         || not (plantEventSince model "recolte" a.date x y)
                                    )
@@ -5432,6 +5496,7 @@ actionKindLabel k =
         "recolte" -> "récolte"
         "traitement" -> "traitement"
         "arrachage" -> "arrachage"
+        "plant_mort" -> "plant mort"
         "note" -> "note"
         _ -> k
 
@@ -5448,6 +5513,7 @@ kindColor k =
         "recolte" -> "#d4a033"
         "traitement" -> "#a05a5a"
         "arrachage" -> "#8b4a2a"
+        "plant_mort" -> "#5a5a5a"
         "note" -> "#8b6e3d"
         _ -> "#888"
 

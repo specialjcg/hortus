@@ -78,6 +78,7 @@ pub const ACTION_KINDS: &[&str] = &[
     "recolte",
     "traitement",
     "arrachage",
+    "plant_mort",
     "note",
 ];
 
