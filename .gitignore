@@ -35,3 +35,4 @@ img.png
 # Deploy artifacts
 deploy_package/
 backend/target-docker/
+img_*.png
