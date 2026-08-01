@@ -2121,7 +2121,7 @@ viewCoachObservations model =
             p [ A.style "color" "#46584c", A.style "font-size" "0.85rem" ]
                 [ text "Aucune observation. Clique un plant → écris ce que tu constates." ]
           else
-            div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.4rem" ]
+            div [ A.class "scrollbox scrollbox-sm", A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.4rem" ]
                 (List.map viewObservationItem observations)
         ]
 
@@ -2274,7 +2274,7 @@ viewAlmanacPage model =
                 p [ A.style "font-size" "0.84rem", A.style "color" "#46584c" ]
                     [ text "Aucun problème ouvert — le jardin se porte bien 🌞" ]
               else
-                div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.8rem" ]
+                div [ A.class "scrollbox", A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.8rem" ]
                     (List.map (viewProblemCard model) openProbs)
             ]
         , div [ A.class "panel" ]
@@ -2283,7 +2283,7 @@ viewAlmanacPage model =
                 p [ A.style "font-size" "0.84rem", A.style "color" "#46584c" ]
                     [ text "Les fiches closes avec leur conclusion apparaîtront ici." ]
               else
-                div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.8rem" ]
+                div [ A.class "scrollbox", A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.8rem" ]
                     (List.map (viewProblemCard model) resolvedProbs)
             ]
         , div [ A.class "panel" ]
@@ -2292,7 +2292,7 @@ viewAlmanacPage model =
                 p [ A.style "font-size" "0.84rem", A.style "color" "#46584c" ]
                     [ text "Les observations rapides saisies sur un plant apparaissent ici." ]
               else
-                div [ A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "1rem" ]
+                div [ A.class "scrollbox", A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "1rem" ]
                     (groupNotesBySpecies notes |> List.map (viewAlmanacGroup model))
             ]
         ]

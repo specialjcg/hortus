@@ -433,6 +433,7 @@ textarea { resize: vertical; line-height: 1.45; }
     -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 20px, #000 calc(100% - 24px), transparent);
     mask-image: linear-gradient(180deg, transparent 0, #000 20px, #000 calc(100% - 24px), transparent);
 }
+.scrollbox.scrollbox-sm { max-height: 36vh; }
 
 .events-list {
     max-height: 220px;
