@@ -98,6 +98,7 @@ type alias Model =
     , deathPicker : Bool -- sélecteur de cause « plant mort » ouvert
     , journalOpen : Bool -- panneau journal déplié ou replié
     , deathDraft : Maybe String -- observation libre pour cause inconnue (Nothing = champ fermé)
+    , harvestDraft : Maybe { plantId : Int, grams : String, finish : Bool } -- pesée de récolte en cours
     , noteDraft : String -- texte observation en cours de saisie
     , almanacSearch : String -- filtre texte de l'almanach
     , solutionDraft : Maybe ( Int, String ) -- (id note, texte solution en édition)
@@ -354,6 +355,7 @@ init flags =
       , deathPicker = False
       , journalOpen = False
       , deathDraft = Nothing
+      , harvestDraft = Nothing
       , noteDraft = ""
       , almanacSearch = ""
       , solutionDraft = Nothing
@@ -450,7 +452,10 @@ type Msg
     | OpenPlantMenu Int
     | ClosePlantMenu
     | QuickAction Int String -- plant id, kind
-    | FinishHarvest Int -- plant id : dernière récolte + arrachage
+    | StartHarvest Int Bool -- plant id, finish : ouvre la pesée de récolte
+    | SetHarvestGrams String
+    | CancelHarvest
+    | ConfirmHarvest -- enregistre la récolte (poids optionnel), + arrachage si finish
     | ToggleDeathPicker
     | ToggleJournal
     | OpenDeathNote -- cause inconnue → saisie d'une observation libre
@@ -686,23 +691,39 @@ update msg model =
                 Nothing -> ( model, Cmd.none )
 
         OpenPlantMenu id ->
-            ( { model | plantMenu = Just id, deathPicker = False }, Cmd.none )
+            ( { model | plantMenu = Just id, deathPicker = False, harvestDraft = Nothing }, Cmd.none )
 
         ClosePlantMenu ->
-            ( { model | plantMenu = Nothing, noteDraft = "", deathPicker = False }, Cmd.none )
+            ( { model | plantMenu = Nothing, noteDraft = "", deathPicker = False, harvestDraft = Nothing }, Cmd.none )
 
         QuickAction plantId kind ->
             ( { model | plantMenu = Nothing, deathPicker = False }
-            , quickActionCmd model plantId kind ""
+            , quickActionCmd model plantId kind "" ""
             )
 
-        FinishHarvest plantId ->
-            ( { model | plantMenu = Nothing }
-            , Cmd.batch
-                [ quickActionCmd model plantId "recolte" ""
-                , quickActionCmd model plantId "arrachage" ""
-                ]
+        StartHarvest plantId finish ->
+            ( { model | harvestDraft = Just { plantId = plantId, grams = "", finish = finish } }
+            , Cmd.none
             )
+
+        SetHarvestGrams s ->
+            ( { model | harvestDraft = model.harvestDraft |> Maybe.map (\d -> { d | grams = s }) }
+            , Cmd.none
+            )
+
+        CancelHarvest ->
+            ( { model | harvestDraft = Nothing }, Cmd.none )
+
+        ConfirmHarvest ->
+            case model.harvestDraft of
+                Nothing -> ( model, Cmd.none )
+                Just d ->
+                    ( { model | harvestDraft = Nothing, plantMenu = Nothing }
+                    , Cmd.batch
+                        (quickActionCmd model d.plantId "recolte" "" d.grams
+                            :: (if d.finish then [ quickActionCmd model d.plantId "arrachage" "" "" ] else [])
+                        )
+                    )
 
         ToggleDeathPicker ->
             ( { model | deathPicker = not model.deathPicker, deathDraft = Nothing }, Cmd.none )
@@ -718,7 +739,7 @@ update msg model =
 
         PlantDead plantId cause ->
             ( { model | plantMenu = Nothing, deathPicker = False, deathDraft = Nothing }
-            , quickActionCmd model plantId "plant_mort" cause
+            , quickActionCmd model plantId "plant_mort" cause ""
             )
 
         SetNoteDraft s ->
@@ -1702,8 +1723,8 @@ distanceTo px py pl =
     round (sqrt (dx * dx + dy * dy))
 
 
-quickActionCmd : Model -> Int -> String -> String -> Cmd Msg
-quickActionCmd model plantId kind notes =
+quickActionCmd : Model -> Int -> String -> String -> String -> Cmd Msg
+quickActionCmd model plantId kind notes quantity =
     case model.actions |> List.filter (\a -> a.id == plantId) |> List.head of
         Just a ->
             let
@@ -1712,7 +1733,7 @@ quickActionCmd model plantId kind notes =
                     , parcelId = ""
                     , speciesId = a.speciesId |> Maybe.withDefault ""
                     , kind = kind
-                    , quantity = ""
+                    , quantity = quantity
                     , notes = notes
                     , gridX = a.gridX |> Maybe.map String.fromInt |> Maybe.withDefault ""
                     , gridY = a.gridY |> Maybe.map String.fromInt |> Maybe.withDefault ""
@@ -2827,17 +2848,51 @@ viewHarvestSuggestion model ( pl, sp ) =
                     [ text "en récolte, cueille ce qui est mûr" ]
               else text ""
             ]
-        , div
-            [ A.style "display" "flex", A.style "flex-direction" "column"
-            , A.style "gap" "3px", A.style "flex-shrink" "0", A.style "width" "9.5rem"
+        , case model.harvestDraft of
+            Just d ->
+                if d.plantId == pl.id then
+                    viewHarvestWeightForm d
+                else
+                    viewHarvestButtons multi pl.id actionBtn
+
+            Nothing ->
+                viewHarvestButtons multi pl.id actionBtn
+        ]
+
+
+viewHarvestButtons : Bool -> Int -> (Msg -> String -> String -> Html Msg) -> Html Msg
+viewHarvestButtons multi plantId actionBtn =
+    div
+        [ A.style "display" "flex", A.style "flex-direction" "column"
+        , A.style "gap" "3px", A.style "flex-shrink" "0", A.style "width" "9.5rem"
+        ]
+        (if multi then
+            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 noter une récolte"
+            , actionBtn (StartHarvest plantId True) "#2e7d4f" "🧺 finir la récolte"
             ]
-            (if multi then
-                [ actionBtn (QuickAction pl.id "recolte") "#f0a832" "🌾 noter une récolte"
-                , actionBtn (FinishHarvest pl.id) "#2e7d4f" "🧺 finir la récolte"
-                ]
-             else
-                [ actionBtn (QuickAction pl.id "recolte") "#f0a832" "🌾 récolter" ]
-            )
+         else
+            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 récolter" ]
+        )
+
+
+viewHarvestWeightForm : { plantId : Int, grams : String, finish : Bool } -> Html Msg
+viewHarvestWeightForm d =
+    div
+        [ A.style "display" "flex", A.style "gap" "0.3rem", A.style "align-items" "center"
+        , A.style "flex-shrink" "0"
+        ]
+        [ input
+            [ A.type_ "number"
+            , A.value d.grams
+            , E.onInput SetHarvestGrams
+            , A.placeholder "poids (g)"
+            , A.style "width" "6rem"
+            ]
+            []
+        , button [ E.onClick ConfirmHarvest, A.class "chip", A.style "background" "#2e7d4f" ]
+            [ text "✓" ]
+        , button [ E.onClick CancelHarvest, A.class "chip", A.style "background" "#7d8f83" ]
+            [ text "✕" ]
         ]
 
 
@@ -3548,11 +3603,17 @@ viewPlantContextMenu model =
                              , btn "paillage" "🍂" "Pailler"
                              , btn "compost" "🌱" "Compost"
                              , btn "traitement" "💊" "Traiter"
-                             , btn "recolte" "🌾" (if isMultiHarvest model sid then "Noter une récolte" else "Récolter")
+                             , button
+                                [ E.onClick (StartHarvest id False)
+                                , A.class "chip"
+                                , A.style "margin" "0.2rem"
+                                , A.style "background" (kindColor "recolte")
+                                ]
+                                [ text ("🌾 " ++ (if isMultiHarvest model sid then "Noter une récolte" else "Récolter")) ]
                              ]
                                 ++ (if isMultiHarvest model sid then
                                         [ button
-                                            [ E.onClick (FinishHarvest id)
+                                            [ E.onClick (StartHarvest id True)
                                             , A.class "chip"
                                             , A.style "margin" "0.2rem"
                                             , A.style "background" "#2e7d4f"
@@ -3571,6 +3632,22 @@ viewPlantContextMenu model =
                                         [ text "☠ Plant mort" ]
                                    ]
                             )
+                        , case model.harvestDraft of
+                            Just d ->
+                                if d.plantId == id then
+                                    div [ A.style "margin-top" "0.4rem", A.style "padding" "0.4rem"
+                                        , A.style "background" "#eef4ee", A.style "border-radius" "4px"
+                                        , A.style "display" "flex", A.style "gap" "0.4rem", A.style "align-items" "center"
+                                        ]
+                                        [ span [ A.class "field-label" ]
+                                            [ text (if d.finish then "Dernière récolte" else "Récolte") ]
+                                        , viewHarvestWeightForm d
+                                        ]
+                                else
+                                    text ""
+
+                            Nothing ->
+                                text ""
                         , if model.deathPicker then
                             div [ A.style "margin-top" "0.4rem", A.style "padding" "0.4rem"
                                 , A.style "background" "#eef4ee", A.style "border-radius" "4px" ]
