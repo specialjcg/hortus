@@ -96,6 +96,7 @@ type alias Model =
     , dragging : Maybe DragState
     , plantMenu : Maybe Int -- id du plant avec menu ouvert
     , deathPicker : Bool -- sélecteur de cause « plant mort » ouvert
+    , journalOpen : Bool -- panneau journal déplié ou replié
     , deathDraft : Maybe String -- observation libre pour cause inconnue (Nothing = champ fermé)
     , noteDraft : String -- texte observation en cours de saisie
     , almanacSearch : String -- filtre texte de l'almanach
@@ -351,6 +352,7 @@ init flags =
       , dragging = Nothing
       , plantMenu = Nothing
       , deathPicker = False
+      , journalOpen = False
       , deathDraft = Nothing
       , noteDraft = ""
       , almanacSearch = ""
@@ -450,6 +452,7 @@ type Msg
     | QuickAction Int String -- plant id, kind
     | FinishHarvest Int -- plant id : dernière récolte + arrachage
     | ToggleDeathPicker
+    | ToggleJournal
     | OpenDeathNote -- cause inconnue → saisie d'une observation libre
     | SetDeathDraft String
     | PlantDead Int String -- plant id, cause de la mort
@@ -703,6 +706,9 @@ update msg model =
 
         ToggleDeathPicker ->
             ( { model | deathPicker = not model.deathPicker, deathDraft = Nothing }, Cmd.none )
+
+        ToggleJournal ->
+            ( { model | journalOpen = not model.journalOpen }, Cmd.none )
 
         OpenDeathNote ->
             ( { model | deathDraft = Just "" }, Cmd.none )
@@ -5453,8 +5459,19 @@ viewActionsTimeline model =
                     )
     in
     div [ A.class "panel" ]
-        [ h2 [] [ text ("Journal (" ++ String.fromInt (List.length filtered) ++ " / " ++ String.fromInt (List.length model.actions) ++ ")") ]
-        , div [ A.style "display" "flex", A.style "gap" "0.6rem", A.style "flex-wrap" "wrap", A.style "margin-bottom" "0.6rem" ]
+        [ div
+            [ A.style "display" "flex", A.style "justify-content" "space-between"
+            , A.style "align-items" "center", A.style "cursor" "pointer"
+            , E.onClick ToggleJournal
+            ]
+            [ h2 [ A.style "margin" "0" ]
+                [ text ("Journal (" ++ String.fromInt (List.length filtered) ++ " / " ++ String.fromInt (List.length model.actions) ++ ")") ]
+            , span [ A.style "font-size" "0.85rem", A.style "color" "#8b6e3d" ]
+                [ text (if model.journalOpen then "▼ masquer" else "▶ afficher") ]
+            ]
+        , if not model.journalOpen then text ""
+          else div []
+        [ div [ A.style "display" "flex", A.style "gap" "0.6rem", A.style "flex-wrap" "wrap", A.style "margin-bottom" "0.6rem", A.style "margin-top" "0.6rem" ]
             [ div [ A.style "display" "flex", A.style "flex-direction" "column" ]
                 [ Html.label [ A.style "font-size" "0.78rem", A.style "color" "#5a3a22" ] [ text "Parcelle" ]
                 , select
@@ -5483,6 +5500,7 @@ viewActionsTimeline model =
                 [ text "Aucune action enregistrée. Ajoute-en une." ]
           else
             div [] (List.map (viewActionRow model) filtered)
+        ]
         ]
 
 
