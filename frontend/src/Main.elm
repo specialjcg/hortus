@@ -3563,6 +3563,7 @@ viewJournalPage model =
                         , A.style "grid-template-columns" "repeat(auto-fit, minmax(280px, 1fr))"
                         , A.style "gap" "0.6rem"
                         , A.style "margin-bottom" "0.6rem"
+                        , A.style "align-items" "start"
                         ]
                         [ viewCoachTodo model cal
                         , viewCoachWatch model cal

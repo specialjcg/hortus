@@ -210,14 +210,14 @@ h3 { font-size: 1rem;  font-weight: 650; margin-bottom: 0.35rem; }
         "main main side"
         "a    b    c";
     gap: 1.1rem;
-    align-items: stretch;
+    align-items: start;
 }
 .bento-main { grid-area: main; }
 .bento-side { grid-area: side; }
 .bento-a { grid-area: a; }
 .bento-b { grid-area: b; }
 .bento-c { grid-area: c; }
-.bento > div > .panel { height: 100%; margin-bottom: 0; }
+.bento > div > .panel { margin-bottom: 0; }
 
 @media (max-width: 1000px) {
     .bento {
