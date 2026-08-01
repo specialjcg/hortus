@@ -5555,7 +5555,7 @@ viewActionsTimeline model =
             p [ A.style "color" "#46584c", A.style "font-size" "0.85rem" ]
                 [ text "Aucune action enregistrée. Ajoute-en une." ]
           else
-            div [] (List.map (viewActionRow model) filtered)
+            div [ A.class "scrollbox" ] (List.map (viewActionRow model) filtered)
         ]
         ]
 
