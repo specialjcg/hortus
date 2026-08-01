@@ -2794,7 +2794,8 @@ viewCoachTodo model cal =
         , if not (List.isEmpty sowSuggestions) then
             div []
                 [ h3 [] [ text "🌱 À semer" ]
-                , div [] (List.map viewSowSuggestion sowSuggestions)
+                , div [ A.class "scrollbox scrollbox-sm" ]
+                    (List.map viewSowSuggestion sowSuggestions)
                 ]
           else text ""
         ]
@@ -2924,29 +2925,39 @@ viewSowSuggestion : SowSuggest -> Html Msg
 viewSowSuggestion s =
     let
         tags =
-            (if s.indoor then [ "🌡 sous abri" ] else [])
+            (if s.indoor then [ "🌡 abri" ] else [])
                 ++ (if s.direct then [ "🌱 pleine terre" ] else [])
     in
     div
         [ A.class "pantry-row"
-        , A.style "padding" "0.4rem 0"
-        , A.style "border-bottom" "1px dashed #e2d2a8"
-        , A.style "flex-direction" "column"
-        , A.style "align-items" "stretch"
+        , A.style "display" "flex"
+        , A.style "justify-content" "space-between"
+        , A.style "align-items" "center"
+        , A.style "gap" "0.5rem"
+        , A.style "padding" "0.25rem 0"
+        , A.style "border-bottom" "1px dashed #dde7de"
         ]
-        [ div [ A.style "display" "flex", A.style "justify-content" "space-between" ]
-            [ span [] [ text (speciesEmoji s.species.id ++ " "), Html.strong [] [ text s.species.nameFr ] ]
-            , span [ A.style "font-size" "0.78rem", A.style "color" "#7d8f83" ]
-                [ text
-                    (if s.daysLeft > 0 then
-                        "fenêtre " ++ String.fromInt s.daysLeft ++ " j restants"
-                     else
-                        "dernier jour !"
-                    )
-                ]
+        [ span
+            [ A.style "min-width" "0", A.style "white-space" "nowrap"
+            , A.style "overflow" "hidden", A.style "text-overflow" "ellipsis"
             ]
-        , div [ A.style "font-size" "0.76rem", A.style "color" "#46584c" ]
-            [ text (String.join " · " tags) ]
+            [ text (speciesEmoji s.species.id ++ " ")
+            , Html.strong [] [ text s.species.nameFr ]
+            , span [ A.class "hint", A.style "margin-left" "0.4rem" ]
+                [ text (String.join " · " tags) ]
+            ]
+        , span
+            [ A.style "font-size" "0.76rem", A.style "flex-shrink" "0"
+            , A.style "color" (if s.daysLeft <= 3 then "#e8603c" else "#7d8f83")
+            , A.style "font-weight" (if s.daysLeft <= 3 then "700" else "400")
+            ]
+            [ text
+                (if s.daysLeft > 0 then
+                    String.fromInt s.daysLeft ++ " j restants"
+                 else
+                    "dernier jour !"
+                )
+            ]
         ]
 
 
