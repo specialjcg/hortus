@@ -85,21 +85,29 @@ jobs:
 
           # 3. Finalisation en une connexion. La DB SQLite (/opt/hortus/data/
           #    hortus.db) n'est jamais touchée, sauvegarde .bak avant restart.
+          #    Script idempotent : la gateway coupe parfois en plein milieu et
+          #    retry le rejoue — chaque mv est gardé par l'existence du .new.
           REMOTE=$(cat <<'FINALIZE'
           set -e
           systemctl stop hortus || true
           [ -f /opt/hortus/data/hortus.db ] && cp -f /opt/hortus/data/hortus.db /opt/hortus/data/hortus.db.bak || true
-          mv -f /opt/hortus/hortus-backend.new /opt/hortus/hortus-backend
-          rm -rf /opt/hortus/static
-          mv /opt/hortus/static.new /opt/hortus/static
-          mv -f /opt/hortus/species.json.new /opt/hortus/data/species.json
+          if [ -f /opt/hortus/hortus-backend.new ]; then
+            mv -f /opt/hortus/hortus-backend.new /opt/hortus/hortus-backend
+          fi
+          if [ -d /opt/hortus/static.new ]; then
+            rm -rf /opt/hortus/static
+            mv /opt/hortus/static.new /opt/hortus/static
+          fi
+          if [ -f /opt/hortus/species.json.new ]; then
+            mv -f /opt/hortus/species.json.new /opt/hortus/data/species.json
+          fi
           chmod 750 /opt/hortus/hortus-backend
           chown -R hortus:hortus /opt/hortus
           chmod 755 /opt/hortus /opt/hortus/static
           find /opt/hortus/static -type f -exec chmod 644 {} \;
           chmod -R o+rX /opt/hortus/static
           chmod o+x /opt/hortus
-          systemctl start hortus
+          systemctl restart hortus
           sleep 2
           systemctl is-active hortus
           echo "=== SERVICE ===" && systemctl status hortus --no-pager | head -6
