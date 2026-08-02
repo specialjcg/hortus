@@ -2109,19 +2109,75 @@ viewCoachPage model =
 viewCoachObservations : Model -> Html Msg
 viewCoachObservations model =
     let
-        observations =
+        noteItems =
             observationNotes model
-                |> List.sortBy .date
+                |> List.map (\a -> ( a.date, viewObservationItem a ))
+
+        problemItems =
+            model.problems
+                |> List.map (\pr -> ( problemLastDate pr, viewProblemObsItem pr ))
+
+        items =
+            (noteItems ++ problemItems)
+                |> List.sortBy Tuple.first
                 |> List.reverse
+                |> List.map Tuple.second
     in
     div [ A.class "panel accent-gold" ]
         [ h2 [] [ text "📝 Mes observations" ]
-        , if List.isEmpty observations then
+        , if List.isEmpty items then
             p [ A.style "color" "#46584c", A.style "font-size" "0.85rem" ]
                 [ text "Aucune observation. Clique un plant → écris ce que tu constates." ]
           else
             div [ A.class "scrollbox scrollbox-sm", A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.4rem" ]
-                (List.map viewObservationItem observations)
+                items
+        ]
+
+
+problemLastDate : Problem -> String
+problemLastDate pr =
+    pr.entries |> List.map .date |> List.maximum |> Maybe.withDefault ""
+
+
+viewProblemObsItem : Problem -> Html Msg
+viewProblemObsItem pr =
+    let
+        sid = pr.speciesId |> Maybe.withDefault ""
+        open = pr.status /= "resolved"
+        head =
+            (if sid == "" then "" else speciesEmoji sid ++ " " ++ speciesShortName sid ++ " · ")
+                ++ problemLastDate pr
+                ++ " · " ++ categoryLabel pr.category
+        lastText =
+            case pr.conclusion of
+                Just c ->
+                    if String.trim c == "" then Nothing else Just ("✅ " ++ c)
+
+                Nothing ->
+                    pr.entries
+                        |> List.sortBy .date
+                        |> List.reverse
+                        |> List.head
+                        |> Maybe.map (\e -> entryKindIcon e.kind ++ " " ++ e.text)
+    in
+    div
+        [ A.style "padding" "0.4rem 0.55rem"
+        , A.style "background" (if open then "#fdf0ec" else "#eef6ee")
+        , A.style "border-left" ("3px solid " ++ (if open then "#e8603c" else "#2e7d4f"))
+        , A.style "border-radius" "4px"
+        ]
+        [ div [ A.style "font-size" "0.74rem", A.style "color" "#46584c", A.style "font-weight" "600" ]
+            [ text head ]
+        , div [ A.style "font-size" "0.85rem", A.style "margin-top" "0.15rem" ]
+            [ Html.strong [] [ text pr.title ]
+            , text (if open then " — en cours" else " — résolu")
+            ]
+        , case lastText of
+            Just t ->
+                div [ A.style "font-size" "0.8rem", A.style "margin-top" "0.15rem", A.style "color" "#46584c" ]
+                    [ text t ]
+
+            Nothing -> text ""
         ]
 
 
