@@ -92,15 +92,20 @@ jobs:
           #    retry le rejoue — chaque mv est gardé par l'existence du .new.
           REMOTE=$(cat <<'FINALIZE'
           set -e
+          # Extraction AVANT l'arrêt du service : si le tar échoue (ex. uid du
+          # tarball hors plage du conteneur → --no-same-owner), on abandonne
+          # sans fenêtre 502. Le service n'est stoppé qu'une fois static.new prêt.
+          if [ -f /opt/hortus/static.tgz ]; then
+            rm -rf /opt/hortus/static.new
+            mkdir -p /opt/hortus/static.new
+            tar xzf /opt/hortus/static.tgz -C /opt/hortus/static.new --strip-components=1 --no-same-owner
+          fi
           systemctl stop hortus || true
           [ -f /opt/hortus/data/hortus.db ] && cp -f /opt/hortus/data/hortus.db /opt/hortus/data/hortus.db.bak || true
           if [ -f /opt/hortus/hortus-backend.new ]; then
             mv -f /opt/hortus/hortus-backend.new /opt/hortus/hortus-backend
           fi
-          if [ -f /opt/hortus/static.tgz ]; then
-            rm -rf /opt/hortus/static.new
-            mkdir -p /opt/hortus/static.new
-            tar xzf /opt/hortus/static.tgz -C /opt/hortus/static.new --strip-components=1
+          if [ -d /opt/hortus/static.new ]; then
             rm -rf /opt/hortus/static
             mv /opt/hortus/static.new /opt/hortus/static
             rm -f /opt/hortus/static.tgz
