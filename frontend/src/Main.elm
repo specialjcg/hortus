@@ -2113,7 +2113,6 @@ viewCoachObservations model =
             observationNotes model
                 |> List.sortBy .date
                 |> List.reverse
-                |> List.take 12
     in
     div [ A.class "panel accent-gold" ]
         [ h2 [] [ text "📝 Mes observations" ]
