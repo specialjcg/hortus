@@ -3998,12 +3998,20 @@ viewShelter model =
         , p [ A.style "font-size" "0.76rem", A.style "color" "#46584c", A.style "margin" "0 0 0.3rem 0" ]
             [ text hint ]
         , Svg.svg
-            [ SA.viewBox ("0 0 " ++ String.fromInt w ++ " " ++ String.fromInt h)
-            , SA.width (String.fromInt w)
-            , SE.on "click" (shelterClickDecoder w h)
-            , SE.on "mousemove" (zoneMoveDecoder Shelter w h)
-            , SE.on "mouseover" (D.succeed (DragEnterZone Shelter))
-            , SA.style ("max-width:100%;height:auto;border:3px dashed #5a8ab8;border-radius:8px;cursor:"
+            ([ SA.viewBox ("0 0 " ++ String.fromInt w ++ " " ++ String.fromInt h)
+             , SA.width (String.fromInt w)
+             , SE.on "click" (shelterClickDecoder w h)
+             ]
+                -- suivi souris seulement pendant un drag : sinon chaque pixel
+                -- déclenchait un cycle update/view complet.
+                ++ (if model.dragging /= Nothing then
+                        [ SE.on "mousemove" (zoneMoveDecoder Shelter w h)
+                        , SE.on "mouseover" (D.succeed (DragEnterZone Shelter))
+                        ]
+                    else
+                        []
+                   )
+                ++ [ SA.style ("max-width:100%;height:auto;border:3px dashed #5a8ab8;border-radius:8px;cursor:"
                 ++ (case ( model.paletteSpecies, model.dragging ) of
                         ( _, Just _ ) -> "grabbing"
                         ( Just _, Nothing ) -> "crosshair"
@@ -4014,8 +4022,9 @@ viewShelter model =
                         Just d -> if d.currentZone == Shelter then ";box-shadow:0 0 0 3px #4a9b3c" else ""
                         Nothing -> ""
                    )
-              )
-            ]
+                     )
+                   ]
+            )
             (shelterPatterns
                 ++ List.map (viewShelterPlant model) plants
                 ++ hoverLayer model plants hoverOverlayShelter
@@ -4422,7 +4431,7 @@ viewTerrain model =
         widthM = toFloat w / 100  -- 1 px = 1 cm
         heightM = toFloat h / 100
         areaM2 = round1 (widthM * heightM)
-        plantCount = List.length (plantsFromActions model)
+        plantCount = List.length plants
         hint =
             case model.paletteSpecies of
                 Just sid ->
@@ -4446,6 +4455,14 @@ viewTerrain model =
                 ( _, _, Just _ ) -> "grabbing"
                 ( _, Just _, _ ) -> "crosshair"
                 _ -> "default"
+
+        -- mousemove seulement quand utile (pan, drag, placement) : sinon
+        -- chaque pixel de souris re-rendait tout le SVG.
+        trackingAttrs =
+            if model.panning /= Nothing || model.dragging /= Nothing || model.paletteSpecies /= Nothing then
+                [ SE.on "mousemove" (terrainMouseMoveDecoder w h gv) ]
+            else
+                []
     in
     div [ A.class "panel" ]
         [ h2 []
@@ -4466,25 +4483,26 @@ viewTerrain model =
                 [ text "⟲ reset" ]
             ]
         , Svg.svg
-            [ SA.viewBox vbStr
-            , SA.width (String.fromInt w)
-            , SE.on "click" (terrainClickDecoder w h gv)
-            , SE.on "mousemove" (terrainMouseMoveDecoder w h gv)
-            , SE.on "mouseover" (D.succeed (DragEnterZone Terrain))
-            , SE.onMouseOut TerrainCursorLeave
-            , SE.preventDefaultOn "wheel" (wheelDecoder |> D.map (\m -> ( m, True )))
-            , SE.preventDefaultOn "mousedown" (panMouseDownDecoder |> D.map (\m -> ( m, True )))
-            , SA.style ("max-width:100%;height:auto;border:3px solid #6a4a2a;border-radius:8px;cursor:"
+            ([ SA.viewBox vbStr
+             , SA.width (String.fromInt w)
+             , SE.on "click" (terrainClickDecoder w h gv)
+             , SE.on "mouseover" (D.succeed (DragEnterZone Terrain))
+             , SE.onMouseOut TerrainCursorLeave
+             , SE.preventDefaultOn "wheel" (wheelDecoder |> D.map (\m -> ( m, True )))
+             , SE.preventDefaultOn "mousedown" (panMouseDownDecoder |> D.map (\m -> ( m, True )))
+             , SA.style ("max-width:100%;height:auto;border:3px solid #6a4a2a;border-radius:8px;cursor:"
                 ++ cursorStyle
                 ++ ";background:" ++ terrainBackground model
                 ++ (case model.dragging of
                         Just d -> if d.currentZone == Terrain then ";box-shadow:0 0 0 3px #4a9b3c" else ""
                         Nothing -> ""
                    )
-              )
-            ]
+               )
+             ]
+                ++ trackingAttrs
+            )
             (terrainPatterns
-                ++ List.map (viewPlantOnTerrain model) plants
+                ++ List.map (viewPlantOnTerrain model plants) plants
                 ++ hoverLayer model plants hoverOverlayTerrain
                 ++ dragGhost model Terrain
                 ++ placementOverlay model
@@ -4620,8 +4638,8 @@ plantsFromActions model =
             )
 
 
-viewPlantOnTerrain : Model -> PlantOnTerrain -> Svg.Svg Msg
-viewPlantOnTerrain model p =
+viewPlantOnTerrain : Model -> List PlantOnTerrain -> PlantOnTerrain -> Svg.Svg Msg
+viewPlantOnTerrain model siblings p =
     let
         emoji = stateEmoji p.state
         size = plantSize p.state
@@ -4641,7 +4659,7 @@ viewPlantOnTerrain model p =
                 Just sp -> sp.spacingCm // 2
                 Nothing -> 20
         hasSpacingConflict =
-            plantsFromActions model
+            siblings
                 |> List.any
                     (\other ->
                         other.id /= p.id
@@ -4655,7 +4673,7 @@ viewPlantOnTerrain model p =
         , SE.onMouseOut (HoverPlant Nothing)
         , SE.on "mousedown" (plantDragDecoder p.id Terrain)
         , SE.stopPropagationOn "click" (D.succeed ( NoOp, True ))
-        , SA.style "cursor:grab"
+        , SA.style ("cursor:grab" ++ (if model.dragging /= Nothing && not isDragged then ";pointer-events:none" else ""))
         , SA.opacity opacity
         ]
         ([ -- Frontière plantation : rouge si voisin trop proche, vert sinon
