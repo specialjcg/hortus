@@ -2872,6 +2872,26 @@ viewCoachTodo model cal =
                             _ -> Nothing
                     )
 
+        -- Une ligne par espèce : on récolte « des tomates », pas le plant (x,y).
+        harvestBySpecies =
+            harvestSuggestions
+                |> List.map Tuple.second
+                |> List.foldl
+                    (\s acc ->
+                        if List.member s acc then acc else acc ++ [ s ]
+                    )
+                    []
+                |> List.map
+                    (\sp ->
+                        ( sp
+                        , harvestSuggestions
+                            |> List.filterMap
+                                (\( pl, s ) ->
+                                    if s == sp then Just pl else Nothing
+                                )
+                        )
+                    )
+
         -- Pluie significative dans les 24h ?
         rainTomorrow =
             model.forecast
@@ -2926,9 +2946,9 @@ viewCoachTodo model cal =
             div [ A.style "margin-bottom" "0.6rem" ]
                 [ h3 [] [ text "🌾 À récolter" ]
                 , p [ A.class "hint", A.style "margin" "0 0 0.3rem 0" ]
-                    [ text "Plants en récolte : cueille ce qui est mûr, note chaque cueillette." ]
+                    [ text "Cueille ce qui est mûr, note ta récolte par espèce." ]
                 , div [ A.class "scrollbox scrollbox-sm" ]
-                    (List.map (viewHarvestSuggestion model) harvestSuggestions)
+                    (List.map (viewHarvestSpeciesRow model) harvestBySpecies)
                 ]
           else text ""
         , if not (List.isEmpty waterSuggestions) then
@@ -2999,10 +3019,21 @@ viewMaintenanceSuggestion kind icon pl =
         ]
 
 
-viewHarvestSuggestion : Model -> ( PlantOnTerrain, String ) -> Html Msg
-viewHarvestSuggestion model ( pl, sp ) =
+viewHarvestSpeciesRow : Model -> ( String, List PlantOnTerrain ) -> Html Msg
+viewHarvestSpeciesRow model ( sp, pls ) =
     let
         multi = isMultiHarvest model sp
+
+        -- La pesée/l'arrachage ciblent le plant le plus ancien de l'espèce :
+        -- au moment de cueillir on ne sait pas de quel plant il s'agit.
+        oldestId =
+            pls
+                |> List.sortBy .date
+                |> List.head
+                |> Maybe.map .id
+                |> Maybe.withDefault 0
+
+        n = List.length pls
     in
     div
         [ A.class "pantry-row"
@@ -3020,17 +3051,17 @@ viewHarvestSuggestion model ( pl, sp ) =
             [ text (speciesEmoji sp ++ " ")
             , Html.strong [] [ text (speciesShortName sp) ]
             , span [ A.class "coords" ]
-                [ text ("(" ++ String.fromInt pl.x ++ "," ++ String.fromInt pl.y ++ ")") ]
+                [ text ("× " ++ String.fromInt n ++ " prêt" ++ (if n > 1 then "s" else "")) ]
             ]
         , case model.harvestDraft of
             Just d ->
-                if d.plantId == pl.id then
+                if List.any (\pl -> pl.id == d.plantId) pls then
                     viewHarvestWeightForm d
                 else
-                    viewHarvestButtons multi pl.id
+                    viewHarvestButtons multi oldestId
 
             Nothing ->
-                viewHarvestButtons multi pl.id
+                viewHarvestButtons multi oldestId
         ]
 
 
@@ -3048,11 +3079,11 @@ viewHarvestButtons multi plantId =
     in
     div [ A.style "display" "flex", A.style "gap" "0.3rem", A.style "flex-shrink" "0" ]
         (if multi then
-            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 noter" "Noter une récolte — le plant reste en place"
-            , actionBtn (StartHarvest plantId True) "#2e7d4f" "🧺 finir" "Dernière récolte + arrachage du plant"
+            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 noter" "Noter une récolte — les plants restent en place"
+            , actionBtn (StartHarvest plantId True) "#2e7d4f" "🧺 finir" "Dernière récolte — le plant le plus ancien est arraché"
             ]
          else
-            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 récolter" "Récolter (le plant disparaît)" ]
+            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 récolter" "Récolter — le plant le plus ancien disparaît" ]
         )
 
 
