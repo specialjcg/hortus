@@ -102,6 +102,8 @@ type alias Model =
     , deathDraft : Maybe String -- observation libre pour cause inconnue (Nothing = champ fermé)
     , harvestDraft : Maybe { plantId : Int, grams : String, finish : Bool } -- pesée de récolte en cours
     , noteDraft : String -- texte observation en cours de saisie
+    , coachObsSpecies : String -- espèce de l'observation rapide ("" = général)
+    , coachObsText : String -- texte de l'observation rapide (panneau Coach)
     , almanacSearch : String -- filtre texte de l'almanach
     , solutionDraft : Maybe ( Int, String ) -- (id note, texte solution en édition)
     , problems : List Problem
@@ -360,6 +362,8 @@ init flags =
       , deathDraft = Nothing
       , harvestDraft = Nothing
       , noteDraft = ""
+      , coachObsSpecies = ""
+      , coachObsText = ""
       , almanacSearch = ""
       , solutionDraft = Nothing
       , problems = []
@@ -468,6 +472,9 @@ type Msg
     | SetDeathDraft String
     | PlantDead Int String -- plant id, cause de la mort
     | SetNoteDraft String
+    | SetCoachObsSpecies String
+    | SetCoachObsText String
+    | SubmitCoachObs
     | SaveObservation Int -- plant id
     | SetAlmanacSearch String
     | GotProblems (Result Http.Error (List Problem))
@@ -774,6 +781,29 @@ update msg model =
 
         SetNoteDraft s ->
             ( { model | noteDraft = s }, Cmd.none )
+
+        SetCoachObsSpecies s ->
+            ( { model | coachObsSpecies = s }, Cmd.none )
+
+        SetCoachObsText s ->
+            ( { model | coachObsText = s }, Cmd.none )
+
+        SubmitCoachObs ->
+            if String.trim model.coachObsText == "" then
+                ( model, Cmd.none )
+            else
+                ( { model | coachObsText = "" }
+                , createAction model.backendUrl
+                    { date = model.today
+                    , parcelId = ""
+                    , speciesId = model.coachObsSpecies
+                    , kind = "note"
+                    , quantity = ""
+                    , notes = model.coachObsText
+                    , gridX = ""
+                    , gridY = ""
+                    }
+                )
 
         SetAlmanacSearch s ->
             ( { model | almanacSearch = s }, Cmd.none )
@@ -2125,13 +2155,84 @@ viewCoachObservations model =
     in
     div [ A.class "panel accent-gold" ]
         [ h2 [] [ text "📝 Mes observations" ]
+        , viewCoachObsForm model
         , if List.isEmpty items then
             p [ A.style "color" "#46584c", A.style "font-size" "0.85rem" ]
-                [ text "Aucune observation. Clique un plant → écris ce que tu constates." ]
+                [ text "Aucune observation. Note ce que tu constates, par espèce ou en général." ]
           else
             div [ A.class "scrollbox scrollbox-sm", A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.4rem" ]
                 items
         ]
+
+
+-- Saisie rapide d'une observation par espèce (sans désigner un plant précis).
+
+
+viewCoachObsForm : Model -> Html Msg
+viewCoachObsForm model =
+    let
+        speciesOpts =
+            plantedSpeciesIds model
+                |> List.map
+                    (\sid ->
+                        option [ A.value sid, A.selected (model.coachObsSpecies == sid) ]
+                            [ text (speciesEmoji sid ++ " " ++ speciesShortName sid) ]
+                    )
+    in
+    div [ A.style "display" "flex", A.style "gap" "0.35rem", A.style "margin-bottom" "0.5rem", A.style "flex-wrap" "wrap" ]
+        [ select
+            [ E.onInput SetCoachObsSpecies
+            , A.style "padding" "4px", A.style "border" "1px solid #d4b85a"
+            , A.style "border-radius" "3px", A.style "background" "#ffffff"
+            , A.style "font-size" "0.8rem", A.style "max-width" "10rem"
+            ]
+            (option [ A.value "", A.selected (model.coachObsSpecies == "") ] [ text "— général —" ]
+                :: speciesOpts
+            )
+        , input
+            [ A.type_ "text"
+            , A.value model.coachObsText
+            , E.onInput SetCoachObsText
+            , A.placeholder "ex : premières fleurs, feuilles piquées..."
+            , onEnter SubmitCoachObs
+            , A.style "flex" "1 1 9rem", A.style "padding" "4px 6px"
+            , A.style "border" "1px solid #d4b85a", A.style "border-radius" "3px"
+            , A.style "background" "#ffffff", A.style "font-size" "0.8rem"
+            ]
+            []
+        , button
+            [ E.onClick SubmitCoachObs
+            , A.disabled (String.trim model.coachObsText == "")
+            , A.style "padding" "4px 10px", A.style "font-size" "0.8rem"
+            ]
+            [ text "➕" ]
+        ]
+
+
+onEnter : Msg -> Html.Attribute Msg
+onEnter msg =
+    E.on "keydown"
+        (D.field "key" D.string
+            |> D.andThen
+                (\k ->
+                    if k == "Enter" then D.succeed msg else D.fail "pas Entrée"
+                )
+        )
+
+
+-- Espèces effectivement présentes (jardin + pépinière), sans doublon.
+
+
+plantedSpeciesIds : Model -> List String
+plantedSpeciesIds model =
+    (plantsFromActions model ++ shelterPlantsFromActions model)
+        |> List.map .speciesId
+        |> List.foldl
+            (\s acc ->
+                if List.member s acc then acc else s :: acc
+            )
+            []
+        |> List.sortBy speciesShortName
 
 
 problemLastDate : Problem -> String
