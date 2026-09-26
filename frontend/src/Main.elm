@@ -100,7 +100,7 @@ type alias Model =
     , deathPicker : Bool -- sélecteur de cause « plant mort » ouvert
     , journalOpen : Bool -- panneau journal déplié ou replié
     , deathDraft : Maybe String -- observation libre pour cause inconnue (Nothing = champ fermé)
-    , harvestDraft : Maybe { plantId : Int, grams : String, finish : Bool } -- pesée de récolte en cours
+    , harvestDraft : Maybe { plantId : Int, grams : String, uproot : List Int } -- pesée de récolte en cours ; uproot = plants arrachés après validation
     , noteDraft : String -- texte observation en cours de saisie
     , coachObsSpecies : String -- espèce de l'observation rapide ("" = général)
     , coachObsText : String -- texte de l'observation rapide (panneau Coach)
@@ -459,10 +459,10 @@ type Msg
     | OpenPlantMenu Int
     | ClosePlantMenu
     | QuickAction Int String -- plant id, kind
-    | StartHarvest Int Bool -- plant id, finish : ouvre la pesée de récolte
+    | StartHarvest Int (List Int) -- plant pesé, plants à arracher après validation : ouvre la pesée de récolte
     | SetHarvestGrams String
     | CancelHarvest
-    | ConfirmHarvest -- enregistre la récolte (poids optionnel), + arrachage si finish
+    | ConfirmHarvest -- enregistre la récolte (poids optionnel), + arrachage des plants uproot
     | ToggleDeathPicker
     | ToggleJournal
     | PickPhoto Int
@@ -714,8 +714,8 @@ update msg model =
             , quickActionCmd model plantId kind "" ""
             )
 
-        StartHarvest plantId finish ->
-            ( { model | harvestDraft = Just { plantId = plantId, grams = "", finish = finish } }
+        StartHarvest plantId uproot ->
+            ( { model | harvestDraft = Just { plantId = plantId, grams = "", uproot = uproot } }
             , Cmd.none
             )
 
@@ -734,7 +734,7 @@ update msg model =
                     ( { model | harvestDraft = Nothing, plantMenu = Nothing }
                     , Cmd.batch
                         (quickActionCmd model d.plantId "recolte" "" d.grams
-                            :: (if d.finish then [ quickActionCmd model d.plantId "arrachage" "" "" ] else [])
+                            :: List.map (\pid -> quickActionCmd model pid "arrachage" "" "") d.uproot
                         )
                     )
 
@@ -3024,7 +3024,7 @@ viewHarvestSpeciesRow model ( sp, pls ) =
     let
         multi = isMultiHarvest model sp
 
-        -- La pesée/l'arrachage ciblent le plant le plus ancien de l'espèce :
+        -- La pesée cible le plant le plus ancien de l'espèce (« finir » arrache tous les plants prêts) :
         -- au moment de cueillir on ne sait pas de quel plant il s'agit.
         oldestId =
             pls
@@ -3058,15 +3058,15 @@ viewHarvestSpeciesRow model ( sp, pls ) =
                 if List.any (\pl -> pl.id == d.plantId) pls then
                     viewHarvestWeightForm d
                 else
-                    viewHarvestButtons multi oldestId
+                    viewHarvestButtons multi oldestId (List.map .id pls)
 
             Nothing ->
-                viewHarvestButtons multi oldestId
+                viewHarvestButtons multi oldestId (List.map .id pls)
         ]
 
 
-viewHarvestButtons : Bool -> Int -> Html Msg
-viewHarvestButtons multi plantId =
+viewHarvestButtons : Bool -> Int -> List Int -> Html Msg
+viewHarvestButtons multi plantId allIds =
     let
         actionBtn msg bg lbl title =
             button
@@ -3079,15 +3079,15 @@ viewHarvestButtons multi plantId =
     in
     div [ A.style "display" "flex", A.style "gap" "0.3rem", A.style "flex-shrink" "0" ]
         (if multi then
-            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 noter" "Noter une récolte — les plants restent en place"
-            , actionBtn (StartHarvest plantId True) "#2e7d4f" "🧺 finir" "Dernière récolte — le plant le plus ancien est arraché"
+            [ actionBtn (StartHarvest plantId []) "#f0a832" "🌾 noter" "Noter une récolte — les plants restent en place"
+            , actionBtn (StartHarvest plantId allIds) "#2e7d4f" "🧺 finir" "Dernière récolte — tous les plants prêts de l'espèce sont arrachés"
             ]
          else
-            [ actionBtn (StartHarvest plantId False) "#f0a832" "🌾 récolter" "Récolter — le plant le plus ancien disparaît" ]
+            [ actionBtn (StartHarvest plantId []) "#f0a832" "🌾 récolter" "Récolter — le plant le plus ancien disparaît" ]
         )
 
 
-viewHarvestWeightForm : { plantId : Int, grams : String, finish : Bool } -> Html Msg
+viewHarvestWeightForm : { plantId : Int, grams : String, uproot : List Int } -> Html Msg
 viewHarvestWeightForm d =
     div
         [ A.style "display" "flex", A.style "gap" "0.3rem", A.style "align-items" "center"
@@ -3105,6 +3105,17 @@ viewHarvestWeightForm d =
             [ text "✓" ]
         , button [ E.onClick CancelHarvest, A.class "chip", A.style "background" "#7d8f83" ]
             [ text "✕" ]
+        , case List.length d.uproot of
+            0 ->
+                text ""
+
+            1 ->
+                span [ A.style "font-size" "0.75rem", A.style "color" "#8a5a1f" ]
+                    [ text "→ plant arraché après validation" ]
+
+            k ->
+                span [ A.style "font-size" "0.75rem", A.style "color" "#8a5a1f" ]
+                    [ text ("→ " ++ String.fromInt k ++ " plants arrachés après validation") ]
         ]
 
 
@@ -3822,7 +3833,7 @@ viewPlantContextMenu model =
                              , btn "compost" "🌱" "Compost"
                              , btn "traitement" "💊" "Traiter"
                              , button
-                                [ E.onClick (StartHarvest id False)
+                                [ E.onClick (StartHarvest id [])
                                 , A.class "chip"
                                 , A.style "margin" "0.2rem"
                                 , A.style "background" (kindColor "recolte")
@@ -3831,7 +3842,7 @@ viewPlantContextMenu model =
                              ]
                                 ++ (if isMultiHarvest model sid then
                                         [ button
-                                            [ E.onClick (StartHarvest id True)
+                                            [ E.onClick (StartHarvest id [ id ])
                                             , A.class "chip"
                                             , A.style "margin" "0.2rem"
                                             , A.style "background" "#2e7d4f"
@@ -3858,7 +3869,7 @@ viewPlantContextMenu model =
                                         , A.style "display" "flex", A.style "gap" "0.4rem", A.style "align-items" "center"
                                         ]
                                         [ span [ A.class "field-label" ]
-                                            [ text (if d.finish then "Dernière récolte" else "Récolte") ]
+                                            [ text (if List.isEmpty d.uproot then "Récolte" else "Dernière récolte") ]
                                         , viewHarvestWeightForm d
                                         ]
                                 else
