@@ -9,7 +9,9 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
@@ -20,13 +22,20 @@ use crate::journal::{
     self, Action, ActionFilter, ActionInput, Parcel, ParcelInput, ACTION_KINDS,
 };
 use crate::problems::{self, EntryInput, Problem, ProblemInput, ProblemUpdate};
+use crate::domain::vigieau::{self, Restriction};
+use crate::restrictions::{self, LevelChange};
 
 /// État partagé.
 #[derive(Clone)]
 pub struct AppState {
     pub species: Arc<Vec<Species>>,
     pub db: Db,
+    /// Cache VigiEau par ville : (instant du fetch, restrictions).
+    pub water_cache: Arc<Mutex<HashMap<String, (Instant, Vec<Restriction>)>>>,
 }
+
+/// Durée de vie du cache VigiEau (les arrêtés changent au plus quelques fois par semaine).
+const WATER_CACHE_TTL: Duration = Duration::from_secs(6 * 3600);
 
 /// Répertoire des photos du journal (jamais touché par le déploiement,
 /// comme la DB — il vit à côté dans data/).
@@ -134,7 +143,11 @@ pub fn router() -> Router {
         eprintln!("[fatal] DB non ouverte : {e}");
         std::process::exit(1);
     });
-    let state = AppState { species: Arc::new(species), db };
+    let state = AppState {
+        species: Arc::new(species),
+        db,
+        water_cache: Arc::new(Mutex::new(HashMap::new())),
+    };
 
     Router::new()
         .route("/health", get(health))
@@ -142,6 +155,8 @@ pub fn router() -> Router {
         .route("/cities", get(list_cities))
         .route("/calendar", get(calendar))
         .route("/forecast", get(forecast))
+        .route("/water-restrictions", get(water_restrictions))
+        .route("/water-restrictions/seen", post(water_restrictions_seen))
         .route("/historical-year", get(historical_year))
         .route("/action-kinds", get(list_action_kinds))
         .route("/parcels", get(get_parcels).post(create_parcel))
@@ -256,6 +271,74 @@ async fn forecast(Query(q): Query<ForecastQuery>) -> Json<Vec<ForecastDay>> {
         .collect();
     out.sort_by(|a, b| a.date.cmp(&b.date));
     Json(out)
+}
+
+#[derive(Debug, Serialize)]
+pub struct WaterRestrictions {
+    /// false = VigiEau injoignable et rien en cache.
+    pub available: bool,
+    pub resources: Vec<Restriction>,
+    /// Changements de niveau pas encore lus (bandeau).
+    pub changes: Vec<LevelChange>,
+}
+
+/// Restrictions d'eau VigiEau à la position de la ville. Cache 6 h ; le suivi
+/// des niveaux n'est mis à jour qu'à chaque fetch frais.
+async fn water_restrictions(
+    State(s): State<AppState>,
+    Query(q): Query<ForecastQuery>,
+) -> Result<Json<WaterRestrictions>, (StatusCode, String)> {
+    let slug = q.city.as_deref().unwrap_or("le_bois_doingt").to_string();
+    let cached = s
+        .water_cache
+        .lock()
+        .expect("cache mutex poisoned")
+        .get(&slug)
+        .filter(|(at, _)| at.elapsed() < WATER_CACHE_TTL)
+        .map(|(_, r)| r.clone());
+    let resources = match cached {
+        Some(r) => Some(r),
+        None => {
+            let loc = Location::by_slug(&slug);
+            match vigieau::fetch_restrictions(loc.latitude_deg, loc.longitude_deg).await {
+                Ok(r) => {
+                    restrictions::record_levels(&s.db, &slug, &r)
+                        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+                    s.water_cache
+                        .lock()
+                        .expect("cache mutex poisoned")
+                        .insert(slug.clone(), (Instant::now(), r.clone()));
+                    Some(r)
+                }
+                Err(e) => {
+                    tracing::warn!("{e}");
+                    // Cache périmé plutôt que rien.
+                    s.water_cache
+                        .lock()
+                        .expect("cache mutex poisoned")
+                        .get(&slug)
+                        .map(|(_, r)| r.clone())
+                }
+            }
+        }
+    };
+    let changes = restrictions::pending_changes(&s.db, &slug)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(WaterRestrictions {
+        available: resources.is_some(),
+        resources: resources.unwrap_or_default(),
+        changes,
+    }))
+}
+
+/// Ferme le bandeau de changement de niveau.
+async fn water_restrictions_seen(
+    State(s): State<AppState>,
+    Query(q): Query<ForecastQuery>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let slug = q.city.as_deref().unwrap_or("le_bois_doingt");
+    restrictions::mark_seen(&s.db, slug).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn get_parcels(State(s): State<AppState>) -> Result<Json<Vec<Parcel>>, (StatusCode, String)> {

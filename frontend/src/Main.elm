@@ -90,6 +90,7 @@ type alias Model =
     , filterActionKind : Maybe String
     , today : String
     , forecast : List ForecastDay
+    , water : Maybe WaterRestrictions -- restrictions VigiEau (réseau, cours d'eau, puits)
     , historical : List HistoricalDay
     , historicalLoading : Bool
     , paletteSpecies : Maybe String
@@ -206,6 +207,24 @@ type alias SpeciesLocal =
 
 type alias Location =
     { name : String, latitude : Float, longitude : Float, altitudeM : Float }
+
+
+type alias WaterRestriction =
+    { kind : String -- AEP (réseau) / SUP (cours d'eau) / SOU (puits, nappe)
+    , zone : Maybe String
+    , level : Maybe String -- Nothing = aucune restriction
+    , potager : Maybe String -- règle « arrosage des potagers » de l'arrêté
+    , validUntil : Maybe String
+    , arreteUrl : Maybe String
+    }
+
+
+type alias LevelChange =
+    { kind : String, from : String, to : String, changedAt : String }
+
+
+type alias WaterRestrictions =
+    { available : Bool, resources : List WaterRestriction, changes : List LevelChange }
 
 
 type alias CalendarResponse =
@@ -350,6 +369,7 @@ init flags =
       , filterActionParcel = Nothing
       , filterActionKind = Nothing
       , forecast = []
+      , water = Nothing
       , historical = []
       , historicalLoading = False
       , paletteSpecies = Nothing
@@ -387,6 +407,7 @@ init flags =
         , fetchActions flags.backendUrl
         , fetchActionKinds flags.backendUrl
         , fetchForecast flags.backendUrl "le_bois_doingt"
+        , fetchWater flags.backendUrl "le_bois_doingt"
         , fetchProblems flags.backendUrl
         ]
     )
@@ -441,6 +462,9 @@ type Msg
     | SetFilterActionParcel String
     | SetFilterActionKind String
     | GotForecast (Result Http.Error (List ForecastDay))
+    | GotWater (Result Http.Error WaterRestrictions)
+    | DismissWaterChanges -- ferme le bandeau de changement de niveau
+    | WaterSeen (Result Http.Error ())
     | LoadHistorical
     | GotHistorical (Result Http.Error (List HistoricalDay))
     | SelectTile Int Int
@@ -543,11 +567,22 @@ update msg model =
             , Cmd.batch
                 [ fetchCalendar model.backendUrl slug False
                 , fetchForecast model.backendUrl slug
+                , fetchWater model.backendUrl slug
                 ]
             )
 
         GotForecast (Ok f) -> ( { model | forecast = f }, Cmd.none )
         GotForecast (Err _) -> ( model, Cmd.none )
+
+        GotWater (Ok w) -> ( { model | water = Just w }, Cmd.none )
+        GotWater (Err _) -> ( model, Cmd.none )
+
+        DismissWaterChanges ->
+            ( { model | water = Maybe.map (\w -> { w | changes = [] }) model.water }
+            , markWaterSeen model.backendUrl model.selectedCity
+            )
+
+        WaterSeen _ -> ( model, Cmd.none )
 
         LoadHistorical ->
             ( { model | historicalLoading = True }
@@ -1415,6 +1450,51 @@ fetchForecast url slug =
         }
 
 
+fetchWater : String -> String -> Cmd Msg
+fetchWater url slug =
+    Http.get
+        { url = url ++ "/water-restrictions?city=" ++ slug
+        , expect = Http.expectJson GotWater waterRestrictionsDecoder
+        }
+
+
+markWaterSeen : String -> String -> Cmd Msg
+markWaterSeen url slug =
+    Http.post
+        { url = url ++ "/water-restrictions/seen?city=" ++ slug
+        , body = Http.emptyBody
+        , expect = Http.expectWhatever WaterSeen
+        }
+
+
+waterRestrictionsDecoder : Decoder WaterRestrictions
+waterRestrictionsDecoder =
+    D.map3 WaterRestrictions
+        (D.field "available" D.bool)
+        (D.field "resources"
+            (D.list
+                (D.map6 WaterRestriction
+                    (D.field "kind" D.string)
+                    (D.field "zone" (D.nullable D.string))
+                    (D.field "level" (D.nullable D.string))
+                    (D.field "potager" (D.nullable D.string))
+                    (D.field "valid_until" (D.nullable D.string))
+                    (D.field "arrete_url" (D.nullable D.string))
+                )
+            )
+        )
+        (D.field "changes"
+            (D.list
+                (D.map4 LevelChange
+                    (D.field "kind" D.string)
+                    (D.field "from" D.string)
+                    (D.field "to" D.string)
+                    (D.field "changed_at" D.string)
+                )
+            )
+        )
+
+
 fetchHistorical : String -> String -> Cmd Msg
 fetchHistorical url slug =
     Http.get
@@ -2124,13 +2204,145 @@ viewCoachPage model =
             div [ A.class "panel" ] [ text "Chargement du catalogue..." ]
 
         Just cal ->
-            div [ A.class "bento" ]
+            div []
+            [ viewWaterChanges model
+            , div [ A.class "bento" ]
                 [ div [ A.class "bento-main" ] [ viewCoachTodo model cal ]
                 , div [ A.class "bento-side" ] [ viewCoachWatch model cal ]
                 , div [ A.class "bento-a" ] [ viewCoachWeek model ]
                 , div [ A.class "bento-b" ] [ viewCoachObservations model ]
                 , div [ A.class "bento-c" ] [ viewCoachTip model ]
+                , div [ A.class "bento-d" ] [ viewCoachWater model ]
                 ]
+            ]
+
+
+-- Restrictions d'eau VigiEau : bandeau de changement de niveau + carte par ressource
+
+
+waterKindLabel : String -> String
+waterKindLabel kind =
+    case kind of
+        "AEP" -> "Eau du réseau"
+        "SUP" -> "Cours d'eau"
+        "SOU" -> "Puits / nappe"
+        other -> other
+
+
+waterLevelLabel : String -> ( String, String )
+waterLevelLabel level =
+    case level of
+        "vigilance" -> ( "Vigilance", "#b08900" )
+        "alerte" -> ( "Alerte", "#d9730d" )
+        "crise" -> ( "Crise", "#b02a2a" )
+        "aucune" -> ( "Aucune", "#4a7a3a" )
+        other ->
+            if String.contains "renforc" other then
+                ( "Alerte renforcée", "#c2410c" )
+
+            else
+                ( other, "#46584c" )
+
+
+waterBadge : String -> Html Msg
+waterBadge level =
+    let
+        ( label, color ) = waterLevelLabel level
+    in
+    span
+        [ A.style "background" color
+        , A.style "color" "white"
+        , A.style "border-radius" "999px"
+        , A.style "padding" "0.05rem 0.55rem"
+        , A.style "font-size" "0.75rem"
+        , A.style "font-weight" "600"
+        ]
+        [ text label ]
+
+
+-- "2026-10-31" -> "31/10"
+isoDayMonth : String -> String
+isoDayMonth iso =
+    String.slice 8 10 iso ++ "/" ++ String.slice 5 7 iso
+
+
+viewWaterChanges : Model -> Html Msg
+viewWaterChanges model =
+    case Maybe.map .changes model.water of
+        Just ((_ :: _) as changes) ->
+            div
+                [ A.style "display" "flex"
+                , A.style "align-items" "center"
+                , A.style "gap" "0.8rem"
+                , A.style "background" "#fdecea"
+                , A.style "border" "1px solid #b02a2a"
+                , A.style "border-radius" "8px"
+                , A.style "padding" "0.6rem 0.9rem"
+                , A.style "margin-bottom" "1rem"
+                ]
+                [ span [ A.style "font-size" "1.2rem" ] [ text "⚠️" ]
+                , div [ A.style "flex" "1", A.style "display" "flex", A.style "flex-direction" "column", A.style "gap" "0.2rem" ]
+                    (List.map
+                        (\c ->
+                            div [ A.style "display" "flex", A.style "align-items" "center", A.style "gap" "0.4rem", A.style "flex-wrap" "wrap" ]
+                                [ text ("Restriction d'eau — " ++ waterKindLabel c.kind ++ " :")
+                                , waterBadge c.from
+                                , text "→"
+                                , waterBadge c.to
+                                , span [ A.style "font-size" "0.75rem", A.style "color" "#46584c" ] [ text ("le " ++ isoDayMonth c.changedAt) ]
+                                ]
+                        )
+                        changes
+                    )
+                , button [ E.onClick DismissWaterChanges, A.title "Marquer comme lu" ] [ text "✕" ]
+                ]
+
+        _ ->
+            text ""
+
+
+viewCoachWater : Model -> Html Msg
+viewCoachWater model =
+    div [ A.class "panel" ]
+        (h2 [] [ text "💧 Restrictions d'eau" ]
+            :: (case model.water of
+                    Nothing ->
+                        [ p [] [ text "Chargement VigiEau..." ] ]
+
+                    Just w ->
+                        if not w.available then
+                            [ p [ A.style "color" "#46584c" ] [ text "VigiEau injoignable pour l'instant." ] ]
+
+                        else if List.all (\r -> r.level == Nothing) w.resources then
+                            [ p [ A.style "color" "#4a7a3a" ] [ text "Aucune restriction en cours." ] ]
+
+                        else
+                            List.map viewWaterResource w.resources
+               )
+        )
+
+
+viewWaterResource : WaterRestriction -> Html Msg
+viewWaterResource r =
+    div [ A.style "padding" "0.45rem 0", A.style "border-bottom" "1px solid #e4e0d4" ]
+        [ div [ A.style "display" "flex", A.style "align-items" "center", A.style "gap" "0.5rem", A.style "flex-wrap" "wrap" ]
+            [ span [ A.style "font-weight" "600" ] [ text (waterKindLabel r.kind) ]
+            , waterBadge (Maybe.withDefault "aucune" r.level)
+            , case r.validUntil of
+                Just d -> span [ A.style "font-size" "0.75rem", A.style "color" "#46584c" ] [ text ("jusqu'au " ++ isoDayMonth d) ]
+                Nothing -> text ""
+            , case r.arreteUrl of
+                Just url -> Html.a [ A.href url, A.target "_blank", A.style "font-size" "0.75rem" ] [ text "arrêté" ]
+                Nothing -> text ""
+            ]
+        , case r.potager of
+            Just rule ->
+                -- Première ligne = la règle ; le détail (dérogations) en infobulle.
+                p [ A.style "margin" "0.25rem 0 0", A.style "font-size" "0.85rem", A.title rule ]
+                    [ text ("Potager : " ++ (rule |> String.lines |> List.head |> Maybe.withDefault rule)) ]
+
+            Nothing -> text ""
+        ]
 
 
 -- Panneau "Mes observations" (notes texte saisies sur les plants)
