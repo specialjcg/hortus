@@ -96,6 +96,8 @@ type alias Model =
     , paletteSpecies : Maybe String
     , hoverPlant : Maybe Int -- action id
     , movingPlant : Maybe Int -- id action en cours de déplacement (click-move)
+    , drawingBed : Maybe (List ( Int, Int )) -- sommets posés de la planche en cours de dessin
+    , bedName : String
     , dragging : Maybe DragState
     , plantMenu : Maybe Int -- id du plant avec menu ouvert
     , deathPicker : Bool -- sélecteur de cause « plant mort » ouvert
@@ -242,6 +244,7 @@ type alias Parcel =
     , gridW : Int
     , gridH : Int
     , color : String
+    , shape : Maybe (List ( Int, Int )) -- contour de planche (px terrain, 1 px = 1 cm)
     }
 
 
@@ -375,6 +378,8 @@ init flags =
       , paletteSpecies = Nothing
       , hoverPlant = Nothing
       , movingPlant = Nothing
+      , drawingBed = Nothing
+      , bedName = ""
       , dragging = Nothing
       , plantMenu = Nothing
       , deathPicker = False
@@ -471,6 +476,12 @@ type Msg
     | SelectPaletteSpecies String
     | ClearPalette
     | PlaceAtPixel Int Int
+    | StartDrawBed
+    | AddBedPoint Int Int
+    | CancelDrawBed
+    | UndoBedPoint
+    | SetBedName String
+    | SaveBed
     | HoverPlant (Maybe Int)
     | DeletePlant Int
     | PlaceInShelter Int Int
@@ -612,6 +623,35 @@ update msg model =
 
         ClearPalette ->
             ( { model | paletteSpecies = Nothing }, Cmd.none )
+
+        StartDrawBed ->
+            ( { model | drawingBed = Just [], bedName = "", paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
+
+        CancelDrawBed ->
+            ( { model | drawingBed = Nothing }, Cmd.none )
+
+        UndoBedPoint ->
+            ( { model | drawingBed = Maybe.map (List.reverse >> List.drop 1 >> List.reverse) model.drawingBed }, Cmd.none )
+
+        SetBedName n ->
+            ( { model | bedName = n }, Cmd.none )
+
+        SaveBed ->
+            case model.drawingBed of
+                Just pts ->
+                    if List.length pts < 3 || String.trim model.bedName == "" then
+                        ( { model | error = Just "Planche : 3 sommets minimum et un nom." }, Cmd.none )
+
+                    else
+                        ( { model | drawingBed = Nothing, error = Nothing }
+                        , createBed model.backendUrl (String.trim model.bedName) pts
+                        )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        AddBedPoint px py ->
+            ( { model | drawingBed = Maybe.map (\pts -> pts ++ [ ( px, py ) ]) model.drawingBed }, Cmd.none )
 
         PlaceAtPixel px py ->
             case model.movingPlant of
@@ -1581,6 +1621,21 @@ createParcel url form =
         }
 
 
+createBed : String -> String -> List ( Int, Int ) -> Cmd Msg
+createBed url name pts =
+    Http.post
+        { url = url ++ "/parcels"
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "name", Encode.string name )
+                    , ( "shape", Encode.list (\( x, y ) -> Encode.list Encode.int [ x, y ]) pts )
+                    ]
+                )
+        , expect = Http.expectJson GotParcelSaved parcelDecoder
+        }
+
+
 updateParcel : String -> Int -> ParcelForm -> Cmd Msg
 updateParcel url id form =
     Http.request
@@ -2053,6 +2108,12 @@ parcelDecoder =
         |> andMap (D.field "grid_w" D.int)
         |> andMap (D.field "grid_h" D.int)
         |> andMap (D.field "color" D.string)
+        |> andMap (D.maybe (D.field "shape" (D.nullable pointsDecoder)) |> D.map (Maybe.andThen identity))
+
+
+pointsDecoder : Decoder (List ( Int, Int ))
+pointsDecoder =
+    D.list (D.map2 Tuple.pair (D.index 0 D.int) (D.index 1 D.int))
 
 
 actionDecoder : Decoder ActionEntry
@@ -4788,6 +4849,10 @@ viewTerrain model =
         areaM2 = round1 (widthM * heightM)
         plantCount = List.length plants
         hint =
+            if model.drawingBed /= Nothing then
+                "✏ Clique pour poser les sommets de la planche, puis nomme-la et enregistre"
+
+            else
             case model.paletteSpecies of
                 Just sid ->
                     "🖱 Clique sur le terrain pour poser " ++ speciesShortName sid ++ " · Échap pour annuler"
@@ -4809,7 +4874,7 @@ viewTerrain model =
                 ( Just _, _, _ ) -> "grabbing"
                 ( _, _, Just _ ) -> "grabbing"
                 ( _, Just _, _ ) -> "crosshair"
-                _ -> "default"
+                _ -> if model.drawingBed /= Nothing then "crosshair" else "default"
 
         -- mousemove seulement quand utile (pan, drag, placement) : sinon
         -- chaque pixel de souris re-rendait tout le SVG.
@@ -4840,7 +4905,7 @@ viewTerrain model =
         , Svg.svg
             ([ SA.viewBox vbStr
              , SA.width (String.fromInt w)
-             , SE.on "click" (terrainClickDecoder w h gv)
+             , SE.on "click" (terrainClickDecoder w h gv (model.drawingBed /= Nothing))
              , SE.on "mouseover" (D.succeed (DragEnterZone Terrain))
              , SE.onMouseOut TerrainCursorLeave
              , SE.preventDefaultOn "wheel" (wheelDecoder |> D.map (\m -> ( m, True )))
@@ -4857,12 +4922,113 @@ viewTerrain model =
                 ++ trackingAttrs
             )
             (terrainPatterns
+                ++ List.filterMap viewBed model.parcels
                 ++ List.map (viewPlantOnTerrain model plants) plants
                 ++ hoverLayer model plants hoverOverlayTerrain
                 ++ dragGhost model Terrain
                 ++ placementOverlay model
+                ++ bedDraftOverlay model.drawingBed
             )
+        , viewBedToolbar model
         ]
+
+
+pointsAttr : List ( Int, Int ) -> String
+pointsAttr pts =
+    pts
+        |> List.map (\( x, y ) -> String.fromInt x ++ "," ++ String.fromInt y)
+        |> String.join " "
+
+
+-- Planche polygonale : contour + nom et surface au barycentre des sommets.
+-- pointer-events none : les clics passent au SVG (offsetX reste relatif au terrain).
+viewBed : Parcel -> Maybe (Svg.Svg Msg)
+viewBed parcel =
+    parcel.shape
+        |> Maybe.map
+            (\pts ->
+                let
+                    n = toFloat (max 1 (List.length pts))
+                    cx = toFloat (List.sum (List.map Tuple.first pts)) / n
+                    cy = toFloat (List.sum (List.map Tuple.second pts)) / n
+                    surface =
+                        parcel.surfaceM2
+                            |> Maybe.map (\m -> " · " ++ String.fromFloat (round1 m) ++ " m²")
+                            |> Maybe.withDefault ""
+                in
+                Svg.g [ SA.pointerEvents "none" ]
+                    [ Svg.polygon
+                        [ SA.points (pointsAttr pts)
+                        , SA.fill parcel.color
+                        , SA.fillOpacity "0.22"
+                        , SA.stroke "#4a3a1a"
+                        , SA.strokeWidth "2"
+                        , SA.strokeDasharray "6 3"
+                        ]
+                        []
+                    , Svg.text_
+                        [ SA.x (String.fromFloat cx)
+                        , SA.y (String.fromFloat cy)
+                        , SA.textAnchor "middle"
+                        , SA.fontSize "13"
+                        , SA.fill "#2e2410"
+                        , SA.opacity "0.75"
+                        ]
+                        [ Svg.text (parcel.name ++ surface) ]
+                    ]
+            )
+
+
+bedDraftOverlay : Maybe (List ( Int, Int )) -> List (Svg.Svg Msg)
+bedDraftOverlay drawing =
+    case drawing of
+        Just pts ->
+            Svg.polygon
+                [ SA.points (pointsAttr pts)
+                , SA.fill "#4a9b3c"
+                , SA.fillOpacity "0.15"
+                , SA.stroke "#2f6b25"
+                , SA.strokeWidth "2"
+                , SA.pointerEvents "none"
+                ]
+                []
+                :: List.map
+                    (\( x, y ) ->
+                        Svg.circle
+                            [ SA.cx (String.fromInt x), SA.cy (String.fromInt y), SA.r "5"
+                            , SA.fill "#2f6b25", SA.pointerEvents "none"
+                            ]
+                            []
+                    )
+                    pts
+
+        Nothing ->
+            []
+
+
+viewBedToolbar : Model -> Html Msg
+viewBedToolbar model =
+    let
+        beds = List.filter (\pc -> pc.shape /= Nothing) model.parcels
+        chip pc =
+            span [ A.class "bed-chip" ]
+                [ text (pc.name ++ (pc.surfaceM2 |> Maybe.map (\m -> " " ++ String.fromFloat (round1 m) ++ " m²") |> Maybe.withDefault ""))
+                , button [ E.onClick (DeleteParcel pc.id), A.class "danger", A.title "Supprimer la planche" ] [ text "🗑" ]
+                ]
+    in
+    div [ A.class "bed-toolbar" ]
+        (case model.drawingBed of
+            Just pts ->
+                [ input [ A.placeholder "Nom de la planche", A.value model.bedName, E.onInput SetBedName ] []
+                , button [ E.onClick SaveBed, A.disabled (List.length pts < 3 || String.trim model.bedName == "") ]
+                    [ text ("✔ Enregistrer (" ++ String.fromInt (List.length pts) ++ " sommets)") ]
+                , button [ E.onClick UndoBedPoint, A.disabled (List.isEmpty pts) ] [ text "↶ Sommet" ]
+                , button [ E.onClick CancelDrawBed ] [ text "✖ Annuler" ]
+                ]
+
+            Nothing ->
+                button [ E.onClick StartDrawBed ] [ text "✏ Dessiner une planche" ] :: List.map chip beds
+        )
 
 
 terrainBackground : Model -> String
@@ -4898,15 +5064,16 @@ terrainPatterns =
 -- Décodeur qui extrait (offsetX, offsetY) d'un clic et les clampe aux dimensions du terrain.
 
 
-terrainClickDecoder : Int -> Int -> GardenView -> Decoder Msg
-terrainClickDecoder w h gv =
+terrainClickDecoder : Int -> Int -> GardenView -> Bool -> Decoder Msg
+terrainClickDecoder w h gv drawing =
     D.map2
         (\ox oy ->
             let
                 sx = round (gv.panX + toFloat ox / gv.zoom)
                 sy = round (gv.panY + toFloat oy / gv.zoom)
+                toMsg = if drawing then AddBedPoint else PlaceAtPixel
             in
-            PlaceAtPixel (clamp 0 (w - 1) sx) (clamp 0 (h - 1) sy)
+            toMsg (clamp 0 (w - 1) sx) (clamp 0 (h - 1) sy)
         )
         (D.field "offsetX" (D.map round D.float))
         (D.field "offsetY" (D.map round D.float))

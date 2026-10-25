@@ -69,6 +69,7 @@ pub fn run_additive_migrations(conn: &rusqlite::Connection) -> Result<(), String
         "ALTER TABLE parcel ADD COLUMN grid_w INTEGER NOT NULL DEFAULT 2",
         "ALTER TABLE parcel ADD COLUMN grid_h INTEGER NOT NULL DEFAULT 2",
         "ALTER TABLE parcel ADD COLUMN color TEXT NOT NULL DEFAULT '#8fbc4a'",
+        "ALTER TABLE parcel ADD COLUMN shape TEXT",
         "ALTER TABLE action ADD COLUMN grid_x INTEGER",
         "ALTER TABLE action ADD COLUMN grid_y INTEGER",
         "ALTER TABLE action ADD COLUMN solution TEXT",

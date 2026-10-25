@@ -725,3 +725,10 @@ button.chip:hover:not(:disabled) {
 ::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
 
 ::selection { background: var(--moss-pale); color: var(--ink); }
+
+/* Planches polygonales (vue Mon jardin) */
+.bed-toolbar { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-top: 0.4rem; font-size: 0.8rem; }
+.bed-toolbar input { padding: 3px 6px; font-size: 0.8rem; }
+.bed-toolbar button { padding: 3px 8px; font-size: 0.78rem; }
+.bed-chip { display: inline-flex; gap: 0.3rem; align-items: center; padding: 2px 4px 2px 8px; border: 1px dashed #4a3a1a; border-radius: 4px; background: #f7f1e3; color: #2e2410; }
+.bed-chip button { padding: 1px 5px; font-size: 0.72rem; }

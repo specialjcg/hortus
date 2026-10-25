@@ -4,6 +4,7 @@ use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use crate::db::Db;
+use crate::domain::geometry::Polygon;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Parcel {
@@ -18,6 +19,8 @@ pub struct Parcel {
     pub grid_h: i64,
     pub color: String,
     pub created_at: String,
+    /// Contour de la planche (pixels terrain). `None` = parcelle legacy.
+    pub shape: Option<Polygon>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,6 +39,9 @@ pub struct ParcelInput {
     pub grid_h: Option<i64>,
     #[serde(default)]
     pub color: Option<String>,
+    /// Validé à la désérialisation (parse, don't validate).
+    #[serde(default)]
+    pub shape: Option<Polygon>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,27 +89,55 @@ pub const ACTION_KINDS: &[&str] = &[
     "note",
 ];
 
+const PARCEL_COLS: &str =
+    "id, name, surface_m2, exposition, soil_notes, grid_x, grid_y, grid_w, grid_h, color, created_at, shape";
+
+fn row_to_parcel(r: &rusqlite::Row) -> rusqlite::Result<Parcel> {
+    let shape: Option<String> = r.get(11)?;
+    Ok(Parcel {
+        id: r.get(0)?,
+        name: r.get(1)?,
+        surface_m2: r.get(2)?,
+        exposition: r.get(3)?,
+        soil_notes: r.get(4)?,
+        grid_x: r.get(5)?,
+        grid_y: r.get(6)?,
+        grid_w: r.get(7)?,
+        grid_h: r.get(8)?,
+        color: r.get(9)?,
+        created_at: r.get(10)?,
+        // Forme invalide en base (édition manuelle) : ignorée plutôt que de casser la liste.
+        shape: shape.and_then(|s| serde_json::from_str(&s).ok()),
+    })
+}
+
+fn shape_json(shape: &Option<Polygon>) -> Option<String> {
+    shape
+        .as_ref()
+        .map(|p| serde_json::to_string(p).expect("Polygon sérialisable"))
+}
+
+/// Surface saisie, sinon calculée depuis le polygone (arrondie à 0,1 m²).
+fn surface_of(surface_m2: Option<f64>, shape: Option<&Polygon>) -> Option<f64> {
+    surface_m2.or_else(|| shape.map(|p| (p.area_m2() * 10.0).round() / 10.0))
+}
+
+fn fetch_parcel(conn: &rusqlite::Connection, id: i64) -> Result<Parcel, String> {
+    conn.query_row(
+        &format!("SELECT {PARCEL_COLS} FROM parcel WHERE id = ?"),
+        params![id],
+        row_to_parcel,
+    )
+    .map_err(|e| format!("fetch parcel : {e}"))
+}
+
 pub fn list_parcels(db: &Db) -> Result<Vec<Parcel>, String> {
     let conn = db.lock().expect("DB mutex poisoned");
     let mut stmt = conn
-        .prepare("SELECT id, name, surface_m2, exposition, soil_notes, grid_x, grid_y, grid_w, grid_h, color, created_at FROM parcel ORDER BY name")
+        .prepare(&format!("SELECT {PARCEL_COLS} FROM parcel ORDER BY name"))
         .map_err(|e| format!("prep : {e}"))?;
     let rows = stmt
-        .query_map([], |r| {
-            Ok(Parcel {
-                id: r.get(0)?,
-                name: r.get(1)?,
-                surface_m2: r.get(2)?,
-                exposition: r.get(3)?,
-                soil_notes: r.get(4)?,
-                grid_x: r.get(5)?,
-                grid_y: r.get(6)?,
-                grid_w: r.get(7)?,
-                grid_h: r.get(8)?,
-                color: r.get(9)?,
-                created_at: r.get(10)?,
-            })
-        })
+        .query_map([], row_to_parcel)
         .map_err(|e| format!("query : {e}"))?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("collect : {e}"))
@@ -112,10 +146,10 @@ pub fn list_parcels(db: &Db) -> Result<Vec<Parcel>, String> {
 pub fn insert_parcel(db: &Db, input: &ParcelInput) -> Result<Parcel, String> {
     let conn = db.lock().expect("DB mutex poisoned");
     conn.execute(
-        "INSERT INTO parcel (name, surface_m2, exposition, soil_notes, grid_x, grid_y, grid_w, grid_h, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO parcel (name, surface_m2, exposition, soil_notes, grid_x, grid_y, grid_w, grid_h, color, shape) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         params![
             input.name,
-            input.surface_m2,
+            surface_of(input.surface_m2, input.shape.as_ref()),
             input.exposition,
             input.soil_notes,
             input.grid_x.unwrap_or(0),
@@ -123,42 +157,27 @@ pub fn insert_parcel(db: &Db, input: &ParcelInput) -> Result<Parcel, String> {
             input.grid_w.unwrap_or(2),
             input.grid_h.unwrap_or(2),
             input.color.clone().unwrap_or_else(|| "#8fbc4a".into()),
+            shape_json(&input.shape),
         ],
     )
     .map_err(|e| format!("insert parcel : {e}"))?;
-    let id = conn.last_insert_rowid();
-    let parcel = conn
-        .query_row(
-            "SELECT id, name, surface_m2, exposition, soil_notes, grid_x, grid_y, grid_w, grid_h, color, created_at FROM parcel WHERE id = ?",
-            params![id],
-            |r| {
-                Ok(Parcel {
-                    id: r.get(0)?,
-                    name: r.get(1)?,
-                    surface_m2: r.get(2)?,
-                    exposition: r.get(3)?,
-                    soil_notes: r.get(4)?,
-                    grid_x: r.get(5)?,
-                    grid_y: r.get(6)?,
-                    grid_w: r.get(7)?,
-                    grid_h: r.get(8)?,
-                    color: r.get(9)?,
-                    created_at: r.get(10)?,
-                })
-            },
-        )
-        .map_err(|e| format!("fetch parcel : {e}"))?;
-    Ok(parcel)
+    fetch_parcel(&conn, conn.last_insert_rowid())
 }
 
 pub fn update_parcel(db: &Db, id: i64, input: &ParcelInput) -> Result<Parcel, String> {
     let conn = db.lock().expect("DB mutex poisoned");
+    // Sans nouvelle forme, la surface se recalcule sur le polygone déjà stocké.
+    let stored_shape = match &input.shape {
+        Some(_) => None,
+        None => fetch_parcel(&conn, id).ok().and_then(|p| p.shape),
+    };
+    let surface = surface_of(input.surface_m2, input.shape.as_ref().or(stored_shape.as_ref()));
     let n = conn
         .execute(
-            "UPDATE parcel SET name = ?, surface_m2 = ?, exposition = ?, soil_notes = ?, grid_x = COALESCE(?, grid_x), grid_y = COALESCE(?, grid_y), grid_w = COALESCE(?, grid_w), grid_h = COALESCE(?, grid_h), color = COALESCE(?, color) WHERE id = ?",
+            "UPDATE parcel SET name = ?, surface_m2 = ?, exposition = ?, soil_notes = ?, grid_x = COALESCE(?, grid_x), grid_y = COALESCE(?, grid_y), grid_w = COALESCE(?, grid_w), grid_h = COALESCE(?, grid_h), color = COALESCE(?, color), shape = COALESCE(?, shape) WHERE id = ?",
             params![
                 input.name,
-                input.surface_m2,
+                surface,
                 input.exposition,
                 input.soil_notes,
                 input.grid_x,
@@ -166,6 +185,7 @@ pub fn update_parcel(db: &Db, id: i64, input: &ParcelInput) -> Result<Parcel, St
                 input.grid_w,
                 input.grid_h,
                 input.color,
+                shape_json(&input.shape),
                 id
             ],
         )
@@ -173,28 +193,15 @@ pub fn update_parcel(db: &Db, id: i64, input: &ParcelInput) -> Result<Parcel, St
     if n == 0 {
         return Err("parcelle inconnue".into());
     }
-    let parcel = conn
-        .query_row(
-            "SELECT id, name, surface_m2, exposition, soil_notes, grid_x, grid_y, grid_w, grid_h, color, created_at FROM parcel WHERE id = ?",
-            params![id],
-            |r| {
-                Ok(Parcel {
-                    id: r.get(0)?,
-                    name: r.get(1)?,
-                    surface_m2: r.get(2)?,
-                    exposition: r.get(3)?,
-                    soil_notes: r.get(4)?,
-                    grid_x: r.get(5)?,
-                    grid_y: r.get(6)?,
-                    grid_w: r.get(7)?,
-                    grid_h: r.get(8)?,
-                    color: r.get(9)?,
-                    created_at: r.get(10)?,
-                })
-            },
-        )
-        .map_err(|e| format!("fetch : {e}"))?;
-    Ok(parcel)
+    fetch_parcel(&conn, id)
+}
+
+/// Planche dont le polygone contient le point (première trouvée).
+pub fn parcel_at(parcels: &[Parcel], x: i64, y: i64) -> Option<i64> {
+    parcels
+        .iter()
+        .find(|p| p.shape.as_ref().is_some_and(|s| s.contains(x as f64, y as f64)))
+        .map(|p| p.id)
 }
 
 pub fn delete_parcel(db: &Db, id: i64) -> Result<(), String> {
@@ -460,7 +467,8 @@ mod tests {
                 grid_w INTEGER NOT NULL DEFAULT 2,
                 grid_h INTEGER NOT NULL DEFAULT 2,
                 color TEXT NOT NULL DEFAULT '#8fbc4a',
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                shape TEXT
             );
             CREATE TABLE action (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -598,5 +606,53 @@ mod tests {
         let remaining = list_actions(&db, &ActionFilter::default()).unwrap();
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].id, b.id);
+    }
+
+    fn parcel_input(json: &str) -> ParcelInput {
+        serde_json::from_str(json).expect("ParcelInput")
+    }
+
+    #[test]
+    fn polygon_parcel_roundtrip_and_computed_surface() {
+        let db = mk_db();
+        // 200×100 px à 1 px = 1 cm = 2 m²
+        let p = insert_parcel(&db, &parcel_input(r#"{"name":"Butte","shape":[[0,0],[200,0],[200,100],[0,100]]}"#)).unwrap();
+        assert_eq!(p.surface_m2, Some(2.0));
+        assert_eq!(p.shape.as_ref().map(|s| s.vertices().len()), Some(4));
+        let listed = list_parcels(&db).unwrap();
+        assert_eq!(listed[0].shape, p.shape);
+    }
+
+    #[test]
+    fn explicit_surface_wins_over_polygon() {
+        let db = mk_db();
+        let p = insert_parcel(&db, &parcel_input(r#"{"name":"B","surface_m2":5.0,"shape":[[0,0],[80,0],[0,40]]}"#)).unwrap();
+        assert_eq!(p.surface_m2, Some(5.0));
+    }
+
+    #[test]
+    fn invalid_shape_rejected_at_parse() {
+        assert!(serde_json::from_str::<ParcelInput>(r#"{"name":"X","shape":[[0,0],[40,40],[40,0],[0,40]]}"#).is_err());
+    }
+
+    #[test]
+    fn update_without_shape_keeps_it() {
+        let db = mk_db();
+        let p = insert_parcel(&db, &parcel_input(r#"{"name":"A","shape":[[0,0],[80,0],[0,40]]}"#)).unwrap();
+        let u = update_parcel(&db, p.id, &parcel_input(r#"{"name":"A2"}"#)).unwrap();
+        assert_eq!(u.name, "A2");
+        assert_eq!(u.shape, p.shape);
+        assert_eq!(u.surface_m2, p.surface_m2);
+    }
+
+    #[test]
+    fn parcel_at_finds_containing_polygon() {
+        let db = mk_db();
+        let a = insert_parcel(&db, &parcel_input(r#"{"name":"A","shape":[[0,0],[100,0],[100,100],[0,100]]}"#)).unwrap();
+        let b = insert_parcel(&db, &parcel_input(r#"{"name":"B","shape":[[200,0],[300,0],[300,100],[200,100]]}"#)).unwrap();
+        let ps = list_parcels(&db).unwrap();
+        assert_eq!(parcel_at(&ps, 50, 50), Some(a.id));
+        assert_eq!(parcel_at(&ps, 250, 50), Some(b.id));
+        assert_eq!(parcel_at(&ps, 150, 50), None);
     }
 }
