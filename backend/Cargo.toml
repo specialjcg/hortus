@@ -25,6 +25,7 @@ thiserror = "1"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 rusqlite = { version = "0.32", features = ["bundled"] }
+good_lp = { version = "1", default-features = false, features = ["highs"] }
 
 [dev-dependencies]
 approx = "0.5"

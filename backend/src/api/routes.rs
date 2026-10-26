@@ -21,6 +21,7 @@ use crate::domain::species::{CalendarWindow, Species};
 use crate::journal::{
     self, Action, ActionFilter, ActionInput, Parcel, ParcelInput, ACTION_KINDS,
 };
+use crate::planner;
 use crate::problems::{self, EntryInput, Problem, ProblemInput, ProblemUpdate};
 use crate::domain::vigieau::{self, Restriction};
 use crate::restrictions::{self, LevelChange};
@@ -166,6 +167,7 @@ pub fn router() -> Router {
         .route("/actions/{id}", put(put_action).delete(del_action))
         .route("/actions/{id}/photo", post(upload_action_photo))
         .route("/photos/{name}", get(serve_photo))
+        .route("/plan", get(get_plan))
         .route("/problems", get(get_problems).post(create_problem))
         .route("/problems/{id}", put(put_problem).delete(del_problem))
         .route("/problems/{id}/entries", post(create_problem_entry))
@@ -632,6 +634,86 @@ async fn calendar(
         climate_source,
         species: species_local,
     }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PlanQuery {
+    pub city: Option<String>,
+    pub year: Option<i32>,
+    /// Part max de la surface par espèce (0.05..=1, défaut 0.25).
+    pub share: Option<f64>,
+    /// Envies « espece:m2,espece:m2 », ex. `tomato:2,basil:0.5`.
+    pub wish: Option<String>,
+}
+
+/// Parse `tomato:2,basil:0.5` → [(id, m²)], ids vérifiés dans le catalogue.
+fn parse_wishes(raw: &str, species: &[Species]) -> Result<Vec<(String, f64)>, String> {
+    raw.split(',')
+        .filter(|w| !w.trim().is_empty())
+        .map(|w| {
+            let (id, m2) = w.trim().split_once(':').ok_or(format!("envie mal formée : {w}"))?;
+            let m2: f64 = m2.parse().map_err(|_| format!("surface invalide : {w}"))?;
+            if !(m2 > 0.0 && m2 <= 1000.0) {
+                return Err(format!("surface hors bornes : {w}"));
+            }
+            if !species.iter().any(|s| s.id == id) {
+                return Err(format!("espèce inconnue : {id}"));
+            }
+            Ok((id.to_string(), m2))
+        })
+        .collect()
+}
+
+#[derive(Debug, Serialize)]
+pub struct PlanResponse {
+    pub year: i32,
+    #[serde(flatten)]
+    pub plan: planner::Plan,
+}
+
+/// Plan de saison optimisé sur les planches dessinées (MILP HiGHS).
+async fn get_plan(
+    State(s): State<AppState>,
+    Query(q): Query<PlanQuery>,
+) -> Result<Json<PlanResponse>, (StatusCode, String)> {
+    let year = q.year.unwrap_or_else(|| chrono::Local::now().year() + 1);
+    let share = q.share.unwrap_or(0.25);
+    if !(0.05..=1.0).contains(&share) {
+        return Err((StatusCode::BAD_REQUEST, "share hors de 0.05..=1".into()));
+    }
+    let wishes = parse_wishes(q.wish.as_deref().unwrap_or(""), &s.species)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    let loc = Location::by_slug(q.city.as_deref().unwrap_or("le_bois_doingt"));
+    let shift = spring_shift_days(&ClimateProfile::paris(), &loc.climate);
+    let parcels = journal::list_parcels(&s.db).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    let actions = journal::list_actions(&s.db, &ActionFilter::default())
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    let species = s.species.clone();
+
+    // MILP : calcul bloquant, hors du runtime async.
+    let plan = tokio::task::spawn_blocking(move || {
+        let beds = planner::beds_from_parcels(&parcels, &actions, &species);
+        let history = planner::history_from_actions(&parcels, &actions, &species);
+        let crops: Vec<planner::Crop> = species
+            .iter()
+            .filter(|sp| !sp.is_perennial() && (sp.yield_kg_m2.is_some() || sp.green_manure))
+            .map(|sp| planner::Crop {
+                species: sp,
+                direct: sp.direct_sow.map(|w| shift_window(w, shift)),
+                transplant: sp.transplant.map(|w| shift_window(w, shift)),
+                harvest: shift_window(sp.harvest, shift),
+            })
+            .collect();
+        let params = planner::PlanParams { year, max_species_share: share, time_limit_s: 20.0, wishes };
+        planner::plan(&beds, &crops, &history, &params)
+    })
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("tâche plan : {e}")))?
+    .map_err(|e| match e {
+        planner::PlanError::NoBeds => (StatusCode::UNPROCESSABLE_ENTITY, e.to_string()),
+        planner::PlanError::Solver(_) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    })?;
+    Ok(Json(PlanResponse { year, plan }))
 }
 
 /// Décalage de printemps en jours entre climat cible et référence.

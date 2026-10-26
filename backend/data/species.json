@@ -15,6 +15,8 @@
     "spacing_cm": 60,
     "days_to_harvest": 80,
     "height_class": "Tall",
+    "yield_kg_m2": 5,
+    "price_eur_kg": 4.5,
     "multi_harvest": true,
     "notes": [
       "Exposition plein soleil, au moins 6h/jour.",
@@ -42,6 +44,8 @@
     "spacing_cm": 50,
     "days_to_harvest": 70,
     "height_class": "Tall",
+    "yield_kg_m2": 3,
+    "price_eur_kg": 9,
     "multi_harvest": true,
     "notes": [
       "Plus facile que la tomate classique, moins sensible aux maladies.",
@@ -67,6 +71,8 @@
     "spacing_cm": 50,
     "days_to_harvest": 90,
     "height_class": "Medium",
+    "yield_kg_m2": 2,
+    "price_eur_kg": 6,
     "multi_harvest": true,
     "notes": [
       "Germination lente, chauffer le terreau (22-25°C).",
@@ -92,6 +98,8 @@
     "spacing_cm": 60,
     "days_to_harvest": 100,
     "height_class": "Medium",
+    "yield_kg_m2": 2.5,
+    "price_eur_kg": 4.5,
     "multi_harvest": true,
     "notes": [
       "La plus exigeante en chaleur des solanacées.",
@@ -118,6 +126,8 @@
     "spacing_cm": 100,
     "days_to_harvest": 60,
     "height_class": "Medium",
+    "yield_kg_m2": 5,
+    "price_eur_kg": 3,
     "multi_harvest": true,
     "notes": [
       "Très productive — 2-3 plants suffisent pour un foyer.",
@@ -144,6 +154,8 @@
     "spacing_cm": 150,
     "days_to_harvest": 100,
     "height_class": "Ground",
+    "yield_kg_m2": 2.5,
+    "price_eur_kg": 3,
     "multi_harvest": true,
     "notes": [
       "Prévoir 2-3 m² par pied — coureuse.",
@@ -170,6 +182,8 @@
     "spacing_cm": 200,
     "days_to_harvest": 110,
     "height_class": "Ground",
+    "yield_kg_m2": 2.5,
+    "price_eur_kg": 2.5,
     "multi_harvest": true,
     "notes": [
       "Très gourmand en eau et en compost.",
@@ -195,6 +209,8 @@
     "spacing_cm": 40,
     "days_to_harvest": 60,
     "height_class": "Medium",
+    "yield_kg_m2": 4,
+    "price_eur_kg": 3.5,
     "multi_harvest": true,
     "notes": [
       "Palisser pour gagner de la place et éviter les attaques au sol.",
@@ -219,6 +235,8 @@
     "spacing_cm": 100,
     "days_to_harvest": 110,
     "height_class": "Ground",
+    "yield_kg_m2": 1.5,
+    "price_eur_kg": 4,
     "multi_harvest": true,
     "notes": [
       "Exige beaucoup de chaleur — chassis ou voile recommandé.",
@@ -244,6 +262,8 @@
     "spacing_cm": 5,
     "days_to_harvest": 90,
     "height_class": "Ground",
+    "yield_kg_m2": 3,
+    "price_eur_kg": 2.5,
     "notes": [
       "Germe en 10-20 jours, maintenir humide.",
       "Éclaircir à 5 cm quand plants ont 3 vraies feuilles.",
@@ -269,6 +289,8 @@
     "spacing_cm": 3,
     "days_to_harvest": 25,
     "height_class": "Ground",
+    "yield_kg_m2": 1.5,
+    "price_eur_kg": 6,
     "notes": [
       "Cycle très court (3-4 semaines) — idéal entre deux cultures.",
       "Semer tous les 15 jours pour étaler la récolte.",
@@ -293,6 +315,8 @@
     "spacing_cm": 10,
     "days_to_harvest": 60,
     "height_class": "Ground",
+    "yield_kg_m2": 3,
+    "price_eur_kg": 3,
     "notes": [
       "Préfère la fraîcheur, semis fin août-septembre pour la conservation hiver.",
       "Récolter jeune pour une chair tendre."
@@ -316,6 +340,8 @@
     "spacing_cm": 10,
     "days_to_harvest": 90,
     "height_class": "Ground",
+    "yield_kg_m2": 3,
+    "price_eur_kg": 3,
     "notes": [
       "Tremper les graines 24h pour accélérer germination.",
       "Éclaircir à 10 cm (les jeunes feuilles se mangent).",
@@ -341,6 +367,8 @@
     "spacing_cm": 15,
     "days_to_harvest": 180,
     "height_class": "Medium",
+    "yield_kg_m2": 2.5,
+    "price_eur_kg": 4,
     "notes": [
       "Germination très lente (3-4 semaines) — graines fraîches obligatoires.",
       "Le gel améliore le goût (transforme l'amidon en sucre).",
@@ -365,6 +393,8 @@
     "spacing_cm": 35,
     "days_to_harvest": 180,
     "height_class": "Medium",
+    "yield_kg_m2": 3,
+    "price_eur_kg": 3.5,
     "notes": [
       "Germination capricieuse, semer en surface, lumière requise.",
       "Dégager la boule en été (butter inverse)."
@@ -388,6 +418,8 @@
     "spacing_cm": 40,
     "days_to_harvest": 110,
     "height_class": "Medium",
+    "yield_kg_m2": 3,
+    "price_eur_kg": 2.5,
     "notes": [
       "Planter les tubercules quand le lilas fleurit (pas avant).",
       "Butter 2 fois pendant la culture.",
@@ -437,6 +469,8 @@
     "spacing_cm": 25,
     "days_to_harvest": 50,
     "height_class": "Ground",
+    "yield_kg_m2": 3,
+    "price_eur_kg": 6,
     "notes": [
       "Semer tous les 15 jours pour étaler la récolte.",
       "Monte à graines en plein été — privilégier printemps/automne.",
@@ -461,6 +495,8 @@
     "spacing_cm": 10,
     "days_to_harvest": 75,
     "height_class": "Ground",
+    "yield_kg_m2": 1,
+    "price_eur_kg": 20,
     "notes": [
       "Salade d'hiver par excellence, très rustique (-15°C).",
       "Tasser légèrement après semis (graines qui germent en surface).",
@@ -485,6 +521,8 @@
     "spacing_cm": 15,
     "days_to_harvest": 50,
     "height_class": "Ground",
+    "yield_kg_m2": 1.5,
+    "price_eur_kg": 8,
     "multi_harvest": true,
     "notes": [
       "Culture de printemps et d'automne, monte à graines en été.",
@@ -510,6 +548,8 @@
     "spacing_cm": 10,
     "days_to_harvest": 40,
     "height_class": "Ground",
+    "yield_kg_m2": 1,
+    "price_eur_kg": 20,
     "multi_harvest": true,
     "notes": [
       "Cycle très court — semer tous les 10 jours.",
@@ -534,6 +574,8 @@
     "spacing_cm": 40,
     "days_to_harvest": 60,
     "height_class": "Medium",
+    "yield_kg_m2": 4,
+    "price_eur_kg": 4,
     "multi_harvest": true,
     "notes": [
       "Récolter feuille à feuille pour production longue.",
@@ -558,6 +600,8 @@
     "spacing_cm": 50,
     "days_to_harvest": 90,
     "height_class": "Medium",
+    "yield_kg_m2": 2,
+    "price_eur_kg": 8,
     "multi_harvest": true,
     "notes": [
       "Très rustique, supporte -15°C.",
@@ -583,6 +627,8 @@
     "spacing_cm": 60,
     "days_to_harvest": 120,
     "height_class": "Medium",
+    "yield_kg_m2": 4,
+    "price_eur_kg": 3,
     "notes": [
       "Culture gourmande : compost avant plantation.",
       "Surveiller la piéride (chenille verte) en été.",
@@ -607,6 +653,8 @@
     "spacing_cm": 60,
     "days_to_harvest": 120,
     "height_class": "Medium",
+    "yield_kg_m2": 2.5,
+    "price_eur_kg": 4,
     "notes": [
       "Capricieux — exige des apports réguliers et pas de stress.",
       "Plier les feuilles sur la pomme pour la blanchir."
@@ -630,6 +678,8 @@
     "spacing_cm": 50,
     "days_to_harvest": 90,
     "height_class": "Medium",
+    "yield_kg_m2": 1.5,
+    "price_eur_kg": 6,
     "multi_harvest": true,
     "notes": [
       "Après la pomme centrale, les rejets latéraux donnent des mini-brocolis.",
@@ -654,6 +704,8 @@
     "spacing_cm": 60,
     "days_to_harvest": 180,
     "height_class": "Medium",
+    "yield_kg_m2": 1.5,
+    "price_eur_kg": 6,
     "multi_harvest": true,
     "notes": [
       "Culture longue (6 mois) mais peu exigeante.",
@@ -679,6 +731,8 @@
     "spacing_cm": 10,
     "days_to_harvest": 60,
     "height_class": "Medium",
+    "yield_kg_m2": 1.5,
+    "price_eur_kg": 9,
     "multi_harvest": true,
     "notes": [
       "Semer quand sol > 12°C (après mi-mai).",
@@ -705,6 +759,8 @@
     "spacing_cm": 15,
     "days_to_harvest": 110,
     "height_class": "Medium",
+    "yield_kg_m2": 0.3,
+    "price_eur_kg": 8,
     "notes": [
       "Laisser les gousses sécher sur pied avant récolte.",
       "Stockage 2 ans en bocal sec.",
@@ -729,6 +785,8 @@
     "spacing_cm": 5,
     "days_to_harvest": 90,
     "height_class": "Medium",
+    "yield_kg_m2": 0.8,
+    "price_eur_kg": 10,
     "multi_harvest": true,
     "notes": [
       "Rustique — semis dès fin février possible.",
@@ -754,6 +812,8 @@
     "spacing_cm": 20,
     "days_to_harvest": 180,
     "height_class": "Medium",
+    "yield_kg_m2": 1.5,
+    "price_eur_kg": 6,
     "multi_harvest": true,
     "notes": [
       "Semis d'automne (octobre-novembre) pour récolte de mai-juin.",
@@ -779,6 +839,8 @@
     "spacing_cm": 10,
     "days_to_harvest": 180,
     "height_class": "Medium",
+    "yield_kg_m2": 3,
+    "price_eur_kg": 3,
     "notes": [
       "Bulbilles (pour commencer simple) ou semis (plus productif).",
       "Récolter quand les feuilles jaunissent et tombent.",
@@ -803,6 +865,8 @@
     "spacing_cm": 15,
     "days_to_harvest": 140,
     "height_class": "Medium",
+    "yield_kg_m2": 2,
+    "price_eur_kg": 7,
     "notes": [
       "Plantation des caïeux pointe en l'air.",
       "Ne pas enfouir complètement (tête dépasse).",
@@ -827,6 +891,8 @@
     "spacing_cm": 15,
     "days_to_harvest": 240,
     "height_class": "Medium",
+    "yield_kg_m2": 1,
+    "price_eur_kg": 12,
     "notes": [
       "Ail blanc/violet : plantation automne (oct-nov).",
       "Ail rose : plantation fin d'hiver (fév-mars).",
@@ -852,6 +918,8 @@
     "spacing_cm": 15,
     "days_to_harvest": 180,
     "height_class": "Medium",
+    "yield_kg_m2": 3,
+    "price_eur_kg": 4,
     "notes": [
       "Habiller les racines et feuilles avant repiquage (tailler 1/3).",
       "Butter progressivement pour blanchir le fût.",
@@ -901,6 +969,8 @@
     "spacing_cm": 25,
     "days_to_harvest": 60,
     "height_class": "Medium",
+    "yield_kg_m2": 1,
+    "price_eur_kg": 30,
     "multi_harvest": true,
     "notes": [
       "Germination exige 20-25°C.",
@@ -926,6 +996,8 @@
     "spacing_cm": 15,
     "days_to_harvest": 80,
     "height_class": "Ground",
+    "yield_kg_m2": 1.5,
+    "price_eur_kg": 20,
     "multi_harvest": true,
     "notes": [
       "Germination longue (3 semaines) — tremper les graines 24h.",
@@ -951,6 +1023,8 @@
     "spacing_cm": 15,
     "days_to_harvest": 45,
     "height_class": "Medium",
+    "yield_kg_m2": 0.5,
+    "price_eur_kg": 25,
     "multi_harvest": true,
     "notes": [
       "Monte à graines rapidement en été — semer étalé.",
@@ -976,6 +1050,8 @@
     "spacing_cm": 20,
     "days_to_harvest": 60,
     "height_class": "Medium",
+    "yield_kg_m2": 0.5,
+    "price_eur_kg": 25,
     "multi_harvest": true,
     "notes": [
       "Pas de repiquage — semis direct seulement.",
@@ -1000,6 +1076,8 @@
     "spacing_cm": 15,
     "days_to_harvest": 50,
     "height_class": "Ground",
+    "yield_kg_m2": 0.5,
+    "price_eur_kg": 25,
     "multi_harvest": true,
     "notes": [
       "Préfère la mi-ombre en été.",
@@ -1522,6 +1600,8 @@
     "spacing_cm": 50,
     "days_to_harvest": 70,
     "height_class": "Ground",
+    "yield_kg_m2": 3,
+    "price_eur_kg": 8,
     "multi_harvest": true,
     "notes": [
       "Épinard d'été qui ne monte pas à graines.",
@@ -1547,6 +1627,8 @@
     "spacing_cm": 15,
     "days_to_harvest": 40,
     "height_class": "Ground",
+    "yield_kg_m2": 1.5,
+    "price_eur_kg": 15,
     "multi_harvest": true,
     "notes": [
       "Riche en oméga-3, salade estivale résistante à la chaleur.",

@@ -138,6 +138,12 @@ pub struct Species {
     /// Engrais vert : couvre le sol entre deux cultures, fauché puis laissé en surface.
     #[serde(default)]
     pub green_manure: bool,
+    /// Rendement amateur estimé (kg/m² par culture), pour le planificateur.
+    #[serde(default)]
+    pub yield_kg_m2: Option<f32>,
+    /// Prix indicatif bio au détail (€/kg) : pondère le planificateur.
+    #[serde(default)]
+    pub price_eur_kg: Option<f32>,
 }
 
 impl Species {
