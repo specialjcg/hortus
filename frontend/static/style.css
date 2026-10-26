@@ -732,3 +732,12 @@ button.chip:hover:not(:disabled) {
 .bed-toolbar button { padding: 3px 8px; font-size: 0.78rem; }
 .bed-chip { display: inline-flex; gap: 0.3rem; align-items: center; padding: 2px 4px 2px 8px; border: 1px dashed #4a3a1a; border-radius: 4px; background: #f7f1e3; color: #2e2410; }
 .bed-chip button { padding: 1px 5px; font-size: 0.72rem; }
+
+/* Plan de saison */
+.plan-panel .bed-toolbar { margin-bottom: 0.4rem; }
+.plan-gantt { overflow-x: auto; margin-top: 0.5rem; }
+.plan-gantt svg { display: block; }
+.plan-error { color: #b23c17; margin: 0.3rem 0; }
+.muted { color: #888; }
+/* Police texte d'abord : l'ordre emoji-first de `svg text` étire les lettres. */
+.plan-gantt svg text { font-family: system-ui, sans-serif, "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji"; }

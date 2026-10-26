@@ -98,6 +98,14 @@ type alias Model =
     , movingPlant : Maybe Int -- id action en cours de déplacement (click-move)
     , drawingBed : Maybe (List ( Int, Int )) -- sommets posés de la planche en cours de dessin
     , bedName : String
+    , plan : Maybe SeasonPlan
+    , planLoading : Bool
+    , planError : Maybe String
+    , planYear : Int
+    , planShare : Float -- part max d'une espèce dans la surface totale
+    , wishes : List ( String, Float ) -- envies (espèce, m²), contraintes souples du plan
+    , wishSpecies : String
+    , wishM2 : String
     , dragging : Maybe DragState
     , plantMenu : Maybe Int -- id du plant avec menu ouvert
     , deathPicker : Bool -- sélecteur de cause « plant mort » ouvert
@@ -248,6 +256,30 @@ type alias Parcel =
     }
 
 
+-- Plan de saison renvoyé par GET /plan (MILP côté backend).
+type alias PlanItem =
+    { bedId : Int
+    , speciesId : String
+    , mode : String -- "direct" | "transplant"
+    , week : Int -- semaine de semis/plantation 1..52
+    , weeksOnBed : Int
+    , areaM2 : Float
+    , expectedKg : Float
+    , expectedEur : Float
+    }
+
+
+type alias SeasonPlan =
+    { year : Int
+    , items : List PlanItem
+    , totalKg : Float
+    , totalEur : Float
+    , unmetWishes : List ( String, Float ) -- (espèce, m² manquants)
+    , coverRatio : Float
+    , optimal : Bool
+    }
+
+
 type alias ParcelForm =
     { name : String
     , surface : String
@@ -380,6 +412,14 @@ init flags =
       , movingPlant = Nothing
       , drawingBed = Nothing
       , bedName = ""
+      , plan = Nothing
+      , planLoading = False
+      , planError = Nothing
+      , planYear = (String.left 4 flags.today |> String.toInt |> Maybe.withDefault 2026) + 1
+      , planShare = 0.25
+      , wishes = []
+      , wishSpecies = ""
+      , wishM2 = "1"
       , dragging = Nothing
       , plantMenu = Nothing
       , deathPicker = False
@@ -482,6 +522,14 @@ type Msg
     | UndoBedPoint
     | SetBedName String
     | SaveBed
+    | SetPlanYear String
+    | SetPlanShare String
+    | SetWishSpecies String
+    | SetWishM2 String
+    | AddWish
+    | RemoveWish String
+    | ComputePlan
+    | GotPlan (Result String SeasonPlan)
     | HoverPlant (Maybe Int)
     | DeletePlant Int
     | PlaceInShelter Int Int
@@ -1132,6 +1180,49 @@ update msg model =
         GardenPanEnd ->
             ( { model | panning = Nothing }, Cmd.none )
 
+        SetPlanYear s ->
+            ( { model | planYear = String.toInt s |> Maybe.withDefault model.planYear }, Cmd.none )
+
+        SetPlanShare s ->
+            ( { model | planShare = String.toFloat s |> Maybe.withDefault model.planShare }, Cmd.none )
+
+        SetWishSpecies s ->
+            ( { model | wishSpecies = s }, Cmd.none )
+
+        SetWishM2 s ->
+            ( { model | wishM2 = s }, Cmd.none )
+
+        AddWish ->
+            case String.toFloat (String.replace "," "." model.wishM2) of
+                Just m2 ->
+                    if model.wishSpecies /= "" && m2 > 0 && m2 <= 1000 then
+                        ( { model
+                            | wishes = List.filter (\( sid, _ ) -> sid /= model.wishSpecies) model.wishes ++ [ ( model.wishSpecies, m2 ) ]
+                            , wishSpecies = ""
+                          }
+                        , Cmd.none
+                        )
+
+                    else
+                        ( model, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        RemoveWish sid ->
+            ( { model | wishes = List.filter (\( s, _ ) -> s /= sid) model.wishes }, Cmd.none )
+
+        ComputePlan ->
+            ( { model | planLoading = True, planError = Nothing }
+            , fetchPlan model.backendUrl model.selectedCity model.planYear model.planShare model.wishes
+            )
+
+        GotPlan (Ok plan) ->
+            ( { model | plan = Just plan, planLoading = False }, Cmd.none )
+
+        GotPlan (Err e) ->
+            ( { model | planError = Just e, planLoading = False }, Cmd.none )
+
         HoverPlant mid ->
             ( { model | hoverPlant = mid }, Cmd.none )
 
@@ -1347,6 +1438,74 @@ fetchCalendar url slug refresh =
         { url = url ++ "/calendar" ++ q
         , expect = Http.expectJson GotCalendar calendarResponseDecoder
         }
+
+
+fetchPlan : String -> String -> Int -> Float -> List ( String, Float ) -> Cmd Msg
+fetchPlan url city year share wishes =
+    let
+        wishParam =
+            if List.isEmpty wishes then
+                ""
+
+            else
+                "&wish=" ++ String.join "," (List.map (\( sid, m2 ) -> sid ++ ":" ++ String.fromFloat m2) wishes)
+    in
+    Http.request
+        { method = "GET"
+        , headers = []
+        , url = url ++ "/plan?city=" ++ city ++ "&year=" ++ String.fromInt year ++ "&share=" ++ String.fromFloat share ++ wishParam
+        , body = Http.emptyBody
+        , expect = expectJsonOrMessage GotPlan seasonPlanDecoder
+        , timeout = Just 60000 -- le solveur peut prendre ~20 s
+        , tracker = Nothing
+        }
+
+
+-- Comme Http.expectJson, mais garde le corps des réponses 4xx (message lisible du backend).
+expectJsonOrMessage : (Result String a -> Msg) -> Decoder a -> Http.Expect Msg
+expectJsonOrMessage toMsg decoder =
+    Http.expectStringResponse toMsg <|
+        \resp ->
+            case resp of
+                Http.GoodStatus_ _ body ->
+                    D.decodeString decoder body |> Result.mapError D.errorToString
+
+                Http.BadStatus_ meta body ->
+                    Err (if String.isEmpty body then "HTTP " ++ String.fromInt meta.statusCode else body)
+
+                Http.BadUrl_ s ->
+                    Err ("URL invalide : " ++ s)
+
+                Http.Timeout_ ->
+                    Err "Timeout"
+
+                Http.NetworkError_ ->
+                    Err "Réseau injoignable — backend démarré ?"
+
+
+seasonPlanDecoder : Decoder SeasonPlan
+seasonPlanDecoder =
+    D.map7 SeasonPlan
+        (D.field "year" D.int)
+        (D.field "items"
+            (D.list
+                (D.map8 PlanItem
+                    (D.field "bed_id" D.int)
+                    (D.field "species_id" D.string)
+                    (D.field "mode" D.string)
+                    (D.field "week" D.int)
+                    (D.field "weeks_on_bed" D.int)
+                    (D.field "area_m2" D.float)
+                    (D.field "expected_kg" D.float)
+                    (D.field "expected_eur" D.float)
+                )
+            )
+        )
+        (D.field "total_kg" D.float)
+        (D.field "total_eur" D.float)
+        (D.field "unmet_wishes" (D.list (D.map2 Tuple.pair (D.field "species_id" D.string) (D.field "missing_m2" D.float))))
+        (D.field "cover_ratio" D.float)
+        (D.field "optimal" D.bool)
 
 
 fetchParcels : String -> Cmd Msg
@@ -4056,6 +4215,7 @@ viewJournalPage model =
             [ div []
                 [ viewShelter model
                 , viewTerrain model
+                , viewPlanPanel model
                 , viewPlantContextMenu model
                 , viewActionsTimeline model
                 ]
@@ -4932,6 +5092,262 @@ viewTerrain model =
             )
         , viewBedToolbar model
         ]
+
+
+-- Plan de saison : réglages, envies (contraintes souples) et frise par planche.
+viewPlanPanel : Model -> Html Msg
+viewPlanPanel model =
+    let
+        beds = List.filter (\pc -> pc.shape /= Nothing) model.parcels
+        thisYear = model.planYear - 1
+
+        annuals =
+            model.calendar
+                |> Maybe.map .species
+                |> Maybe.withDefault []
+                |> List.map .species
+                |> List.filter (\sp -> sp.lifeCycle == "Annual" || sp.lifeCycle == "Biennial")
+                |> List.sortBy .nameFr
+
+        yearOpt y = option [ A.value (String.fromInt y), A.selected (y == model.planYear) ] [ text (String.fromInt y) ]
+
+        shareOpt ( v, label ) = option [ A.value (String.fromFloat v), A.selected (v == model.planShare) ] [ text label ]
+
+        wishChip ( sid, m2 ) =
+            span [ A.class "bed-chip" ]
+                [ text (speciesEmoji sid ++ " " ++ planSpeciesName model sid ++ " " ++ String.fromFloat m2 ++ " m²")
+                , button [ E.onClick (RemoveWish sid), A.class "danger", A.title "Retirer l'envie" ] [ text "✖" ]
+                ]
+
+        controls =
+            div [ A.class "bed-toolbar" ]
+                [ select [ E.onInput SetPlanYear ] (List.map yearOpt [ thisYear, thisYear + 1 ])
+                , select [ E.onInput SetPlanShare, A.title "Part maximale d'une espèce dans la surface totale" ]
+                    (List.map shareOpt [ ( 0.15, "max 15 % / espèce" ), ( 0.25, "max 25 % / espèce" ), ( 0.4, "max 40 % / espèce" ), ( 1, "sans limite" ) ])
+                , button [ E.onClick ComputePlan, A.disabled (model.planLoading || List.isEmpty beds) ]
+                    [ text (if model.planLoading then "⏳ Calcul… (jusqu'à 20 s)" else "🧮 Calculer le plan") ]
+                ]
+
+        wishRow =
+            div [ A.class "bed-toolbar" ]
+                ([ select [ E.onInput SetWishSpecies ]
+                    (option [ A.value "", A.selected (model.wishSpecies == "") ] [ text "Je veux…" ]
+                        :: List.map (\sp -> option [ A.value sp.id, A.selected (sp.id == model.wishSpecies) ] [ text (speciesEmoji sp.id ++ " " ++ sp.nameFr) ]) annuals
+                    )
+                 , input [ A.type_ "number", A.step "0.5", A.min "0.5", A.value model.wishM2, E.onInput SetWishM2, A.style "width" "5em" ] []
+                 , span [] [ text "m²" ]
+                 , button [ E.onClick AddWish, A.disabled (model.wishSpecies == "") ] [ text "＋ Envie" ]
+                 ]
+                    ++ List.map wishChip model.wishes
+                )
+
+        result =
+            case ( model.planError, model.plan ) of
+                ( Just e, _ ) ->
+                    p [ A.class "plan-error" ] [ text ("⚠ " ++ e) ]
+
+                ( Nothing, Just plan ) ->
+                    viewPlanResult model beds plan
+
+                ( Nothing, Nothing ) ->
+                    if List.isEmpty beds then
+                        p [ A.class "muted" ] [ text "Dessine d'abord une planche sur le terrain : le plan répartit les cultures par planche." ]
+
+                    else
+                        p [ A.class "muted" ] [ text "Ajoute tes envies (facultatif) puis calcule : le plan maximise la valeur récoltée (€) en respectant rotations, associations et couverture du sol." ]
+    in
+    div [ A.class "panel plan-panel" ]
+        [ h2 [] [ text "🗓 Plan de saison" ]
+        , controls
+        , wishRow
+        , result
+        ]
+
+
+viewPlanResult : Model -> List Parcel -> SeasonPlan -> Html Msg
+viewPlanResult model beds plan =
+    let
+        summary =
+            p []
+                [ text
+                    ("≈ " ++ String.fromFloat (round1 plan.totalKg) ++ " kg · "
+                        ++ String.fromInt (round plan.totalEur) ++ " € · sol couvert "
+                        ++ String.fromInt (round (plan.coverRatio * 100)) ++ " % de l'année · "
+                        ++ (if plan.optimal then "optimal" else "solution approchée (temps limite atteint)")
+                    )
+                ]
+
+        unmet ( sid, missing ) =
+            p [ A.class "plan-error" ]
+                [ text ("⚠ Envie non tenue : " ++ planSpeciesName model sid ++ " (manque " ++ String.fromFloat (round1 missing) ++ " m² — fenêtre, rotation ou antagonistes)") ]
+    in
+    div []
+        (summary
+            :: List.map unmet plan.unmetWishes
+            ++ [ viewPlanGantt model beds plan ]
+        )
+
+
+-- Barre fusionnée : les semis d'une même espèce étalés sur des semaines voisines.
+type alias PlanBar =
+    { bedId : Int
+    , speciesId : String
+    , mode : String
+    , start : Int
+    , span : Int
+    , lastWeek : Int
+    , area : Float
+    , kg : Float
+    , eur : Float
+    }
+
+
+mergePlanItems : List PlanItem -> List PlanBar
+mergePlanItems items =
+    let
+        toBar it =
+            { bedId = it.bedId, speciesId = it.speciesId, mode = it.mode, start = it.week, span = it.weeksOnBed
+            , lastWeek = it.week, area = it.areaM2, kg = it.expectedKg, eur = it.expectedEur }
+
+        step it acc =
+            case acc of
+                b :: rest ->
+                    if b.bedId == it.bedId && b.speciesId == it.speciesId && b.mode == it.mode && it.week <= b.lastWeek + 1 then
+                        { b
+                            | span = max (b.start + b.span) (it.week + it.weeksOnBed) - b.start
+                            , lastWeek = it.week
+                            , area = b.area + it.areaM2
+                            , kg = b.kg + it.expectedKg
+                            , eur = b.eur + it.expectedEur
+                        }
+                            :: rest
+
+                    else
+                        toBar it :: acc
+
+                [] ->
+                    [ toBar it ]
+    in
+    items
+        |> List.sortBy (\it -> ( it.bedId, it.speciesId, ( it.mode, it.week ) ))
+        |> List.foldl step []
+        |> List.reverse
+
+
+viewPlanGantt : Model -> List Parcel -> SeasonPlan -> Html Msg
+viewPlanGantt model beds plan =
+    let
+        labelW = 150
+        cw = 12 -- px par semaine
+        rowH = 18
+        headH = 18
+        bars = mergePlanItems plan.items
+
+        bedRows pc =
+            ( pc, List.filter (\b -> b.bedId == pc.id) bars |> List.sortBy .start )
+
+        groups = List.map bedRows beds
+
+        -- y de départ de chaque groupe : une ligne d'en-tête + une ligne par barre.
+        layout =
+            List.foldl
+                (\( pc, bs ) ( y, acc ) -> ( y + rowH * (1 + max 1 (List.length bs)), acc ++ [ ( y, pc, bs ) ] ))
+                ( headH, [] )
+                groups
+
+        totalH = Tuple.first layout
+        totalW = labelW + 52 * cw
+
+        monthStarts = [ 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 ]
+        monthNames = [ "janv", "févr", "mars", "avr", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc" ]
+
+        weekX w = labelW + (w - 1) * cw
+
+        monthTick d name =
+            let x = labelW + round (toFloat d / 7 * toFloat cw) in
+            [ Svg.line [ SA.x1 (String.fromInt x), SA.x2 (String.fromInt x), SA.y1 "0", SA.y2 (String.fromInt totalH), SA.stroke "#ddd" ] []
+            , Svg.text_ [ SA.x (String.fromInt (x + 2)), SA.y "12", SA.fontSize "10", SA.fill "#777" ] [ Svg.text name ]
+            ]
+
+        rect x y w color =
+            Svg.rect [ SA.x (String.fromInt x), SA.y (String.fromInt (y + 2)), SA.width (String.fromInt w), SA.height (String.fromInt (rowH - 4)), SA.rx "3", SA.fill color ] []
+
+        barSvg y b =
+            let
+                color = speciesFamily model b.speciesId |> familyColor
+                endW = b.start - 1 + b.span -- semaines écoulées depuis S1 en fin de culture
+                -- Année cyclique : une culture d'hiver déborde sur le début de l'année.
+                pieces =
+                    if endW > 52 then
+                        [ rect (weekX b.start) y ((53 - b.start) * cw) color, rect labelW y ((endW - 52) * cw) color ]
+
+                    else
+                        [ rect (weekX b.start) y (b.span * cw) color ]
+
+                tip =
+                    planSpeciesName model b.speciesId ++ " · "
+                        ++ (if b.mode == "transplant" then "plantation" else "semis") ++ " S" ++ String.fromInt b.start
+                        ++ (if b.lastWeek > b.start then "–S" ++ String.fromInt b.lastWeek else "")
+                        ++ " · " ++ String.fromFloat (round1 b.area) ++ " m² · "
+                        ++ String.fromFloat (round1 b.kg) ++ " kg · " ++ String.fromInt (round b.eur) ++ " €"
+            in
+            Svg.g []
+                (Svg.title [] [ Svg.text tip ]
+                    :: pieces
+                    ++ [ Svg.text_ [ SA.x "8", SA.y (String.fromInt (y + rowH - 5)), SA.fontSize "11" ]
+                            [ Svg.text (speciesEmoji b.speciesId ++ " " ++ planSpeciesName model b.speciesId ++ " " ++ String.fromFloat (round1 b.area) ++ " m²") ]
+                       ]
+                )
+
+        groupSvg ( y, pc, bs ) =
+            Svg.g []
+                (Svg.text_ [ SA.x "2", SA.y (String.fromInt (y + rowH - 5)), SA.fontSize "12", SA.fontWeight "bold" ]
+                    [ Svg.text (pc.name ++ (pc.surfaceM2 |> Maybe.map (\m -> " · " ++ String.fromFloat (round1 m) ++ " m²") |> Maybe.withDefault "")) ]
+                    :: Svg.line [ SA.x1 "0", SA.x2 (String.fromInt totalW), SA.y1 (String.fromInt y), SA.y2 (String.fromInt y), SA.stroke "#bbb" ] []
+                    :: (if List.isEmpty bs then
+                            [ Svg.text_ [ SA.x "8", SA.y (String.fromInt (y + 2 * rowH - 5)), SA.fontSize "11", SA.fill "#999" ] [ Svg.text "(rien de rentable ici)" ] ]
+
+                        else
+                            List.indexedMap (\i b -> barSvg (y + rowH * (i + 1)) b) bs
+                       )
+                )
+    in
+    div [ A.class "plan-gantt" ]
+        [ Svg.svg
+            [ SA.width (String.fromInt totalW), SA.height (String.fromInt totalH), SA.viewBox ("0 0 " ++ String.fromInt totalW ++ " " ++ String.fromInt totalH) ]
+            (List.concat (List.map2 monthTick monthStarts monthNames) ++ List.map groupSvg (Tuple.second layout))
+        ]
+
+
+-- Nom court connu, sinon nom FR du catalogue (engrais verts absents de speciesShortName).
+planSpeciesName : Model -> String -> String
+planSpeciesName model sid =
+    let short = speciesShortName sid in
+    if short /= sid then short else findSpecies sid model |> Maybe.map .nameFr |> Maybe.withDefault sid
+
+
+speciesFamily : Model -> String -> String
+speciesFamily model sid =
+    findSpecies sid model |> Maybe.map .family |> Maybe.withDefault ""
+
+
+-- Couleur par famille botanique : la rotation se lit d'un coup d'œil.
+familyColor : String -> String
+familyColor fam =
+    case fam of
+        "Solanaceae" -> "#e57373"
+        "Cucurbitaceae" -> "#ffb74d"
+        "Brassicaceae" -> "#9575cd"
+        "Fabaceae" -> "#81c784"
+        "Apiaceae" -> "#ff8a65"
+        "Alliaceae" -> "#ba68c8"
+        "Asteraceae" -> "#aed581"
+        "Amaranthaceae" -> "#f06292"
+        "Chenopodiaceae" -> "#f06292"
+        "Lamiaceae" -> "#4db6ac"
+        "Boraginaceae" -> "#64b5f6"
+        "Poaceae" -> "#d4e157"
+        _ -> "#bdbdbd"
 
 
 pointsAttr : List ( Int, Int ) -> String
