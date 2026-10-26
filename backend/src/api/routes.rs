@@ -644,6 +644,8 @@ pub struct PlanQuery {
     pub share: Option<f64>,
     /// Envies « espece:m2,espece:m2 », ex. `tomato:2,basil:0.5`.
     pub wish: Option<String>,
+    /// Espèces exclues « beet,leek » : jamais proposées par le plan.
+    pub exclude: Option<String>,
 }
 
 /// Parse `tomato:2,basil:0.5` → [(id, m²)], ids vérifiés dans le catalogue.
@@ -660,6 +662,21 @@ fn parse_wishes(raw: &str, species: &[Species]) -> Result<Vec<(String, f64)>, St
                 return Err(format!("espèce inconnue : {id}"));
             }
             Ok((id.to_string(), m2))
+        })
+        .collect()
+}
+
+/// Parse `beet,leek` → ids vérifiés dans le catalogue.
+fn parse_excludes(raw: &str, species: &[Species]) -> Result<Vec<String>, String> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(|id| {
+            if species.iter().any(|s| s.id == id) {
+                Ok(id.to_string())
+            } else {
+                Err(format!("espèce inconnue : {id}"))
+            }
         })
         .collect()
 }
@@ -683,6 +700,11 @@ async fn get_plan(
     }
     let wishes = parse_wishes(q.wish.as_deref().unwrap_or(""), &s.species)
         .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    let excludes = parse_excludes(q.exclude.as_deref().unwrap_or(""), &s.species)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    if let Some((id, _)) = wishes.iter().find(|(id, _)| excludes.contains(id)) {
+        return Err((StatusCode::BAD_REQUEST, format!("espèce à la fois voulue et exclue : {id}")));
+    }
     let loc = Location::by_slug(q.city.as_deref().unwrap_or("le_bois_doingt"));
     let shift = spring_shift_days(&ClimateProfile::paris(), &loc.climate);
     let parcels = journal::list_parcels(&s.db).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
@@ -697,6 +719,7 @@ async fn get_plan(
         let crops: Vec<planner::Crop> = species
             .iter()
             .filter(|sp| !sp.is_perennial() && (sp.yield_kg_m2.is_some() || sp.green_manure))
+            .filter(|sp| !excludes.contains(&sp.id))
             .map(|sp| planner::Crop {
                 species: sp,
                 direct: sp.direct_sow.map(|w| shift_window(w, shift)),
@@ -764,3 +787,24 @@ async fn fetch_5y_climate(lat: f64, lon: f64) -> Option<ClimateProfile> {
 
 // Ajout nécessaire pour `today.year() - 5`.
 use chrono::Datelike;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn catalog() -> Vec<Species> {
+        Species::load_from_json("data/species.json").expect("species.json valide")
+    }
+
+    #[test]
+    fn excludes_parse_known_ids_and_skip_blanks() {
+        let sp = catalog();
+        assert_eq!(parse_excludes(" beet, ,leek ", &sp), Ok(vec!["beet".into(), "leek".into()]));
+        assert_eq!(parse_excludes("", &sp), Ok(vec![]));
+    }
+
+    #[test]
+    fn excludes_reject_unknown_id() {
+        assert_eq!(parse_excludes("beet,licorne", &catalog()), Err("espèce inconnue : licorne".into()));
+    }
+}

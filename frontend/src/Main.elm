@@ -106,6 +106,7 @@ type alias Model =
     , wishes : List ( String, Float ) -- envies (espèce, m²), contraintes souples du plan
     , wishSpecies : String
     , wishM2 : String
+    , excludes : List String -- espèces exclues, contrainte dure du plan
     , dragging : Maybe DragState
     , plantMenu : Maybe Int -- id du plant avec menu ouvert
     , deathPicker : Bool -- sélecteur de cause « plant mort » ouvert
@@ -420,6 +421,7 @@ init flags =
       , wishes = []
       , wishSpecies = ""
       , wishM2 = "1"
+      , excludes = []
       , dragging = Nothing
       , plantMenu = Nothing
       , deathPicker = False
@@ -528,6 +530,8 @@ type Msg
     | SetWishM2 String
     | AddWish
     | RemoveWish String
+    | AddExclude String
+    | RemoveExclude String
     | ComputePlan
     | GotPlan (Result String SeasonPlan)
     | HoverPlant (Maybe Int)
@@ -1199,6 +1203,7 @@ update msg model =
                         ( { model
                             | wishes = List.filter (\( sid, _ ) -> sid /= model.wishSpecies) model.wishes ++ [ ( model.wishSpecies, m2 ) ]
                             , wishSpecies = ""
+                            , excludes = List.filter ((/=) model.wishSpecies) model.excludes
                           }
                         , Cmd.none
                         )
@@ -1212,9 +1217,24 @@ update msg model =
         RemoveWish sid ->
             ( { model | wishes = List.filter (\( s, _ ) -> s /= sid) model.wishes }, Cmd.none )
 
+        AddExclude sid ->
+            if sid == "" || List.member sid model.excludes then
+                ( model, Cmd.none )
+
+            else
+                ( { model
+                    | excludes = model.excludes ++ [ sid ]
+                    , wishes = List.filter (\( s, _ ) -> s /= sid) model.wishes
+                  }
+                , Cmd.none
+                )
+
+        RemoveExclude sid ->
+            ( { model | excludes = List.filter ((/=) sid) model.excludes }, Cmd.none )
+
         ComputePlan ->
             ( { model | planLoading = True, planError = Nothing }
-            , fetchPlan model.backendUrl model.selectedCity model.planYear model.planShare model.wishes
+            , fetchPlan model.backendUrl model.selectedCity model.planYear model.planShare model.wishes model.excludes
             )
 
         GotPlan (Ok plan) ->
@@ -1440,8 +1460,8 @@ fetchCalendar url slug refresh =
         }
 
 
-fetchPlan : String -> String -> Int -> Float -> List ( String, Float ) -> Cmd Msg
-fetchPlan url city year share wishes =
+fetchPlan : String -> String -> Int -> Float -> List ( String, Float ) -> List String -> Cmd Msg
+fetchPlan url city year share wishes excludes =
     let
         wishParam =
             if List.isEmpty wishes then
@@ -1449,11 +1469,18 @@ fetchPlan url city year share wishes =
 
             else
                 "&wish=" ++ String.join "," (List.map (\( sid, m2 ) -> sid ++ ":" ++ String.fromFloat m2) wishes)
+
+        excludeParam =
+            if List.isEmpty excludes then
+                ""
+
+            else
+                "&exclude=" ++ String.join "," excludes
     in
     Http.request
         { method = "GET"
         , headers = []
-        , url = url ++ "/plan?city=" ++ city ++ "&year=" ++ String.fromInt year ++ "&share=" ++ String.fromFloat share ++ wishParam
+        , url = url ++ "/plan?city=" ++ city ++ "&year=" ++ String.fromInt year ++ "&share=" ++ String.fromFloat share ++ wishParam ++ excludeParam
         , body = Http.emptyBody
         , expect = expectJsonOrMessage GotPlan seasonPlanDecoder
         , timeout = Just 60000 -- le solveur peut prendre ~20 s
@@ -5119,6 +5146,22 @@ viewPlanPanel model =
                 , button [ E.onClick (RemoveWish sid), A.class "danger", A.title "Retirer l'envie" ] [ text "✖" ]
                 ]
 
+        excludeChip sid =
+            span [ A.class "bed-chip" ]
+                [ text ("🚫 " ++ speciesEmoji sid ++ " " ++ planSpeciesName model sid)
+                , button [ E.onClick (RemoveExclude sid), A.class "danger", A.title "Ne plus exclure" ] [ text "✖" ]
+                ]
+
+        excludeRow =
+            div [ A.class "bed-toolbar" ]
+                (select [ E.onInput AddExclude ]
+                    (option [ A.value "", A.selected True ] [ text "🚫 Je ne veux pas…" ]
+                        :: List.map (\sp -> option [ A.value sp.id ] [ text (speciesEmoji sp.id ++ " " ++ sp.nameFr) ])
+                            (List.filter (\sp -> not (List.member sp.id model.excludes)) annuals)
+                    )
+                    :: List.map excludeChip model.excludes
+                )
+
         controls =
             div [ A.class "bed-toolbar" ]
                 [ select [ E.onInput SetPlanYear ] (List.map yearOpt [ thisYear, thisYear + 1 ])
@@ -5160,6 +5203,7 @@ viewPlanPanel model =
         [ h2 [] [ text "🗓 Plan de saison" ]
         , controls
         , wishRow
+        , excludeRow
         , result
         ]
 
