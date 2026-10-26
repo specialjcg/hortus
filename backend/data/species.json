@@ -14,6 +14,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 60,
     "days_to_harvest": 80,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Exposition plein soleil, au moins 6h/jour.",
@@ -40,6 +41,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 50,
     "days_to_harvest": 70,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Plus facile que la tomate classique, moins sensible aux maladies.",
@@ -47,7 +49,7 @@
       "Ne pincer que si plant faible."
     ],
     "friends": ["basil", "marigold"],
-    "foes": ["potato"]
+    "foes": ["potato", "fennel"]
   },
   {
     "id": "pepper",
@@ -64,6 +66,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 50,
     "days_to_harvest": 90,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Germination lente, chauffer le terreau (22-25°C).",
@@ -88,6 +91,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 60,
     "days_to_harvest": 100,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "La plus exigeante en chaleur des solanacées.",
@@ -113,6 +117,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 100,
     "days_to_harvest": 60,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Très productive — 2-3 plants suffisent pour un foyer.",
@@ -121,7 +126,7 @@
       "Sensible à l'oïdium en fin d'été."
     ],
     "friends": ["bean_dry", "corn"],
-    "foes": ["potato"]
+    "foes": ["potato", "fennel"]
   },
   {
     "id": "butternut_squash",
@@ -138,6 +143,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 150,
     "days_to_harvest": 100,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Prévoir 2-3 m² par pied — coureuse.",
@@ -146,7 +152,7 @@
       "Affinage 2-3 semaines après récolte améliore le goût."
     ],
     "friends": ["bean_dry", "corn"],
-    "foes": ["potato"]
+    "foes": ["potato", "fennel"]
   },
   {
     "id": "pumpkin",
@@ -163,6 +169,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 200,
     "days_to_harvest": 110,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Très gourmand en eau et en compost.",
@@ -170,7 +177,7 @@
       "Se conserve 6 mois au cellier."
     ],
     "friends": ["corn", "bean_dry"],
-    "foes": ["potato"]
+    "foes": ["potato", "fennel"]
   },
   {
     "id": "cucumber",
@@ -187,6 +194,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 40,
     "days_to_harvest": 60,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Palisser pour gagner de la place et éviter les attaques au sol.",
@@ -210,6 +218,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 100,
     "days_to_harvest": 110,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Exige beaucoup de chaleur — chassis ou voile recommandé.",
@@ -234,6 +243,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 5,
     "days_to_harvest": 90,
+    "height_class": "Ground",
     "notes": [
       "Germe en 10-20 jours, maintenir humide.",
       "Éclaircir à 5 cm quand plants ont 3 vraies feuilles.",
@@ -258,6 +268,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 3,
     "days_to_harvest": 25,
+    "height_class": "Ground",
     "notes": [
       "Cycle très court (3-4 semaines) — idéal entre deux cultures.",
       "Semer tous les 15 jours pour étaler la récolte.",
@@ -281,6 +292,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 10,
     "days_to_harvest": 60,
+    "height_class": "Ground",
     "notes": [
       "Préfère la fraîcheur, semis fin août-septembre pour la conservation hiver.",
       "Récolter jeune pour une chair tendre."
@@ -303,6 +315,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 10,
     "days_to_harvest": 90,
+    "height_class": "Ground",
     "notes": [
       "Tremper les graines 24h pour accélérer germination.",
       "Éclaircir à 10 cm (les jeunes feuilles se mangent).",
@@ -327,6 +340,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 15,
     "days_to_harvest": 180,
+    "height_class": "Medium",
     "notes": [
       "Germination très lente (3-4 semaines) — graines fraîches obligatoires.",
       "Le gel améliore le goût (transforme l'amidon en sucre).",
@@ -350,6 +364,7 @@
     "depth_cm": 0.3,
     "spacing_cm": 35,
     "days_to_harvest": 180,
+    "height_class": "Medium",
     "notes": [
       "Germination capricieuse, semer en surface, lumière requise.",
       "Dégager la boule en été (butter inverse)."
@@ -372,6 +387,7 @@
     "depth_cm": 10.0,
     "spacing_cm": 40,
     "days_to_harvest": 110,
+    "height_class": "Medium",
     "notes": [
       "Planter les tubercules quand le lilas fleurit (pas avant).",
       "Butter 2 fois pendant la culture.",
@@ -396,6 +412,7 @@
     "depth_cm": 10.0,
     "spacing_cm": 50,
     "days_to_harvest": 200,
+    "height_class": "Tall",
     "notes": [
       "Planter les tubercules en bordure — très envahissant.",
       "Récolter au besoin d'octobre à mars.",
@@ -419,6 +436,7 @@
     "depth_cm": 0.3,
     "spacing_cm": 25,
     "days_to_harvest": 50,
+    "height_class": "Ground",
     "notes": [
       "Semer tous les 15 jours pour étaler la récolte.",
       "Monte à graines en plein été — privilégier printemps/automne.",
@@ -442,6 +460,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 10,
     "days_to_harvest": 75,
+    "height_class": "Ground",
     "notes": [
       "Salade d'hiver par excellence, très rustique (-15°C).",
       "Tasser légèrement après semis (graines qui germent en surface).",
@@ -465,6 +484,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 15,
     "days_to_harvest": 50,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Culture de printemps et d'automne, monte à graines en été.",
@@ -489,6 +509,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 10,
     "days_to_harvest": 40,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Cycle très court — semer tous les 10 jours.",
@@ -512,6 +533,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 40,
     "days_to_harvest": 60,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Récolter feuille à feuille pour production longue.",
@@ -535,6 +557,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 50,
     "days_to_harvest": 90,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Très rustique, supporte -15°C.",
@@ -559,6 +582,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 60,
     "days_to_harvest": 120,
+    "height_class": "Medium",
     "notes": [
       "Culture gourmande : compost avant plantation.",
       "Surveiller la piéride (chenille verte) en été.",
@@ -582,6 +606,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 60,
     "days_to_harvest": 120,
+    "height_class": "Medium",
     "notes": [
       "Capricieux — exige des apports réguliers et pas de stress.",
       "Plier les feuilles sur la pomme pour la blanchir."
@@ -604,6 +629,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 50,
     "days_to_harvest": 90,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Après la pomme centrale, les rejets latéraux donnent des mini-brocolis.",
@@ -627,6 +653,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 60,
     "days_to_harvest": 180,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Culture longue (6 mois) mais peu exigeante.",
@@ -651,6 +678,7 @@
     "depth_cm": 3.0,
     "spacing_cm": 10,
     "days_to_harvest": 60,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Semer quand sol > 12°C (après mi-mai).",
@@ -676,6 +704,7 @@
     "depth_cm": 3.0,
     "spacing_cm": 15,
     "days_to_harvest": 110,
+    "height_class": "Medium",
     "notes": [
       "Laisser les gousses sécher sur pied avant récolte.",
       "Stockage 2 ans en bocal sec.",
@@ -699,6 +728,7 @@
     "depth_cm": 3.0,
     "spacing_cm": 5,
     "days_to_harvest": 90,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Rustique — semis dès fin février possible.",
@@ -723,6 +753,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 20,
     "days_to_harvest": 180,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Semis d'automne (octobre-novembre) pour récolte de mai-juin.",
@@ -747,6 +778,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 10,
     "days_to_harvest": 180,
+    "height_class": "Medium",
     "notes": [
       "Bulbilles (pour commencer simple) ou semis (plus productif).",
       "Récolter quand les feuilles jaunissent et tombent.",
@@ -770,6 +802,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 15,
     "days_to_harvest": 140,
+    "height_class": "Medium",
     "notes": [
       "Plantation des caïeux pointe en l'air.",
       "Ne pas enfouir complètement (tête dépasse).",
@@ -793,6 +826,7 @@
     "depth_cm": 3.0,
     "spacing_cm": 15,
     "days_to_harvest": 240,
+    "height_class": "Medium",
     "notes": [
       "Ail blanc/violet : plantation automne (oct-nov).",
       "Ail rose : plantation fin d'hiver (fév-mars).",
@@ -817,6 +851,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 15,
     "days_to_harvest": 180,
+    "height_class": "Medium",
     "notes": [
       "Habiller les racines et feuilles avant repiquage (tailler 1/3).",
       "Butter progressivement pour blanchir le fût.",
@@ -840,6 +875,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 20,
     "days_to_harvest": 90,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Vivace — une plantation dure 4-5 ans.",
@@ -864,6 +900,7 @@
     "depth_cm": 0.3,
     "spacing_cm": 25,
     "days_to_harvest": 60,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Germination exige 20-25°C.",
@@ -888,6 +925,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 15,
     "days_to_harvest": 80,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Germination longue (3 semaines) — tremper les graines 24h.",
@@ -912,6 +950,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 15,
     "days_to_harvest": 45,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Monte à graines rapidement en été — semer étalé.",
@@ -936,6 +975,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 20,
     "days_to_harvest": 60,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Pas de repiquage — semis direct seulement.",
@@ -959,6 +999,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 15,
     "days_to_harvest": 50,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Préfère la mi-ombre en été.",
@@ -983,6 +1024,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 40,
     "days_to_harvest": 60,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Très envahissante — cantonner (pot enterré).",
@@ -1007,6 +1049,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 40,
     "days_to_harvest": 90,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Sol drainé, pauvre, calcaire — méditerranéen.",
@@ -1031,6 +1074,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 80,
     "days_to_harvest": 180,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Persistant, récoltable toute l'année.",
@@ -1055,6 +1099,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 60,
     "days_to_harvest": 90,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Aime le soleil et les sols drainés.",
@@ -1079,6 +1124,7 @@
     "depth_cm": 0.3,
     "spacing_cm": 30,
     "days_to_harvest": 90,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Méditerranéen, supporte la sécheresse.",
@@ -1102,6 +1148,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 40,
     "days_to_harvest": 90,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Variété 'français' non disponible en graines — toujours boutures.",
@@ -1125,6 +1172,7 @@
     "depth_cm": 0.5,
     "spacing_cm": 30,
     "days_to_harvest": 90,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Vivace, une plantation dure des années.",
@@ -1149,6 +1197,7 @@
     "depth_cm": 1.0,
     "spacing_cm": 30,
     "days_to_harvest": 270,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Plantation idéale en septembre — bonne reprise avant hiver.",
@@ -1174,6 +1223,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 80,
     "days_to_harvest": 365,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Variétés non-remontantes : récolte juin-juillet.",
@@ -1182,7 +1232,7 @@
       "Palisser sur fil de fer."
     ],
     "friends": [],
-    "foes": ["potato"]
+    "foes": ["potato", "fennel"]
   },
   {
     "id": "blackcurrant",
@@ -1199,6 +1249,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 120,
     "days_to_harvest": 730,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Riche en vitamine C (plus que l'orange).",
@@ -1223,6 +1274,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 120,
     "days_to_harvest": 730,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Préfère mi-ombre et sol frais.",
@@ -1246,6 +1298,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 150,
     "days_to_harvest": 730,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Exige un sol acide (pH 4.5-5.5) — terre de bruyère.",
@@ -1270,6 +1323,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1460,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Plantation en racines nues de novembre à mars (hors gel).",
@@ -1295,6 +1349,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1825,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Emplacement ensoleillé, abrité des vents du nord.",
@@ -1318,6 +1373,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 500,
     "days_to_harvest": 1460,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Ne pas tailler — le cerisier n'apprécie pas (gomme).",
@@ -1341,6 +1397,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1095,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Rustique, peu exigeant.",
@@ -1364,6 +1421,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1095,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Floraison précoce — sensible au gel tardif.",
@@ -1388,6 +1446,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1095,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Rustique jusqu'à -15°C une fois établi.",
@@ -1412,6 +1471,7 @@
     "depth_cm": 40.0,
     "spacing_cm": 400,
     "days_to_harvest": 1095,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Planter au moins 2 variétés différentes pour la pollinisation.",
@@ -1436,6 +1496,7 @@
     "depth_cm": 60.0,
     "spacing_cm": 1000,
     "days_to_harvest": 2555,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Grand arbre — prévoir 10m en tous sens.",
@@ -1460,6 +1521,7 @@
     "depth_cm": 2.0,
     "spacing_cm": 50,
     "days_to_harvest": 70,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Épinard d'été qui ne monte pas à graines.",
@@ -1484,6 +1546,7 @@
     "depth_cm": 0.3,
     "spacing_cm": 15,
     "days_to_harvest": 40,
+    "height_class": "Ground",
     "multi_harvest": true,
     "notes": [
       "Riche en oméga-3, salade estivale résistante à la chaleur.",
@@ -1508,6 +1571,7 @@
     "depth_cm": 5.0,
     "spacing_cm": 100,
     "days_to_harvest": 180,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Vivace qui dure 4-5 ans.",
@@ -1532,6 +1596,7 @@
     "depth_cm": 20.0,
     "spacing_cm": 50,
     "days_to_harvest": 730,
+    "height_class": "Tall",
     "multi_harvest": true,
     "notes": [
       "Patience : première récolte 2-3 ans après plantation.",
@@ -1557,6 +1622,7 @@
     "depth_cm": 10.0,
     "spacing_cm": 100,
     "days_to_harvest": 365,
+    "height_class": "Medium",
     "multi_harvest": true,
     "notes": [
       "Feuilles toxiques (oxalates) — ne consommer que les pétioles.",
@@ -1564,6 +1630,141 @@
       "Diviser la touffe tous les 5-6 ans."
     ],
     "friends": ["cabbage"],
+    "foes": []
+  },
+  {
+    "id": "phacelia",
+    "name_fr": "Phacélie",
+    "name_latin": "Phacelia tanacetifolia",
+    "family": "Boraginaceae",
+    "life_cycle": "Annual",
+    "category": "GreenManure",
+    "difficulty": "Beginner",
+    "indoor_sow": null,
+    "direct_sow": { "doy_start": 75, "doy_end": 250 },
+    "transplant": null,
+    "harvest": { "doy_start": 135, "doy_end": 320 },
+    "depth_cm": 1,
+    "spacing_cm": 5,
+    "days_to_harvest": 60,
+    "height_class": "Medium",
+    "multi_harvest": false,
+    "green_manure": true,
+    "notes": [
+      "Engrais vert : semis à la volée 1 à 2 g/m², levée rapide, couvre le sol en 3 semaines.",
+      "Faucher à début floraison (6-8 semaines) et laisser en surface en paillis.",
+      "Mellifère, attire les syrphes contre les pucerons.",
+      "Sans parenté avec les légumes : n'interfère pas avec la rotation.",
+      "Gélive vers -8 °C : semée fin d'été, elle se détruit seule en hiver."
+    ],
+    "friends": [],
+    "foes": []
+  },
+  {
+    "id": "white_mustard",
+    "name_fr": "Moutarde blanche",
+    "name_latin": "Sinapis alba",
+    "family": "Brassicaceae",
+    "life_cycle": "Annual",
+    "category": "GreenManure",
+    "difficulty": "Beginner",
+    "indoor_sow": null,
+    "direct_sow": { "doy_start": 60, "doy_end": 258 },
+    "transplant": null,
+    "harvest": { "doy_start": 110, "doy_end": 330 },
+    "depth_cm": 1,
+    "spacing_cm": 5,
+    "days_to_harvest": 50,
+    "height_class": "Medium",
+    "multi_harvest": false,
+    "green_manure": true,
+    "notes": [
+      "Engrais vert le plus rapide : semis à la volée 2 g/m², couvre le sol en 3-4 semaines.",
+      "Piège à nitrates en interculture d'automne.",
+      "Faucher avant la montée en graines.",
+      "Crucifère : à éviter avant choux, navets, radis (hernie du chou)."
+    ],
+    "friends": [],
+    "foes": []
+  },
+  {
+    "id": "crimson_clover",
+    "name_fr": "Trèfle incarnat",
+    "name_latin": "Trifolium incarnatum",
+    "family": "Fabaceae",
+    "life_cycle": "Annual",
+    "category": "GreenManure",
+    "difficulty": "Beginner",
+    "indoor_sow": null,
+    "direct_sow": { "doy_start": 213, "doy_end": 258 },
+    "transplant": null,
+    "harvest": { "doy_start": 100, "doy_end": 140 },
+    "depth_cm": 1,
+    "spacing_cm": 5,
+    "days_to_harvest": 210,
+    "height_class": "Medium",
+    "multi_harvest": false,
+    "green_manure": true,
+    "notes": [
+      "Engrais vert légumineuse : fixe l'azote de l'air.",
+      "Semis août-mi-septembre à la volée 2 g/m², passe l'hiver.",
+      "Faucher en avril-mai à floraison, attendre 3 semaines avant de planter.",
+      "Libère de l'azote pour les gourmands suivants (tomates, courges, choux)."
+    ],
+    "friends": ["winter_rye"],
+    "foes": []
+  },
+  {
+    "id": "winter_rye",
+    "name_fr": "Seigle d'hiver",
+    "name_latin": "Secale cereale",
+    "family": "Poaceae",
+    "life_cycle": "Annual",
+    "category": "GreenManure",
+    "difficulty": "Beginner",
+    "indoor_sow": null,
+    "direct_sow": { "doy_start": 258, "doy_end": 305 },
+    "transplant": null,
+    "harvest": { "doy_start": 90, "doy_end": 130 },
+    "depth_cm": 2,
+    "spacing_cm": 5,
+    "days_to_harvest": 180,
+    "height_class": "Tall",
+    "multi_harvest": false,
+    "green_manure": true,
+    "notes": [
+      "Engrais vert d'hiver très rustique, structure le sol par ses racines.",
+      "Semis mi-septembre à octobre, 15 g/m².",
+      "Faucher avant l'épiaison (mars-avril) ; paille riche en carbone, laisser décomposer 3-4 semaines.",
+      "Souvent associé à la vesce qui grimpe dessus."
+    ],
+    "friends": ["common_vetch", "crimson_clover"],
+    "foes": []
+  },
+  {
+    "id": "common_vetch",
+    "name_fr": "Vesce commune",
+    "name_latin": "Vicia sativa",
+    "family": "Fabaceae",
+    "life_cycle": "Annual",
+    "category": "GreenManure",
+    "difficulty": "Beginner",
+    "indoor_sow": null,
+    "direct_sow": { "doy_start": 244, "doy_end": 288 },
+    "transplant": null,
+    "harvest": { "doy_start": 100, "doy_end": 135 },
+    "depth_cm": 3,
+    "spacing_cm": 5,
+    "days_to_harvest": 200,
+    "height_class": "Medium",
+    "multi_harvest": false,
+    "green_manure": true,
+    "notes": [
+      "Engrais vert légumineuse : fixe l'azote, idéal avant les légumes gourmands.",
+      "Semis septembre-mi-octobre, 10 g/m², en mélange avec du seigle comme tuteur.",
+      "Faucher à floraison (avril-mai)."
+    ],
+    "friends": ["winter_rye"],
     "foes": []
   }
 ]

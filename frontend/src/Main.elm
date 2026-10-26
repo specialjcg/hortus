@@ -3848,6 +3848,7 @@ categoryOptions =
     , ( "Berry", "Petit fruit" )
     , ( "TreeFruit", "Fruitier" )
     , ( "Nut", "Fruit à coque" )
+    , ( "GreenManure", "Engrais vert" )
     ]
 
 
