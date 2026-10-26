@@ -94,6 +94,20 @@ impl Polygon {
         inside
     }
 
+    /// Distance du point au contour le plus proche.
+    pub fn edge_distance(&self, x: f64, y: f64) -> f64 {
+        let pts = &self.0;
+        (0..pts.len())
+            .map(|i| {
+                let [ax, ay] = pts[i].map(|v| v as f64);
+                let [bx, by] = pts[(i + 1) % pts.len()].map(|v| v as f64);
+                let (dx, dy) = (bx - ax, by - ay);
+                let t = (((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)).clamp(0.0, 1.0);
+                (x - ax - t * dx).hypot(y - ay - t * dy)
+            })
+            .fold(f64::INFINITY, f64::min)
+    }
+
     /// Boîte englobante (x_min, y_min, x_max, y_max).
     pub fn bbox(&self) -> (i64, i64, i64, i64) {
         self.0.iter().fold((i64::MAX, i64::MAX, i64::MIN, i64::MIN), |(a, b, c, d), &[x, y]| {
@@ -239,6 +253,13 @@ mod tests {
         assert!(p.contains(60.0, 30.0));
         assert!(!p.contains(60.0, 10.0)); // encoche du L
         assert!(!p.contains(100.0, 30.0));
+    }
+
+    #[test]
+    fn edge_distance_to_nearest_side() {
+        let p = poly(&[[0, 0], [100, 0], [100, 50], [0, 50]]).unwrap();
+        assert_eq!(p.edge_distance(10.0, 25.0), 10.0);
+        assert_eq!(p.edge_distance(50.0, 45.0), 5.0);
     }
 
     #[test]

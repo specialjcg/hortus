@@ -109,6 +109,7 @@ type alias Model =
     , wishSpecies : String
     , wishM2 : String
     , excludes : List String -- espèces exclues, contrainte dure du plan
+    , showGhosts : Bool -- plants du plan en fantômes sur le terrain
     , dragging : Maybe DragState
     , plantMenu : Maybe Int -- id du plant avec menu ouvert
     , deathPicker : Bool -- sélecteur de cause « plant mort » ouvert
@@ -272,6 +273,17 @@ type alias PlanItem =
     }
 
 
+type alias Placement =
+    { bedId : Int
+    , speciesId : String
+    , x : Int
+    , y : Int
+    , week : Int
+    , weeksOnBed : Int
+    , r : Float
+    }
+
+
 type alias SeasonPlan =
     { year : Int
     , items : List PlanItem
@@ -280,6 +292,7 @@ type alias SeasonPlan =
     , unmetWishes : List ( String, Float ) -- (espèce, m² manquants)
     , coverRatio : Float
     , optimal : Bool
+    , placements : List Placement -- plants du plan positionnés (tirage de Poisson)
     }
 
 
@@ -426,6 +439,7 @@ init flags =
       , wishSpecies = ""
       , wishM2 = "1"
       , excludes = []
+      , showGhosts = True
       , dragging = Nothing
       , plantMenu = Nothing
       , deathPicker = False
@@ -540,6 +554,7 @@ type Msg
     | AddWish
     | RemoveWish String
     | AddExclude String
+    | ToggleGhosts
     | RemoveExclude String
     | ComputePlan
     | GotPlan (Result String SeasonPlan)
@@ -1273,6 +1288,9 @@ update msg model =
                 , Cmd.none
                 )
 
+        ToggleGhosts ->
+            ( { model | showGhosts = not model.showGhosts }, Cmd.none )
+
         RemoveExclude sid ->
             ( { model | excludes = List.filter ((/=) sid) model.excludes }, Cmd.none )
 
@@ -1577,6 +1595,20 @@ seasonPlanDecoder =
         (D.field "unmet_wishes" (D.list (D.map2 Tuple.pair (D.field "species_id" D.string) (D.field "missing_m2" D.float))))
         (D.field "cover_ratio" D.float)
         (D.field "optimal" D.bool)
+        |> andMap
+            (D.field "placements"
+                (D.list
+                    (D.map7 Placement
+                        (D.field "bed_id" D.int)
+                        (D.field "species_id" D.string)
+                        (D.field "x" D.int)
+                        (D.field "y" D.int)
+                        (D.field "week" D.int)
+                        (D.field "weeks_on_bed" D.int)
+                        (D.field "r" D.float)
+                    )
+                )
+            )
 
 
 fetchParcels : String -> Cmd Msg
@@ -5173,6 +5205,7 @@ viewTerrain model =
             )
             (terrainPatterns
                 ++ List.filterMap viewBed model.parcels
+                ++ ghostLayer model
                 ++ List.map (viewPlantOnTerrain model plants) plants
                 ++ hoverLayer model plants hoverOverlayTerrain
                 ++ dragGhost model Terrain
@@ -5232,6 +5265,12 @@ viewPlanPanel model =
                     (List.map shareOpt [ ( 0.15, "max 15 % / espèce" ), ( 0.25, "max 25 % / espèce" ), ( 0.4, "max 40 % / espèce" ), ( 1, "sans limite" ) ])
                 , button [ E.onClick ComputePlan, A.disabled (model.planLoading || List.isEmpty beds) ]
                     [ text (if model.planLoading then "⏳ Calcul… (jusqu'à 20 s)" else "🧮 Calculer le plan") ]
+                , if model.plan /= Nothing then
+                    button [ E.onClick ToggleGhosts, A.title "Affiche les plants du plan sur le terrain, à la date du curseur" ]
+                        [ text (if model.showGhosts then "👻 Masquer le plan" else "👻 Voir le plan sur le terrain") ]
+
+                  else
+                    text ""
                 ]
 
         wishRow =
@@ -5427,6 +5466,44 @@ viewPlanGantt model beds plan =
 
 
 -- Nom court connu, sinon nom FR du catalogue (engrais verts absents de speciesShortName).
+-- Plants du plan en terre au jour visualisé (curseur), semi-transparents.
+ghostLayer : Model -> List (Svg.Svg Msg)
+ghostLayer model =
+    let
+        viewWeek =
+            min 51 ((model.viewDoy - 1) // 7)
+
+        onBed g =
+            modBy 52 (viewWeek - (g.week - 1)) < g.weeksOnBed
+
+        ghost g =
+            let
+                r = max 4 g.r
+            in
+            Svg.g [ SA.pointerEvents "none", SA.opacity "0.55" ]
+                [ Svg.circle
+                    [ SA.cx (String.fromInt g.x), SA.cy (String.fromInt g.y), SA.r (String.fromFloat r)
+                    , SA.fill (familyColor (speciesFamily model g.speciesId))
+                    , SA.fillOpacity "0.35"
+                    , SA.stroke "#ffffff"
+                    , SA.strokeDasharray "3 2"
+                    ]
+                    []
+                , Svg.text_
+                    [ SA.x (String.fromInt g.x), SA.y (String.fromInt g.y), SA.textAnchor "middle", SA.dominantBaseline "central"
+                    , SA.fontSize (String.fromFloat (clamp 7 22 (r * 1.2)))
+                    ]
+                    [ Svg.text (speciesEmoji g.speciesId) ]
+                ]
+    in
+    case ( model.showGhosts, model.plan ) of
+        ( True, Just plan ) ->
+            plan.placements |> List.filter onBed |> List.map ghost
+
+        _ ->
+            []
+
+
 planSpeciesName : Model -> String -> String
 planSpeciesName model sid =
     let short = speciesShortName sid in

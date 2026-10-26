@@ -22,6 +22,7 @@ use crate::domain::species::{CalendarWindow, Species};
 use crate::journal::{
     self, Action, ActionFilter, ActionInput, Parcel, ParcelInput, ACTION_KINDS,
 };
+use crate::placement;
 use crate::planner;
 use crate::problems::{self, EntryInput, Problem, ProblemInput, ProblemUpdate};
 use crate::domain::vigieau::{self, Restriction};
@@ -714,6 +715,8 @@ pub struct PlanResponse {
     pub year: i32,
     #[serde(flatten)]
     pub plan: planner::Plan,
+    /// Positions des plants (tirage de Poisson), pour l'aperçu sur le terrain.
+    pub placements: Vec<placement::Placement>,
 }
 
 /// Plan de saison optimisé sur les planches dessinées (MILP HiGHS).
@@ -756,7 +759,10 @@ async fn get_plan(
             })
             .collect();
         let params = planner::PlanParams { year, max_species_share: share, time_limit_s: 20.0, wishes };
-        planner::plan(&beds, &crops, &history, &params)
+        let plan = planner::plan(&beds, &crops, &history, &params)?;
+        let shapes: Vec<(i64, &Polygon)> = parcels.iter().filter_map(|p| Some((p.id, p.shape.as_ref()?))).collect();
+        let placements = placement::place(&plan.items, &shapes, &species, year as u64);
+        Ok((plan, placements))
     })
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("tâche plan : {e}")))?
@@ -764,7 +770,8 @@ async fn get_plan(
         planner::PlanError::NoBeds => (StatusCode::UNPROCESSABLE_ENTITY, e.to_string()),
         planner::PlanError::Solver(_) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     })?;
-    Ok(Json(PlanResponse { year, plan }))
+    let (plan, placements) = plan;
+    Ok(Json(PlanResponse { year, plan, placements }))
 }
 
 /// Décalage de printemps en jours entre climat cible et référence.
