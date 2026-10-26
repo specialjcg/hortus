@@ -97,6 +97,8 @@ type alias Model =
     , hoverPlant : Maybe Int -- action id
     , movingPlant : Maybe Int -- id action en cours de déplacement (click-move)
     , drawingBed : Maybe (List ( Int, Int )) -- sommets posés de la planche en cours de dessin
+    , drawingZone : Bool -- le contour dessiné est une zone à remplir de planches
+    , proposedBeds : List (List ( Int, Int )) -- planches proposées, pas encore créées
     , bedName : String
     , plan : Maybe SeasonPlan
     , planLoading : Bool
@@ -412,6 +414,8 @@ init flags =
       , hoverPlant = Nothing
       , movingPlant = Nothing
       , drawingBed = Nothing
+      , drawingZone = False
+      , proposedBeds = []
       , bedName = ""
       , plan = Nothing
       , planLoading = False
@@ -521,6 +525,11 @@ type Msg
     | StartDrawBed
     | AddBedPoint Int Int
     | CancelDrawBed
+    | StartDrawZone
+    | ProposeBeds
+    | GotProposedBeds (Result String (List (List ( Int, Int ))))
+    | CreateProposedBeds
+    | CancelProposedBeds
     | UndoBedPoint
     | SetBedName String
     | SaveBed
@@ -677,10 +686,45 @@ update msg model =
             ( { model | paletteSpecies = Nothing }, Cmd.none )
 
         StartDrawBed ->
-            ( { model | drawingBed = Just [], bedName = "", paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
+            ( { model | drawingBed = Just [], drawingZone = False, proposedBeds = [], bedName = "", paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
 
         CancelDrawBed ->
-            ( { model | drawingBed = Nothing }, Cmd.none )
+            ( { model | drawingBed = Nothing, drawingZone = False }, Cmd.none )
+
+        StartDrawZone ->
+            ( { model | drawingBed = Just [], drawingZone = True, proposedBeds = [], paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
+
+        ProposeBeds ->
+            case model.drawingBed of
+                Just pts ->
+                    ( { model | drawingBed = Nothing, drawingZone = False, error = Nothing }
+                    , proposeBeds model.backendUrl pts
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        GotProposedBeds (Ok []) ->
+            ( { model | error = Just "Aucune planche ne tient dans cette zone (trop petite ou déjà occupée)." }, Cmd.none )
+
+        GotProposedBeds (Ok beds) ->
+            ( { model | proposedBeds = beds }, Cmd.none )
+
+        GotProposedBeds (Err e) ->
+            ( { model | error = Just e }, Cmd.none )
+
+        CreateProposedBeds ->
+            let
+                existing =
+                    List.length (List.filter (\pc -> pc.shape /= Nothing) model.parcels)
+            in
+            ( { model | proposedBeds = [] }
+            , Cmd.batch
+                (List.indexedMap (\i pts -> createBed model.backendUrl ("Planche " ++ String.fromInt (existing + i + 1)) pts) model.proposedBeds)
+            )
+
+        CancelProposedBeds ->
+            ( { model | proposedBeds = [] }, Cmd.none )
 
         UndoBedPoint ->
             ( { model | drawingBed = Maybe.map (List.reverse >> List.drop 1 >> List.reverse) model.drawingBed }, Cmd.none )
@@ -1807,6 +1851,24 @@ createParcel url form =
         }
 
 
+proposeBeds : String -> List ( Int, Int ) -> Cmd Msg
+proposeBeds url zone =
+    Http.request
+        { method = "POST"
+        , headers = []
+        , url = url ++ "/parcels/propose"
+        , body = Http.jsonBody (Encode.object [ ( "zone", encodePoints zone ) ])
+        , expect = expectJsonOrMessage GotProposedBeds (D.list pointsDecoder)
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+encodePoints : List ( Int, Int ) -> Encode.Value
+encodePoints =
+    Encode.list (\( x, y ) -> Encode.list Encode.int [ x, y ])
+
+
 createBed : String -> String -> List ( Int, Int ) -> Cmd Msg
 createBed url name pts =
     Http.post
@@ -1815,7 +1877,7 @@ createBed url name pts =
             Http.jsonBody
                 (Encode.object
                     [ ( "name", Encode.string name )
-                    , ( "shape", Encode.list (\( x, y ) -> Encode.list Encode.int [ x, y ]) pts )
+                    , ( "shape", encodePoints pts )
                     ]
                 )
         , expect = Http.expectJson GotParcelSaved parcelDecoder
@@ -5116,6 +5178,7 @@ viewTerrain model =
                 ++ dragGhost model Terrain
                 ++ placementOverlay model
                 ++ bedDraftOverlay model.drawingBed
+                ++ List.map proposedBedOverlay model.proposedBeds
             )
         , viewBedToolbar model
         ]
@@ -5467,6 +5530,33 @@ bedDraftOverlay drawing =
             []
 
 
+proposedBedOverlay : List ( Int, Int ) -> Svg.Svg Msg
+proposedBedOverlay pts =
+    Svg.polygon
+        [ SA.points (pointsAttr pts)
+        , SA.fill "#4a9b3c"
+        , SA.fillOpacity "0.25"
+        , SA.stroke "#1f4a19"
+        , SA.strokeWidth "2"
+        , SA.strokeDasharray "8 5"
+        , SA.pointerEvents "none"
+        ]
+        []
+
+
+-- Surface en m² (formule du lacet, 1 px = 1 cm).
+polygonAreaM2 : List ( Int, Int ) -> Float
+polygonAreaM2 pts =
+    let
+        closed =
+            List.drop 1 pts ++ List.take 1 pts
+
+        twice =
+            List.map2 (\( x1, y1 ) ( x2, y2 ) -> x1 * y2 - x2 * y1) pts closed |> List.sum
+    in
+    toFloat (abs twice) / 2 / 10000
+
+
 viewBedToolbar : Model -> Html Msg
 viewBedToolbar model =
     let
@@ -5478,8 +5568,17 @@ viewBedToolbar model =
                 ]
     in
     div [ A.class "bed-toolbar" ]
-        (case model.drawingBed of
-            Just pts ->
+        (case ( model.drawingBed, model.proposedBeds ) of
+            ( Just pts, _ ) ->
+                if model.drawingZone then
+                    [ span [] [ text "Trace le contour de la zone cultivable :" ]
+                    , button [ E.onClick ProposeBeds, A.disabled (List.length pts < 3) ]
+                        [ text ("⬚ Proposer (" ++ String.fromInt (List.length pts) ++ " sommets)") ]
+                    , button [ E.onClick UndoBedPoint, A.disabled (List.isEmpty pts) ] [ text "↶ Sommet" ]
+                    , button [ E.onClick CancelDrawBed ] [ text "✖ Annuler" ]
+                    ]
+
+                else
                 [ input [ A.placeholder "Nom de la planche", A.value model.bedName, E.onInput SetBedName ] []
                 , button [ E.onClick SaveBed, A.disabled (List.length pts < 3 || String.trim model.bedName == "") ]
                     [ text ("✔ Enregistrer (" ++ String.fromInt (List.length pts) ++ " sommets)") ]
@@ -5487,8 +5586,22 @@ viewBedToolbar model =
                 , button [ E.onClick CancelDrawBed ] [ text "✖ Annuler" ]
                 ]
 
-            Nothing ->
-                button [ E.onClick StartDrawBed ] [ text "✏ Dessiner une planche" ] :: List.map chip beds
+            ( Nothing, (_ :: _) as proposed ) ->
+                [ span []
+                    [ text
+                        (String.fromInt (List.length proposed) ++ " planches proposées · "
+                            ++ String.fromFloat (round1 (List.sum (List.map polygonAreaM2 proposed)))
+                            ++ " m² cultivables"
+                        )
+                    ]
+                , button [ E.onClick CreateProposedBeds ] [ text "✔ Créer ces planches" ]
+                , button [ E.onClick CancelProposedBeds ] [ text "✖ Annuler" ]
+                ]
+
+            ( Nothing, [] ) ->
+                button [ E.onClick StartDrawBed ] [ text "✏ Dessiner une planche" ]
+                    :: button [ E.onClick StartDrawZone, A.title "Trace la zone cultivable, Hortus la remplit de planches de 1,2 m séparées d'allées de 40 cm" ] [ text "⬚ Proposer des planches" ]
+                    :: List.map chip beds
         )
 
 

@@ -17,6 +17,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::db::{self, Db};
 use crate::domain::geo::{ClimateProfile, Location};
+use crate::domain::geometry::{self, Polygon};
 use crate::domain::species::{CalendarWindow, Species};
 use crate::journal::{
     self, Action, ActionFilter, ActionInput, Parcel, ParcelInput, ACTION_KINDS,
@@ -161,6 +162,7 @@ pub fn router() -> Router {
         .route("/historical-year", get(historical_year))
         .route("/action-kinds", get(list_action_kinds))
         .route("/parcels", get(get_parcels).post(create_parcel))
+        .route("/parcels/propose", post(propose_beds))
         .route("/parcels/{id}", put(put_parcel).delete(del_parcel))
         .route("/actions", get(get_actions).post(create_action).delete(del_all_actions))
         .route("/actions/bulk", post(create_actions_bulk))
@@ -359,6 +361,32 @@ async fn create_parcel(
     journal::insert_parcel(&s.db, &input)
         .map(|p| (StatusCode::CREATED, Json(p)))
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProposeInput {
+    /// Zone cultivable dessinée (validée à la désérialisation).
+    pub zone: Polygon,
+    pub bed_cm: Option<i64>,
+    pub path_cm: Option<i64>,
+}
+
+/// Propose des planches en bandes dans la zone, sans les enregistrer.
+async fn propose_beds(
+    State(s): State<AppState>,
+    Json(input): Json<ProposeInput>,
+) -> Result<Json<Vec<Polygon>>, (StatusCode, String)> {
+    let bed_cm = input.bed_cm.unwrap_or(120);
+    let path_cm = input.path_cm.unwrap_or(40);
+    if !(60..=300).contains(&bed_cm) || !(20..=150).contains(&path_cm) {
+        return Err((StatusCode::BAD_REQUEST, "largeur 60..=300 cm, allée 20..=150 cm".into()));
+    }
+    let taken: Vec<Polygon> = journal::list_parcels(&s.db)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?
+        .into_iter()
+        .filter_map(|p| p.shape)
+        .collect();
+    Ok(Json(geometry::strip_beds(&input.zone, &taken, bed_cm, path_cm)))
 }
 
 async fn put_parcel(
