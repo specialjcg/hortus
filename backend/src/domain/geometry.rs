@@ -147,6 +147,7 @@ pub fn strip_beds(zone: &Polygon, taken: &[Polygon], bed_cm: i64, path_cm: i64) 
             .collect();
         // Une ligne (1 cm) est cultivable si toute la largeur de la bande l'est.
         let row_ok = |y: i64| xs.iter().all(|&x| usable(x, y as f64 + 0.5));
+        let found = beds.len();
         let mut y = y_min;
         while y < y_max {
             if !row_ok(y) {
@@ -163,7 +164,9 @@ pub fn strip_beds(zone: &Polygon, taken: &[Polygon], bed_cm: i64, path_cm: i64) 
                 }
             }
         }
-        x0 = x1 + path_cm;
+        // Bande vide (bord de zone dans une allée voisine…) : elle glisse
+        // au lieu de perdre toute sa largeur.
+        x0 = if beds.len() > found { x1 + path_cm } else { x0 + SAMPLE_STEP_CM };
     }
     beds
 }
@@ -323,6 +326,17 @@ mod tests {
         let taken = poly(&[[0, 200], [120, 200], [120, 300], [0, 300]]).unwrap();
         let boxes: Vec<_> = strip_beds(&zone, &[taken], 120, 40).iter().map(Polygon::bbox).collect();
         assert_eq!(boxes, vec![(0, 0, 120, 160), (0, 340, 120, 500)]);
+    }
+
+    #[test]
+    fn zone_touching_path_of_neighbour_shifts_first_strip() {
+        // Zone tracée 2 cm dans l'allée de la planche voisine : la première
+        // bande glisse au lieu d'être perdue, deux planches tiennent.
+        let zone = poly(&[[478, 0], [792, 0], [792, 540], [478, 540]]).unwrap();
+        let taken = poly(&[[320, 0], [440, 0], [440, 540], [320, 540]]).unwrap();
+        let boxes: Vec<_> = strip_beds(&zone, &[taken], 120, 40).iter().map(Polygon::bbox).collect();
+        assert_eq!(boxes.len(), 2, "{boxes:?}");
+        assert!(boxes.iter().all(|&(x0, _, x1, _)| x0 >= 480 && x1 - x0 == 120), "{boxes:?}");
     }
 
     #[test]
