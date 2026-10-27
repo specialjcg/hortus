@@ -110,6 +110,7 @@ type alias Model =
     , wishM2 : String
     , excludes : List String -- espèces exclues, contrainte dure du plan
     , showGhosts : Bool -- plants du plan en fantômes sur le terrain
+    , planApply : PlanApply
     , dragging : Maybe DragState
     , plantMenu : Maybe Int -- id du plant avec menu ouvert
     , deathPicker : Bool -- sélecteur de cause « plant mort » ouvert
@@ -284,6 +285,14 @@ type alias Placement =
     }
 
 
+-- Écriture du plan dans le carnet : confirmation puis une seule fois par plan.
+type PlanApply
+    = ApplyIdle
+    | ApplyConfirm
+    | ApplySaving
+    | ApplyDone Int
+
+
 type alias SeasonPlan =
     { year : Int
     , items : List PlanItem
@@ -440,6 +449,7 @@ init flags =
       , wishM2 = "1"
       , excludes = []
       , showGhosts = True
+      , planApply = ApplyIdle
       , dragging = Nothing
       , plantMenu = Nothing
       , deathPicker = False
@@ -555,6 +565,10 @@ type Msg
     | RemoveWish String
     | AddExclude String
     | ToggleGhosts
+    | AskApplyPlan
+    | CancelApplyPlan
+    | ApplyPlan
+    | GotPlanApplied Int (Result Http.Error ())
     | RemoveExclude String
     | ComputePlan
     | GotPlan (Result String SeasonPlan)
@@ -1291,6 +1305,36 @@ update msg model =
         ToggleGhosts ->
             ( { model | showGhosts = not model.showGhosts }, Cmd.none )
 
+        AskApplyPlan ->
+            ( { model | planApply = ApplyConfirm }, Cmd.none )
+
+        CancelApplyPlan ->
+            ( { model | planApply = ApplyIdle }, Cmd.none )
+
+        ApplyPlan ->
+            case model.plan of
+                Just plan ->
+                    let
+                        forms =
+                            planActions model.today plan
+                    in
+                    ( { model | planApply = ApplySaving }
+                    , Http.post
+                        { url = model.backendUrl ++ "/actions/bulk"
+                        , body = Http.jsonBody (Encode.list encodeAction forms)
+                        , expect = Http.expectWhatever (GotPlanApplied (List.length forms))
+                        }
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        GotPlanApplied n (Ok ()) ->
+            ( { model | planApply = ApplyDone n, showGhosts = False }, fetchActions model.backendUrl )
+
+        GotPlanApplied _ (Err e) ->
+            ( { model | planApply = ApplyConfirm, error = Just (httpErr e) }, Cmd.none )
+
         RemoveExclude sid ->
             ( { model | excludes = List.filter ((/=) sid) model.excludes }, Cmd.none )
 
@@ -1300,7 +1344,7 @@ update msg model =
             )
 
         GotPlan (Ok plan) ->
-            ( { model | plan = Just plan, planLoading = False }, Cmd.none )
+            ( { model | plan = Just plan, planLoading = False, planApply = ApplyIdle, showGhosts = True }, Cmd.none )
 
         GotPlan (Err e) ->
             ( { model | planError = Just e, planLoading = False }, Cmd.none )
@@ -5310,6 +5354,65 @@ viewPlanPanel model =
         ]
 
 
+-- Semis/repiquages à venir du plan, un par plant placé, datés en début de semaine.
+planActions : String -> SeasonPlan -> List ActionForm
+planActions today plan =
+    let
+        mk pl =
+            { date = addDaysToIso (String.fromInt plan.year ++ "-01-01") ((pl.week - 1) * 7)
+            , parcelId = String.fromInt pl.bedId
+            , speciesId = pl.speciesId
+            , kind = if isTransplant pl then "repiquage" else "semis_direct"
+            , quantity = ""
+            , notes = "plan " ++ String.fromInt plan.year
+            , gridX = String.fromInt pl.x
+            , gridY = String.fromInt pl.y
+            }
+
+        isTransplant pl =
+            List.any
+                (\it -> it.bedId == pl.bedId && it.speciesId == pl.speciesId && it.week == pl.week && it.mode == "transplant")
+                plan.items
+    in
+    plan.placements
+        |> List.map mk
+        |> List.filter (\f -> f.date > today)
+
+
+viewPlanApply : Model -> SeasonPlan -> Html Msg
+viewPlanApply model plan =
+    let
+        forms =
+            planActions model.today plan
+
+        count kind =
+            List.length (List.filter (\f -> f.kind == kind) forms)
+    in
+    div [ A.class "bed-toolbar" ]
+        (case model.planApply of
+            ApplyIdle ->
+                [ button [ E.onClick AskApplyPlan, A.disabled (List.isEmpty forms) ] [ text "📓 Appliquer au carnet" ] ]
+
+            ApplyConfirm ->
+                [ span []
+                    [ text
+                        ("Créer " ++ String.fromInt (List.length forms) ++ " actions datées ("
+                            ++ String.fromInt (count "semis_direct") ++ " semis, "
+                            ++ String.fromInt (count "repiquage") ++ " repiquages) ?"
+                        )
+                    ]
+                , button [ E.onClick ApplyPlan ] [ text "✔ Confirmer" ]
+                , button [ E.onClick CancelApplyPlan ] [ text "✖ Annuler" ]
+                ]
+
+            ApplySaving ->
+                [ span [] [ text "⏳ Écriture dans le carnet…" ] ]
+
+            ApplyDone n ->
+                [ span [] [ text ("✅ " ++ String.fromInt n ++ " actions ajoutées au carnet (note « plan " ++ String.fromInt plan.year ++ " »).") ] ]
+        )
+
+
 viewPlanResult : Model -> List Parcel -> SeasonPlan -> Html Msg
 viewPlanResult model beds plan =
     let
@@ -5330,7 +5433,7 @@ viewPlanResult model beds plan =
     div []
         (summary
             :: List.map unmet plan.unmetWishes
-            ++ [ viewPlanGantt model beds plan ]
+            ++ [ viewPlanApply model plan, viewPlanGantt model beds plan ]
         )
 
 
