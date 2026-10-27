@@ -144,6 +144,10 @@ pub struct Species {
     /// Prix indicatif bio au détail (€/kg) : pondère le planificateur.
     #[serde(default)]
     pub price_eur_kg: Option<f32>,
+    /// Consommation moyenne d'un adulte en France (kg/an, ordre de grandeur) :
+    /// plafonne la production quand le plan vise un foyer.
+    #[serde(default)]
+    pub need_kg_person_year: Option<f32>,
 }
 
 impl Species {

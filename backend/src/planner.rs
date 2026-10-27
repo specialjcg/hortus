@@ -38,6 +38,8 @@ const HERB_MAX_SHARE: f64 = 0.05;
 const MIN_PATCH_M2: f64 = 0.1;
 /// Écart relatif accepté à l'optimum : 1 % suffit pour un potager.
 const MIP_GAP: f32 = 0.01;
+/// Production tolérée au-delà du besoin du foyer (pertes, dons, conserves).
+const NEED_MARGIN: f64 = 1.1;
 
 pub struct Bed {
     pub id: i64,
@@ -67,6 +69,8 @@ pub struct PlanParams {
     pub time_limit_s: f64,
     /// Envies : (espèce, m² minimum semés dans l'année). Contrainte souple.
     pub wishes: Vec<(String, f64)>,
+    /// Taille du foyer : plafonne chaque espèce à ce qu'il consomme.
+    pub persons: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -96,6 +100,14 @@ pub struct UnmetWish {
     pub missing_m2: f64,
 }
 
+/// Besoin annuel du foyer pour une espèce et production prévue.
+#[derive(Debug, Serialize)]
+pub struct NeedCover {
+    pub species_id: String,
+    pub need_kg: f64,
+    pub planned_kg: f64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct Plan {
     pub items: Vec<PlanItem>,
@@ -107,6 +119,10 @@ pub struct Plan {
     pub cover_ratio: f64,
     /// false = limite de temps atteinte, solution non prouvée à 1 % de l'optimum.
     pub optimal: bool,
+    /// Besoins du foyer (vide sans `persons`), espèces du plan possibles.
+    pub needs: Vec<NeedCover>,
+    /// Part des besoins couverts (excédents non comptés) ; `None` sans foyer.
+    pub need_cover_ratio: Option<f64>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -190,8 +206,18 @@ fn crop_options(crop: &Crop) -> Vec<CropOption> {
         .collect()
 }
 
+fn kg_per_m2(sp: &Species, o: &CropOption) -> f64 {
+    sp.yield_kg_m2.unwrap_or(0.0) as f64 * o.yield_factor
+}
+
 fn eur_per_m2(sp: &Species, o: &CropOption) -> f64 {
-    (sp.yield_kg_m2.unwrap_or(0.0) * sp.price_eur_kg.unwrap_or(DEFAULT_PRICE)) as f64 * o.yield_factor
+    kg_per_m2(sp, o) * sp.price_eur_kg.unwrap_or(DEFAULT_PRICE) as f64
+}
+
+/// Besoin annuel du foyer (kg), si l'espèce en a un et produit quelque chose.
+fn need_kg(sp: &Species, persons: Option<u32>) -> Option<f64> {
+    let need = sp.need_kg_person_year.filter(|_| sp.yield_kg_m2.unwrap_or(0.0) > 0.0)?;
+    Some(persons? as f64 * need as f64)
 }
 
 fn occupies(o: &CropOption, t: usize) -> bool {
@@ -312,6 +338,15 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
         };
         let wished = wish_slacks.iter().filter(|(c, _, _)| *c == ci).map(|(_, m2, _)| *m2).fold(0.0, f64::max);
         model = model.with(constraint!(sown(ci) <= (share * total_area).max(wished)));
+        // Foyer : pas plus que ce qu'il mange (une envie l'emporte).
+        if let Some(cap) = need_kg(crop.species, params.persons).filter(|_| wished == 0.0) {
+            let kg: Expression = a
+                .iter()
+                .filter(|((_, c, _), _)| *c == ci)
+                .map(|((_, _, k), v)| kg_per_m2(crop.species, &options[ci][*k]) * *v)
+                .sum();
+            model = model.with(constraint!(kg <= NEED_MARGIN * cap));
+        }
     }
     for (ci, m2, slack) in &wish_slacks {
         model = model.with(constraint!(sown(*ci) + *slack >= *m2));
@@ -379,6 +414,17 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
         .map(|(ci, missing)| UnmetWish { species_id: crops[*ci].species.id.clone(), missing_m2: (missing * 10.0).round() / 10.0 })
         .collect();
     let covered: f64 = items.iter().map(|i| i.area_m2 * i.weeks_on_bed as f64).sum();
+    let needs: Vec<NeedCover> = crops
+        .iter()
+        .filter_map(|c| {
+            let need = need_kg(c.species, params.persons)?;
+            let planned = items.iter().filter(|i| i.species_id == c.species.id).map(|i| i.expected_kg).sum::<f64>();
+            Some(NeedCover { species_id: c.species.id.clone(), need_kg: need, planned_kg: (planned * 10.0).round() / 10.0 })
+        })
+        .collect();
+    let need_total: f64 = needs.iter().map(|n| n.need_kg).sum();
+    let need_cover_ratio = (need_total > 0.0)
+        .then(|| needs.iter().map(|n| n.planned_kg.min(n.need_kg)).sum::<f64>() / need_total);
     Ok(Plan {
         items,
         total_kg: (total_kg * 10.0).round() / 10.0,
@@ -386,6 +432,8 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
         unmet_wishes,
         cover_ratio: (covered / (total_area * WEEKS as f64)).min(1.0),
         optimal,
+        needs,
+        need_cover_ratio,
     })
 }
 
@@ -478,7 +526,7 @@ mod tests {
     }
 
     fn params() -> PlanParams {
-        PlanParams { year: 2027, max_species_share: 1.0, time_limit_s: 10.0, wishes: vec![] }
+        PlanParams { year: 2027, max_species_share: 1.0, time_limit_s: 10.0, wishes: vec![], persons: None }
     }
 
     /// Occupation hebdomadaire reconstruite depuis le plan.
@@ -652,5 +700,41 @@ mod tests {
         let plan = plan(&[bed(1, 10.0)], &crops, &[], &params()).unwrap();
         let sown: f64 = plan.items.iter().map(|i| i.area_m2).sum();
         assert!(sown <= 0.5 + 1e-6, "sown {sown}");
+    }
+
+    #[test]
+    fn household_need_caps_production() {
+        // 2 personnes × 10 kg de tomates : au plus 22 kg, la laitue prend le reste.
+        let t = sp("tomate", "Solanaceae", 60, Some(5.0), json!({"price_eur_kg": 5.0, "need_kg_person_year": 10.0}));
+        let l = sp("laitue", "Asteraceae", 60, Some(3.0), json!({"price_eur_kg": 2.0, "need_kg_person_year": 50.0}));
+        let s = [t, l];
+        let crops = vec![crop(&s[0], (100, 110)), crop(&s[1], (100, 110))];
+        let p = PlanParams { persons: Some(2), ..params() };
+        let plan = plan(&[bed(1, 10.0)], &crops, &[], &p).unwrap();
+        let tomato: f64 = plan.items.iter().filter(|i| i.species_id == "tomate").map(|i| i.expected_kg).sum();
+        assert!(tomato <= 22.0 + 0.5, "{tomato} kg");
+        assert!(plan.items.iter().any(|i| i.species_id == "laitue"));
+        assert_eq!(plan.needs.len(), 2);
+        let ratio = plan.need_cover_ratio.expect("foyer donné");
+        assert!(ratio > 0.0 && ratio <= 1.0, "{ratio}");
+    }
+
+    #[test]
+    fn wish_overrides_household_cap() {
+        let t = sp("tomate", "Solanaceae", 60, Some(5.0), json!({"need_kg_person_year": 1.0}));
+        let s = [t];
+        let crops = vec![crop(&s[0], (100, 110))];
+        let p = PlanParams { persons: Some(1), wishes: vec![("tomate".into(), 2.0)], ..params() };
+        let plan = plan(&[bed(1, 4.0)], &crops, &[], &p).unwrap();
+        assert!(plan.unmet_wishes.is_empty(), "{:?}", plan.unmet_wishes);
+    }
+
+    #[test]
+    fn no_household_no_needs() {
+        let t = sp("tomate", "Solanaceae", 60, Some(5.0), json!({"need_kg_person_year": 10.0}));
+        let s = [t];
+        let plan = plan(&[bed(1, 2.0)], &[crop(&s[0], (100, 110))], &[], &params()).unwrap();
+        assert!(plan.needs.is_empty());
+        assert!(plan.need_cover_ratio.is_none());
     }
 }

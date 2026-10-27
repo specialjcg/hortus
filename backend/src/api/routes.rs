@@ -675,6 +675,8 @@ pub struct PlanQuery {
     pub wish: Option<String>,
     /// Espèces exclues « beet,leek » : jamais proposées par le plan.
     pub exclude: Option<String>,
+    /// Taille du foyer (1..=12) : plafonne chaque espèce à sa consommation.
+    pub persons: Option<u32>,
 }
 
 /// Parse `tomato:2,basil:0.5` → [(id, m²)], ids vérifiés dans le catalogue.
@@ -729,6 +731,10 @@ async fn get_plan(
     if !(0.05..=1.0).contains(&share) {
         return Err((StatusCode::BAD_REQUEST, "share hors de 0.05..=1".into()));
     }
+    let persons = q.persons;
+    if persons.is_some_and(|n| !(1..=12).contains(&n)) {
+        return Err((StatusCode::BAD_REQUEST, "persons hors de 1..=12".into()));
+    }
     let wishes = parse_wishes(q.wish.as_deref().unwrap_or(""), &s.species)
         .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
     let excludes = parse_excludes(q.exclude.as_deref().unwrap_or(""), &s.species)
@@ -758,7 +764,7 @@ async fn get_plan(
                 harvest: shift_window(sp.harvest, shift),
             })
             .collect();
-        let params = planner::PlanParams { year, max_species_share: share, time_limit_s: 20.0, wishes };
+        let params = planner::PlanParams { year, max_species_share: share, time_limit_s: 20.0, wishes, persons };
         let plan = planner::plan(&beds, &crops, &history, &params)?;
         let shapes: Vec<(i64, &Polygon)> = parcels.iter().filter_map(|p| Some((p.id, p.shape.as_ref()?))).collect();
         let placements = placement::place(&plan.items, &shapes, &species, year as u64);
