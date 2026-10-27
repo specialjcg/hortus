@@ -109,6 +109,9 @@ type alias Model =
     , wishSpecies : String
     , wishM2 : String
     , excludes : List String -- espèces exclues, contrainte dure du plan
+    , persons : Maybe Int -- taille du foyer : plafonne chaque espèce à sa consommation
+    , idealFlow : Bool -- zone dessinée pour le « jardin idéal » (planches puis plan)
+    , idealPending : Maybe Int -- planches du jardin idéal encore en cours de création
     , showGhosts : Bool -- plants du plan en fantômes sur le terrain
     , planApply : PlanApply
     , dragging : Maybe DragState
@@ -302,6 +305,15 @@ type alias SeasonPlan =
     , coverRatio : Float
     , optimal : Bool
     , placements : List Placement -- plants du plan positionnés (tirage de Poisson)
+    , needs : List NeedCover -- besoins du foyer (vide sans foyer)
+    , needCoverRatio : Maybe Float
+    }
+
+
+type alias NeedCover =
+    { speciesId : String
+    , needKg : Float
+    , plannedKg : Float
     }
 
 
@@ -448,6 +460,9 @@ init flags =
       , wishSpecies = ""
       , wishM2 = "1"
       , excludes = []
+      , persons = Just 2
+      , idealFlow = False
+      , idealPending = Nothing
       , showGhosts = True
       , planApply = ApplyIdle
       , dragging = Nothing
@@ -550,6 +565,8 @@ type Msg
     | AddBedPoint Int Int
     | CancelDrawBed
     | StartDrawZone
+    | StartIdealGarden
+    | SetPersons String
     | ProposeBeds
     | GotProposedBeds (Result String (List (List ( Int, Int ))))
     | CreateProposedBeds
@@ -718,10 +735,16 @@ update msg model =
             ( { model | drawingBed = Just [], drawingZone = False, proposedBeds = [], bedName = "", paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
 
         CancelDrawBed ->
-            ( { model | drawingBed = Nothing, drawingZone = False }, Cmd.none )
+            ( { model | drawingBed = Nothing, drawingZone = False, idealFlow = False }, Cmd.none )
 
         StartDrawZone ->
-            ( { model | drawingBed = Just [], drawingZone = True, proposedBeds = [], paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
+            ( { model | drawingBed = Just [], drawingZone = True, idealFlow = False, proposedBeds = [], paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
+
+        StartIdealGarden ->
+            ( { model | drawingBed = Just [], drawingZone = True, idealFlow = True, proposedBeds = [], paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
+
+        SetPersons s ->
+            ( { model | persons = String.toInt s }, Cmd.none )
 
         ProposeBeds ->
             case model.drawingBed of
@@ -734,26 +757,30 @@ update msg model =
                     ( model, Cmd.none )
 
         GotProposedBeds (Ok []) ->
-            ( { model | error = Just "Aucune planche ne tient dans cette zone (trop petite ou déjà occupée)." }, Cmd.none )
+            ( { model | idealFlow = False, error = Just "Aucune planche ne tient dans cette zone (trop petite ou déjà occupée)." }, Cmd.none )
 
         GotProposedBeds (Ok beds) ->
             ( { model | proposedBeds = beds }, Cmd.none )
 
         GotProposedBeds (Err e) ->
-            ( { model | error = Just e }, Cmd.none )
+            ( { model | idealFlow = False, error = Just e }, Cmd.none )
 
         CreateProposedBeds ->
             let
                 existing =
                     List.length (List.filter (\pc -> pc.shape /= Nothing) model.parcels)
             in
-            ( { model | proposedBeds = [] }
+            ( { model
+                | proposedBeds = []
+                , idealFlow = False
+                , idealPending = if model.idealFlow then Just (List.length model.proposedBeds) else Nothing
+              }
             , Cmd.batch
                 (List.indexedMap (\i pts -> createBed model.backendUrl ("Planche " ++ String.fromInt (existing + i + 1)) pts) model.proposedBeds)
             )
 
         CancelProposedBeds ->
-            ( { model | proposedBeds = [] }, Cmd.none )
+            ( { model | proposedBeds = [], idealFlow = False }, Cmd.none )
 
         UndoBedPoint ->
             ( { model | drawingBed = Maybe.map (List.reverse >> List.drop 1 >> List.reverse) model.drawingBed }, Cmd.none )
@@ -1340,7 +1367,7 @@ update msg model =
 
         ComputePlan ->
             ( { model | planLoading = True, planError = Nothing }
-            , fetchPlan model.backendUrl model.selectedCity model.planYear model.planShare model.wishes model.excludes
+            , fetchPlan model.backendUrl model.selectedCity model.planYear model.planShare model.wishes model.excludes model.persons
             )
 
         GotPlan (Ok plan) ->
@@ -1383,10 +1410,25 @@ update msg model =
         GotActionKinds (Err _) -> ( model, Cmd.none )
 
         GotParcelSaved (Ok _) ->
-            ( { model | parcelForm = emptyParcelForm, editingParcel = Nothing }
-            , fetchParcels model.backendUrl
-            )
-        GotParcelSaved (Err e) -> ( { model | error = Just (httpErr e) }, Cmd.none )
+            let
+                saved =
+                    { model | parcelForm = emptyParcelForm, editingParcel = Nothing }
+            in
+            case model.idealPending of
+                -- Dernière planche du jardin idéal créée : le plan peut tourner.
+                Just 1 ->
+                    let
+                        ( planned, planCmd ) =
+                            update ComputePlan { saved | idealPending = Nothing }
+                    in
+                    ( planned, Cmd.batch [ fetchParcels model.backendUrl, planCmd ] )
+
+                Just n ->
+                    ( { saved | idealPending = Just (n - 1) }, fetchParcels model.backendUrl )
+
+                Nothing ->
+                    ( saved, fetchParcels model.backendUrl )
+        GotParcelSaved (Err e) -> ( { model | idealPending = Nothing, error = Just (httpErr e) }, Cmd.none )
 
         GotActionSaved (Ok _) ->
             ( { model | actionForm = emptyActionForm model.actionForm.date, editingAction = Nothing }
@@ -1566,9 +1608,12 @@ fetchCalendar url slug refresh =
         }
 
 
-fetchPlan : String -> String -> Int -> Float -> List ( String, Float ) -> List String -> Cmd Msg
-fetchPlan url city year share wishes excludes =
+fetchPlan : String -> String -> Int -> Float -> List ( String, Float ) -> List String -> Maybe Int -> Cmd Msg
+fetchPlan url city year share wishes excludes persons =
     let
+        personsParam =
+            Maybe.map (\n -> "&persons=" ++ String.fromInt n) persons |> Maybe.withDefault ""
+
         wishParam =
             if List.isEmpty wishes then
                 ""
@@ -1586,7 +1631,7 @@ fetchPlan url city year share wishes excludes =
     Http.request
         { method = "GET"
         , headers = []
-        , url = url ++ "/plan?city=" ++ city ++ "&year=" ++ String.fromInt year ++ "&share=" ++ String.fromFloat share ++ wishParam ++ excludeParam
+        , url = url ++ "/plan?city=" ++ city ++ "&year=" ++ String.fromInt year ++ "&share=" ++ String.fromFloat share ++ wishParam ++ excludeParam ++ personsParam
         , body = Http.emptyBody
         , expect = expectJsonOrMessage GotPlan seasonPlanDecoder
         , timeout = Just 60000 -- le solveur peut prendre ~20 s
@@ -1653,6 +1698,17 @@ seasonPlanDecoder =
                     )
                 )
             )
+        |> andMap
+            (D.field "needs"
+                (D.list
+                    (D.map3 NeedCover
+                        (D.field "species_id" D.string)
+                        (D.field "need_kg" D.float)
+                        (D.field "planned_kg" D.float)
+                    )
+                )
+            )
+        |> andMap (D.field "need_cover_ratio" (D.nullable D.float))
 
 
 fetchParcels : String -> Cmd Msg
@@ -5307,6 +5363,10 @@ viewPlanPanel model =
                 [ select [ E.onInput SetPlanYear ] (List.map yearOpt [ thisYear, thisYear + 1 ])
                 , select [ E.onInput SetPlanShare, A.title "Part maximale d'une espèce dans la surface totale" ]
                     (List.map shareOpt [ ( 0.15, "max 15 % / espèce" ), ( 0.25, "max 25 % / espèce" ), ( 0.4, "max 40 % / espèce" ), ( 1, "sans limite" ) ])
+                , select [ E.onInput SetPersons, A.title "Taille du foyer : chaque légume plafonné à ce que le foyer mange" ]
+                    (option [ A.value "", A.selected (model.persons == Nothing) ] [ text "👥 sans foyer (valeur max)" ]
+                        :: List.map (\n -> option [ A.value (String.fromInt n), A.selected (model.persons == Just n) ] [ text ("👥 " ++ String.fromInt n ++ (if n == 1 then " personne" else " personnes")) ]) (List.range 1 8)
+                    )
                 , button [ E.onClick ComputePlan, A.disabled (model.planLoading || List.isEmpty beds) ]
                     [ text (if model.planLoading then "⏳ Calcul… (jusqu'à 20 s)" else "🧮 Calculer le plan") ]
                 , if model.plan /= Nothing then
@@ -5343,7 +5403,13 @@ viewPlanPanel model =
                         p [ A.class "muted" ] [ text "Dessine d'abord une planche sur le terrain : le plan répartit les cultures par planche." ]
 
                     else
-                        p [ A.class "muted" ] [ text "Ajoute tes envies (facultatif) puis calcule : le plan maximise la valeur récoltée (€) en respectant rotations, associations et couverture du sol." ]
+                        p [ A.class "muted" ]
+                            [ text
+                                ("Ajoute tes envies (facultatif) puis calcule : le plan maximise la valeur récoltée (€)"
+                                    ++ (if model.persons /= Nothing then ", sans dépasser ce que le foyer mange," else "")
+                                    ++ " en respectant rotations, associations et couverture du sol."
+                                )
+                            ]
     in
     div [ A.class "panel plan-panel" ]
         [ h2 [] [ text "🗓 Plan de saison" ]
@@ -5432,9 +5498,41 @@ viewPlanResult model beds plan =
     in
     div []
         (summary
-            :: List.map unmet plan.unmetWishes
+            :: viewNeeds model plan
+            ++ List.map unmet plan.unmetWishes
             ++ [ viewPlanApply model plan, viewPlanGantt model beds plan ]
         )
+
+
+-- Couverture des besoins du foyer ; les plus gros manques d'abord.
+viewNeeds : Model -> SeasonPlan -> List (Html Msg)
+viewNeeds model plan =
+    case plan.needCoverRatio of
+        Nothing ->
+            []
+
+        Just ratio ->
+            let
+                missing =
+                    plan.needs
+                        |> List.map (\n -> ( n.speciesId, n.needKg - n.plannedKg ))
+                        |> List.filter (\( _, kg ) -> kg >= 1)
+                        |> List.sortBy (\( _, kg ) -> -kg)
+                        |> List.take 6
+
+                gap ( sid, kg ) =
+                    speciesEmoji sid ++ " " ++ planSpeciesName model sid ++ " " ++ String.fromInt (round kg) ++ " kg"
+            in
+            [ p []
+                [ text ("👥 Besoins du foyer couverts à " ++ String.fromInt (round (ratio * 100)) ++ " %")
+                , Html.progress [ A.value (String.fromFloat ratio), A.max "1", A.style "margin-left" "0.5em", A.style "vertical-align" "middle" ] []
+                ]
+            , if List.isEmpty missing then
+                text ""
+
+              else
+                p [ A.class "muted" ] [ text ("Manque surtout : " ++ String.join " · " (List.map gap missing)) ]
+            ]
 
 
 -- Barre fusionnée : les semis d'une même espèce étalés sur des semaines voisines.
@@ -5774,13 +5872,15 @@ viewBedToolbar model =
                             ++ " m² cultivables"
                         )
                     ]
-                , button [ E.onClick CreateProposedBeds ] [ text "✔ Créer ces planches" ]
+                , button [ E.onClick CreateProposedBeds ]
+                    [ text (if model.idealFlow then "✔ Créer et planifier" else "✔ Créer ces planches") ]
                 , button [ E.onClick CancelProposedBeds ] [ text "✖ Annuler" ]
                 ]
 
             ( Nothing, [] ) ->
                 button [ E.onClick StartDrawBed ] [ text "✏ Dessiner une planche" ]
                     :: button [ E.onClick StartDrawZone, A.title "Trace la zone cultivable, Hortus la remplit de planches de 1,2 m séparées d'allées de 40 cm" ] [ text "⬚ Proposer des planches" ]
+                    :: button [ E.onClick StartIdealGarden, A.title "Trace la zone : Hortus crée les planches puis choisit les légumes pour nourrir ton foyer" ] [ text "✨ Jardin idéal" ]
                     :: List.map chip beds
         )
 
