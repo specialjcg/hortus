@@ -5488,7 +5488,7 @@ viewPlanResult model beds plan =
                     ("≈ " ++ String.fromFloat (round1 plan.totalKg) ++ " kg · "
                         ++ String.fromInt (round plan.totalEur) ++ " € · sol couvert "
                         ++ String.fromInt (round (plan.coverRatio * 100)) ++ " % de l'année · "
-                        ++ (if plan.optimal then "optimal" else "solution approchée (temps limite atteint)")
+                        ++ (if plan.optimal then "à 5 % près de l'optimum" else "solution approchée (temps limite atteint)")
                     )
                 ]
 

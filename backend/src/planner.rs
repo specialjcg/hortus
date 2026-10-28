@@ -36,8 +36,9 @@ const DEFAULT_PRICE: f32 = 3.0;
 const HERB_MAX_SHARE: f64 = 0.05;
 /// Parcelles plus petites ignorées à la lecture du plan (bruit du solveur).
 const MIN_PATCH_M2: f64 = 0.1;
-/// Écart relatif accepté à l'optimum : 1 % suffit pour un potager.
-const MIP_GAP: f32 = 0.01;
+/// Écart relatif accepté à l'optimum : sous ~4 %, HiGHS piétine à prouver
+/// une solution déjà trouvée (borne qui stagne) ; 5 % suffit pour un potager.
+const MIP_GAP: f32 = 0.05;
 /// Production tolérée au-delà du besoin du foyer (pertes, dons, conserves).
 const NEED_MARGIN: f64 = 1.1;
 
@@ -117,7 +118,7 @@ pub struct Plan {
     pub unmet_wishes: Vec<UnmetWish>,
     /// Part des m²·semaines couverts sur l'année.
     pub cover_ratio: f64,
-    /// false = limite de temps atteinte, solution non prouvée à 1 % de l'optimum.
+    /// false = limite de temps atteinte, solution non prouvée à MIP_GAP de l'optimum.
     pub optimal: bool,
     /// Besoins du foyer (vide sans `persons`), espèces du plan possibles.
     pub needs: Vec<NeedCover>,
