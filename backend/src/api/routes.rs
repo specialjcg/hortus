@@ -35,6 +35,7 @@ pub struct AppState {
     pub db: Db,
     /// Cache VigiEau par ville : (instant du fetch, restrictions).
     pub water_cache: Arc<Mutex<HashMap<String, (Instant, Vec<Restriction>)>>>,
+    pub plan_job: Arc<Mutex<Option<PlanJob>>>,
 }
 
 /// Durée de vie du cache VigiEau (les arrêtés changent au plus quelques fois par semaine).
@@ -150,6 +151,7 @@ pub fn router() -> Router {
         species: Arc::new(species),
         db,
         water_cache: Arc::new(Mutex::new(HashMap::new())),
+        plan_job: Arc::new(Mutex::new(None)),
     };
 
     Router::new()
@@ -172,6 +174,8 @@ pub fn router() -> Router {
         .route("/actions/{id}/photo", post(upload_action_photo))
         .route("/photos/{name}", get(serve_photo))
         .route("/plan", get(get_plan))
+        .route("/plan/jobs", post(start_plan_job))
+        .route("/plan/jobs/{id}", get(get_plan_job))
         .route("/problems", get(get_problems).post(create_problem))
         .route("/problems/{id}", put(put_problem).delete(del_problem))
         .route("/problems/{id}/entries", post(create_problem_entry))
@@ -732,11 +736,22 @@ pub struct PlanResponse {
     pub placements: Vec<placement::Placement>,
 }
 
-/// Plan de saison optimisé sur les planches dessinées (MILP HiGHS).
-async fn get_plan(
-    State(s): State<AppState>,
-    Query(q): Query<PlanQuery>,
-) -> Result<Json<PlanResponse>, (StatusCode, String)> {
+/// Entrées validées d'un calcul de plan, prêtes à partir sur un thread bloquant.
+struct PlanInput {
+    year: i32,
+    share: f64,
+    wishes: Vec<(String, f64)>,
+    excludes: Vec<String>,
+    persons: Option<u32>,
+    shift: i16,
+    parcels: Vec<Parcel>,
+    actions: Vec<Action>,
+    species: Arc<Vec<Species>>,
+}
+
+type HttpError = (StatusCode, String);
+
+fn plan_input(s: &AppState, q: &PlanQuery) -> Result<PlanInput, HttpError> {
     let year = q.year.unwrap_or_else(|| chrono::Local::now().year() + 1);
     let share = q.share.unwrap_or(0.25);
     if !(0.05..=1.0).contains(&share) {
@@ -758,37 +773,113 @@ async fn get_plan(
     let parcels = journal::list_parcels(&s.db).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
     let actions = journal::list_actions(&s.db, &ActionFilter::default())
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
-    let species = s.species.clone();
+    Ok(PlanInput { year, share, wishes, excludes, persons, shift, parcels, actions, species: s.species.clone() })
+}
 
-    // MILP : calcul bloquant, hors du runtime async.
-    let plan = tokio::task::spawn_blocking(move || {
-        let beds = planner::beds_from_parcels(&parcels, &actions, &species);
-        let history = planner::history_from_actions(&parcels, &actions, &species);
-        let crops: Vec<planner::Crop> = species
-            .iter()
-            .filter(|sp| !sp.is_perennial() && (sp.yield_kg_m2.is_some() || sp.green_manure))
-            .filter(|sp| !excludes.contains(&sp.id))
-            .map(|sp| planner::Crop {
-                species: sp,
-                direct: sp.direct_sow.map(|w| shift_window(w, shift)),
-                transplant: sp.transplant.map(|w| shift_window(w, shift)),
-                harvest: shift_window(sp.harvest, shift),
-            })
-            .collect();
-        let params = planner::PlanParams { year, max_species_share: share, time_limit_s: 20.0, wishes, persons };
-        let plan = planner::plan(&beds, &crops, &history, &params)?;
-        let shapes: Vec<(i64, &Polygon)> = parcels.iter().filter_map(|p| Some((p.id, p.shape.as_ref()?))).collect();
-        let placements = placement::place(&plan.items, &shapes, &species, year as u64);
-        Ok((plan, placements))
-    })
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("tâche plan : {e}")))?
-    .map_err(|e| match e {
+/// MILP + placement des plants : calcul bloquant, à lancer hors du runtime async.
+fn compute_plan(input: PlanInput, time_limit_s: f64) -> Result<PlanResponse, HttpError> {
+    let PlanInput { year, share, wishes, excludes, persons, shift, parcels, actions, species } = input;
+    let beds = planner::beds_from_parcels(&parcels, &actions, &species);
+    let history = planner::history_from_actions(&parcels, &actions, &species);
+    let crops: Vec<planner::Crop> = species
+        .iter()
+        .filter(|sp| !sp.is_perennial() && (sp.yield_kg_m2.is_some() || sp.green_manure))
+        .filter(|sp| !excludes.contains(&sp.id))
+        .map(|sp| planner::Crop {
+            species: sp,
+            direct: sp.direct_sow.map(|w| shift_window(w, shift)),
+            transplant: sp.transplant.map(|w| shift_window(w, shift)),
+            harvest: shift_window(sp.harvest, shift),
+        })
+        .collect();
+    let params = planner::PlanParams { year, max_species_share: share, time_limit_s, wishes, persons };
+    let plan = planner::plan(&beds, &crops, &history, &params).map_err(|e| match e {
         planner::PlanError::NoBeds => (StatusCode::UNPROCESSABLE_ENTITY, e.to_string()),
         planner::PlanError::Solver(_) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     })?;
-    let (plan, placements) = plan;
-    Ok(Json(PlanResponse { year, plan, placements }))
+    let shapes: Vec<(i64, &Polygon)> = parcels.iter().filter_map(|p| Some((p.id, p.shape.as_ref()?))).collect();
+    let placements = placement::place(&plan.items, &shapes, &species, year as u64);
+    Ok(PlanResponse { year, plan, placements })
+}
+
+/// Plan de saison optimisé sur les planches dessinées (MILP HiGHS), en synchrone.
+async fn get_plan(
+    State(s): State<AppState>,
+    Query(q): Query<PlanQuery>,
+) -> Result<Json<PlanResponse>, HttpError> {
+    let input = plan_input(&s, &q)?;
+    tokio::task::spawn_blocking(move || compute_plan(input, 20.0))
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("tâche plan : {e}")))?
+        .map(Json)
+}
+
+/// Le calcul en tâche de fond échappe au délai du proxy : le solveur peut chercher plus longtemps.
+const PLAN_JOB_TIME_LIMIT_S: f64 = 60.0;
+
+/// Calcul de plan en tâche de fond. Un seul à la fois (le solveur occupe un cœur) ;
+/// le dernier résultat reste lisible jusqu'au calcul suivant.
+pub struct PlanJob {
+    id: u64,
+    /// Paramètres de la requête : relancer le même calcul rejoint celui en cours.
+    key: String,
+    started: Instant,
+    /// `None` tant que le calcul tourne ; sinon durée et plan (JSON) ou erreur.
+    outcome: Option<(Duration, Result<serde_json::Value, HttpError>)>,
+}
+
+/// Lance un calcul de plan ; le client interroge ensuite `GET /plan/jobs/{id}`.
+async fn start_plan_job(
+    State(s): State<AppState>,
+    Query(q): Query<PlanQuery>,
+) -> Result<(StatusCode, Json<serde_json::Value>), HttpError> {
+    let key = format!("{q:?}");
+    let input = plan_input(&s, &q)?;
+    let id = {
+        let mut slot = s.plan_job.lock().expect("plan_job mutex poisoned");
+        match slot.as_ref() {
+            Some(job) if job.outcome.is_none() && job.key == key => {
+                return Ok((StatusCode::ACCEPTED, Json(serde_json::json!({ "id": job.id }))));
+            }
+            Some(job) if job.outcome.is_none() => {
+                return Err((StatusCode::CONFLICT, "un calcul de plan est déjà en cours".into()));
+            }
+            _ => {}
+        }
+        let id = slot.as_ref().map_or(1, |job| job.id + 1);
+        *slot = Some(PlanJob { id, key, started: Instant::now(), outcome: None });
+        id
+    };
+    let jobs = s.plan_job.clone();
+    tokio::spawn(async move {
+        let started = Instant::now();
+        let result = tokio::task::spawn_blocking(move || compute_plan(input, PLAN_JOB_TIME_LIMIT_S))
+            .await
+            .unwrap_or_else(|e| Err((StatusCode::INTERNAL_SERVER_ERROR, format!("tâche plan : {e}"))))
+            .and_then(|r| serde_json::to_value(r).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())));
+        let mut slot = jobs.lock().expect("plan_job mutex poisoned");
+        if let Some(job) = slot.as_mut().filter(|job| job.id == id) {
+            job.outcome = Some((started.elapsed(), result));
+        }
+    });
+    Ok((StatusCode::ACCEPTED, Json(serde_json::json!({ "id": id }))))
+}
+
+/// État d'un calcul : `running` (+ secondes écoulées), `done` (+ plan) ou `error`.
+async fn get_plan_job(
+    State(s): State<AppState>,
+    Path(id): Path<u64>,
+) -> Result<Json<serde_json::Value>, HttpError> {
+    let slot = s.plan_job.lock().expect("plan_job mutex poisoned");
+    let job = slot
+        .as_ref()
+        .filter(|job| job.id == id)
+        .ok_or((StatusCode::NOT_FOUND, "calcul inconnu (remplacé ou serveur redémarré)".into()))?;
+    Ok(Json(match &job.outcome {
+        None => serde_json::json!({ "status": "running", "elapsed_s": job.started.elapsed().as_secs_f64() }),
+        Some((took, Ok(plan))) => serde_json::json!({ "status": "done", "elapsed_s": took.as_secs_f64(), "result": plan }),
+        Some((took, Err((_, msg)))) => serde_json::json!({ "status": "error", "elapsed_s": took.as_secs_f64(), "message": msg }),
+    }))
 }
 
 /// Décalage de printemps en jours entre climat cible et référence.

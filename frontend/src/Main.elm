@@ -18,9 +18,11 @@ import Html.Events as E
 import Http
 import Json.Decode as D exposing (Decoder)
 import Json.Encode as Encode
+import Process
 import Svg
 import Svg.Attributes as SA
 import Svg.Events as SE
+import Task
 
 
 main : Program Flags Model Msg
@@ -102,6 +104,7 @@ type alias Model =
     , bedName : String
     , plan : Maybe SeasonPlan
     , planLoading : Bool
+    , planElapsed : Maybe Float -- secondes de calcul (en cours, puis durée finale)
     , planError : Maybe String
     , planYear : Int
     , planShare : Float -- part max d'une espèce dans la surface totale
@@ -454,6 +457,7 @@ init flags =
       , bedName = ""
       , plan = Nothing
       , planLoading = False
+      , planElapsed = Nothing
       , planError = Nothing
       , planYear = (String.left 4 flags.today |> String.toInt |> Maybe.withDefault 2026) + 1
       , planShare = 0.25
@@ -591,6 +595,9 @@ type Msg
     | RemoveExclude String
     | ComputePlan
     | GotPlan (Result String SeasonPlan)
+    | GotPlanJob (Result String Int)
+    | PollPlan Int
+    | GotPlanStatus Int (Result String PlanStatus)
     | HoverPlant (Maybe Int)
     | DeletePlant Int
     | PlaceInShelter Int Int
@@ -1386,7 +1393,7 @@ update msg model =
             ( { model | excludes = List.filter ((/=) sid) model.excludes }, Cmd.none )
 
         ComputePlan ->
-            ( { model | planLoading = True, planError = Nothing }
+            ( { model | planLoading = True, planError = Nothing, planElapsed = Nothing }
             , fetchPlan model.backendUrl model.selectedCity model.planYear model.planShare model.wishes model.excludes model.persons
             )
 
@@ -1395,6 +1402,27 @@ update msg model =
 
         GotPlan (Err e) ->
             ( { model | planError = Just e, planLoading = False }, Cmd.none )
+
+        GotPlanJob (Ok id) ->
+            ( model, pollPlanLater id )
+
+        GotPlanJob (Err e) ->
+            update (GotPlan (Err e)) model
+
+        PollPlan id ->
+            ( model, fetchPlanStatus model.backendUrl id )
+
+        GotPlanStatus id (Ok (PlanRunning t)) ->
+            ( { model | planElapsed = Just t }, pollPlanLater id )
+
+        GotPlanStatus _ (Ok (PlanDone t plan)) ->
+            update (GotPlan (Ok plan)) { model | planElapsed = Just t }
+
+        GotPlanStatus _ (Ok (PlanFailed e)) ->
+            update (GotPlan (Err e)) model
+
+        GotPlanStatus _ (Err e) ->
+            update (GotPlan (Err e)) model
 
         HoverPlant mid ->
             ( { model | hoverPlant = mid }, Cmd.none )
@@ -1648,15 +1676,48 @@ fetchPlan url city year share wishes excludes persons =
             else
                 "&exclude=" ++ String.join "," excludes
     in
-    Http.request
-        { method = "GET"
-        , headers = []
-        , url = url ++ "/plan?city=" ++ city ++ "&year=" ++ String.fromInt year ++ "&share=" ++ String.fromFloat share ++ wishParam ++ excludeParam ++ personsParam
+    -- Calcul en tâche de fond : le solveur peut dépasser le délai du proxy (~30 s).
+    Http.post
+        { url = url ++ "/plan/jobs?city=" ++ city ++ "&year=" ++ String.fromInt year ++ "&share=" ++ String.fromFloat share ++ wishParam ++ excludeParam ++ personsParam
         , body = Http.emptyBody
-        , expect = expectJsonOrMessage GotPlan seasonPlanDecoder
-        , timeout = Just 60000 -- le solveur peut prendre ~20 s
-        , tracker = Nothing
+        , expect = expectJsonOrMessage GotPlanJob (D.field "id" D.int)
         }
+
+
+type PlanStatus
+    = PlanRunning Float
+    | PlanDone Float SeasonPlan
+    | PlanFailed String
+
+
+pollPlanLater : Int -> Cmd Msg
+pollPlanLater id =
+    Process.sleep 2000 |> Task.perform (\_ -> PollPlan id)
+
+
+fetchPlanStatus : String -> Int -> Cmd Msg
+fetchPlanStatus url id =
+    Http.get
+        { url = url ++ "/plan/jobs/" ++ String.fromInt id
+        , expect = expectJsonOrMessage (GotPlanStatus id) planStatusDecoder
+        }
+
+
+planStatusDecoder : Decoder PlanStatus
+planStatusDecoder =
+    D.field "status" D.string
+        |> D.andThen
+            (\status ->
+                case status of
+                    "running" ->
+                        D.map PlanRunning (D.field "elapsed_s" D.float)
+
+                    "done" ->
+                        D.map2 PlanDone (D.field "elapsed_s" D.float) (D.field "result" seasonPlanDecoder)
+
+                    _ ->
+                        D.map PlanFailed (D.field "message" D.string)
+            )
 
 
 -- Comme Http.expectJson, mais garde le corps des réponses 4xx (message lisible du backend).
@@ -1669,7 +1730,12 @@ expectJsonOrMessage toMsg decoder =
                     D.decodeString decoder body |> Result.mapError D.errorToString
 
                 Http.BadStatus_ meta body ->
-                    Err (if String.isEmpty body then "HTTP " ++ String.fromInt meta.statusCode else body)
+                    -- Page HTML d'un proxy (502/504…) : illisible telle quelle.
+                    if String.isEmpty body || String.startsWith "<" (String.trimLeft body) then
+                        Err ("Serveur indisponible (HTTP " ++ String.fromInt meta.statusCode ++ "), réessaie dans un instant.")
+
+                    else
+                        Err body
 
                 Http.BadUrl_ s ->
                     Err ("URL invalide : " ++ s)
@@ -5388,7 +5454,14 @@ viewPlanPanel model =
                         :: List.map (\n -> option [ A.value (String.fromInt n), A.selected (model.persons == Just n) ] [ text ("👥 " ++ String.fromInt n ++ (if n == 1 then " personne" else " personnes")) ]) (List.range 1 8)
                     )
                 , button [ E.onClick ComputePlan, A.disabled (model.planLoading || List.isEmpty beds) ]
-                    [ text (if model.planLoading then "⏳ Calcul… (jusqu'à 20 s)" else "🧮 Calculer le plan") ]
+                    [ text
+                        (if model.planLoading then
+                            "⏳ Calcul… " ++ (model.planElapsed |> Maybe.map (\t -> String.fromInt (round t) ++ " s") |> Maybe.withDefault "") ++ " (jusqu'à 1 min)"
+
+                         else
+                            "🧮 Calculer le plan"
+                        )
+                    ]
                 , if model.plan /= Nothing then
                     button [ E.onClick ToggleGhosts, A.title "Affiche les plants du plan sur le terrain, à la date du curseur" ]
                         [ text (if model.showGhosts then "👻 Masquer le plan" else "👻 Voir le plan sur le terrain") ]
@@ -5540,6 +5613,7 @@ viewPlanResult model beds plan =
                         ++ String.fromInt (round plan.totalEur) ++ " € · sol couvert "
                         ++ String.fromInt (round (plan.coverRatio * 100)) ++ " % de l'année · "
                         ++ (if plan.optimal then "à 5 % près de l'optimum" else "solution approchée (temps limite atteint)")
+                        ++ (model.planElapsed |> Maybe.map (\t -> " · calculé en " ++ String.fromInt (round t) ++ " s") |> Maybe.withDefault "")
                     )
                 ]
 
