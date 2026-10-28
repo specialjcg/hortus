@@ -437,6 +437,17 @@ pub fn delete_all_actions(db: &Db) -> Result<(), String> {
     Ok(())
 }
 
+/// Retire du carnet les semis/repiquages d'un plan appliqué (note « plan AAAA »)
+/// encore à venir (date > `today`) ; les actions passées restent, elles ont eu lieu.
+pub fn delete_plan_actions(db: &Db, year: i32, today: &str) -> Result<usize, String> {
+    let conn = db.lock().expect("DB mutex poisoned");
+    conn.execute(
+        "DELETE FROM action WHERE notes = ? AND kind IN ('semis_direct', 'repiquage') AND date > ?",
+        params![format!("plan {year}"), today],
+    )
+    .map_err(|e| format!("delete plan : {e}"))
+}
+
 /// Petit helper pour détecter si une parcelle existe.
 pub fn parcel_exists(db: &Db, id: i64) -> Result<bool, String> {
     let conn = db.lock().expect("DB mutex poisoned");
@@ -543,6 +554,21 @@ mod tests {
         assert_eq!(got.len(), 200);
         let abri_count = got.iter().filter(|a| a.kind == "semis_abri").count();
         assert_eq!(abri_count, 0, "limit=200 mange tous les semis_abri anciens — c'est attendu, le frontend doit utiliser un limit plus large");
+    }
+
+    #[test]
+    fn delete_plan_actions_keeps_past_and_foreign() {
+        let db = mk_db();
+        let plan = |date: &str, kind: &str, notes: &str| ActionInput { notes: Some(notes.into()), ..mk_action(date, kind, Some("carrot"), Some(0), Some(0)) };
+        insert_action(&db, &plan("2026-03-01", "semis_direct", "plan 2026")).unwrap();
+        insert_action(&db, &plan("2026-06-01", "semis_direct", "plan 2026")).unwrap();
+        insert_action(&db, &plan("2026-06-08", "repiquage", "plan 2026")).unwrap();
+        insert_action(&db, &plan("2026-06-08", "arrosage", "plan 2026")).unwrap();
+        insert_action(&db, &plan("2026-06-08", "semis_direct", "plan 2027")).unwrap();
+        insert_action(&db, &plan("2026-06-08", "semis_direct", "à la main")).unwrap();
+
+        assert_eq!(delete_plan_actions(&db, 2026, "2026-05-01").unwrap(), 2);
+        assert_eq!(list_actions(&db, &ActionFilter::default()).unwrap().len(), 4);
     }
 
     /// Le tri par date DESC doit être stable et placer les plus récentes en tête.

@@ -5,7 +5,7 @@ use axum::{
     extract::{DefaultBodyLimit, Path, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::IntoResponse,
-    routing::{get, post, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -167,6 +167,7 @@ pub fn router() -> Router {
         .route("/parcels/{id}", put(put_parcel).delete(del_parcel))
         .route("/actions", get(get_actions).post(create_action).delete(del_all_actions))
         .route("/actions/bulk", post(create_actions_bulk))
+        .route("/actions/plan/{year}", delete(del_plan_actions))
         .route("/actions/{id}", put(put_action).delete(del_action))
         .route("/actions/{id}/photo", post(upload_action_photo))
         .route("/photos/{name}", get(serve_photo))
@@ -539,6 +540,16 @@ async fn del_action(
 async fn del_all_actions(State(s): State<AppState>) -> Result<StatusCode, (StatusCode, String)> {
     journal::delete_all_actions(&s.db)
         .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+async fn del_plan_actions(
+    State(s): State<AppState>,
+    Path(year): Path<i32>,
+) -> Result<Json<usize>, (StatusCode, String)> {
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    journal::delete_plan_actions(&s.db, year, &today)
+        .map(Json)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 

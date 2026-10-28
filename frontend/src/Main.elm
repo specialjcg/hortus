@@ -294,6 +294,8 @@ type PlanApply
     | ApplyConfirm
     | ApplySaving
     | ApplyDone Int
+    | UndoConfirm
+    | UndoDone Int
 
 
 type alias SeasonPlan =
@@ -586,6 +588,9 @@ type Msg
     | CancelApplyPlan
     | ApplyPlan
     | GotPlanApplied Int (Result Http.Error ())
+    | AskUndoPlan
+    | UndoPlan Int
+    | GotPlanUndone (Result Http.Error Int)
     | RemoveExclude String
     | ComputePlan
     | GotPlan (Result String SeasonPlan)
@@ -1361,6 +1366,28 @@ update msg model =
 
         GotPlanApplied _ (Err e) ->
             ( { model | planApply = ApplyConfirm, error = Just (httpErr e) }, Cmd.none )
+
+        AskUndoPlan ->
+            ( { model | planApply = UndoConfirm }, Cmd.none )
+
+        UndoPlan year ->
+            ( { model | planApply = ApplySaving }
+            , Http.request
+                { method = "DELETE"
+                , headers = []
+                , url = model.backendUrl ++ "/actions/plan/" ++ String.fromInt year
+                , body = Http.emptyBody
+                , expect = Http.expectJson GotPlanUndone D.int
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+            )
+
+        GotPlanUndone (Ok n) ->
+            ( { model | planApply = UndoDone n }, fetchActions model.backendUrl )
+
+        GotPlanUndone (Err e) ->
+            ( { model | planApply = ApplyIdle, error = Just (httpErr e) }, Cmd.none )
 
         RemoveExclude sid ->
             ( { model | excludes = List.filter ((/=) sid) model.excludes }, Cmd.none )
@@ -5453,11 +5480,32 @@ viewPlanApply model plan =
 
         count kind =
             List.length (List.filter (\f -> f.kind == kind) forms)
+
+        planNote =
+            "plan " ++ String.fromInt plan.year
+
+        applied =
+            model.actions
+                |> List.filter
+                    (\a ->
+                        a.notes == Just planNote
+                            && List.member a.kind [ "semis_direct", "repiquage" ]
+                            && a.date > model.today
+                    )
+                |> List.length
+
+        undoButton =
+            if applied > 0 then
+                [ button [ E.onClick AskUndoPlan ] [ text ("🗑 Retirer le plan du carnet (" ++ String.fromInt applied ++ ")") ] ]
+
+            else
+                []
     in
     div [ A.class "bed-toolbar" ]
         (case model.planApply of
             ApplyIdle ->
-                [ button [ E.onClick AskApplyPlan, A.disabled (List.isEmpty forms) ] [ text "📓 Appliquer au carnet" ] ]
+                button [ E.onClick AskApplyPlan, A.disabled (List.isEmpty forms) ] [ text "📓 Appliquer au carnet" ]
+                    :: undoButton
 
             ApplyConfirm ->
                 [ span []
@@ -5475,7 +5523,17 @@ viewPlanApply model plan =
                 [ span [] [ text "⏳ Écriture dans le carnet…" ] ]
 
             ApplyDone n ->
-                [ span [] [ text ("✅ " ++ String.fromInt n ++ " actions ajoutées au carnet (note « plan " ++ String.fromInt plan.year ++ " »).") ] ]
+                span [] [ text ("✅ " ++ String.fromInt n ++ " actions ajoutées au carnet (note « " ++ planNote ++ " »).") ]
+                    :: undoButton
+
+            UndoConfirm ->
+                [ span [] [ text ("Retirer du carnet les " ++ String.fromInt applied ++ " semis/repiquages à venir notés « " ++ planNote ++ " » ? Les actions passées restent.") ]
+                , button [ E.onClick (UndoPlan plan.year) ] [ text "✔ Retirer" ]
+                , button [ E.onClick CancelApplyPlan ] [ text "✖ Garder" ]
+                ]
+
+            UndoDone n ->
+                [ span [] [ text ("🗑 " ++ String.fromInt n ++ " actions retirées du carnet.") ] ]
         )
 
 
