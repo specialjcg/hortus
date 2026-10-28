@@ -110,8 +110,7 @@ type alias Model =
     , wishM2 : String
     , excludes : List String -- espèces exclues, contrainte dure du plan
     , persons : Maybe Int -- taille du foyer : plafonne chaque espèce à sa consommation
-    , idealFlow : Bool -- zone dessinée pour le « jardin idéal » (planches puis plan)
-    , idealPending : Maybe Int -- planches du jardin idéal encore en cours de création
+    , idealPending : Maybe Int -- planches en cours de création avant de calculer le plan
     , showGhosts : Bool -- plants du plan en fantômes sur le terrain
     , planApply : PlanApply
     , dragging : Maybe DragState
@@ -463,7 +462,6 @@ init flags =
       , wishM2 = "1"
       , excludes = []
       , persons = Just 2
-      , idealFlow = False
       , idealPending = Nothing
       , showGhosts = True
       , planApply = ApplyIdle
@@ -567,11 +565,10 @@ type Msg
     | AddBedPoint Int Int
     | CancelDrawBed
     | StartDrawZone
-    | StartIdealGarden
     | SetPersons String
     | ProposeBeds
     | GotProposedBeds (Result String (List (List ( Int, Int ))))
-    | CreateProposedBeds
+    | CreateProposedBeds Bool
     | CancelProposedBeds
     | UndoBedPoint
     | SetBedName String
@@ -740,13 +737,10 @@ update msg model =
             ( { model | drawingBed = Just [], drawingZone = False, proposedBeds = [], bedName = "", paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
 
         CancelDrawBed ->
-            ( { model | drawingBed = Nothing, drawingZone = False, idealFlow = False }, Cmd.none )
+            ( { model | drawingBed = Nothing, drawingZone = False }, Cmd.none )
 
         StartDrawZone ->
-            ( { model | drawingBed = Just [], drawingZone = True, idealFlow = False, proposedBeds = [], paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
-
-        StartIdealGarden ->
-            ( { model | drawingBed = Just [], drawingZone = True, idealFlow = True, proposedBeds = [], paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
+            ( { model | drawingBed = Just [], drawingZone = True, proposedBeds = [], paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
 
         SetPersons s ->
             ( { model | persons = String.toInt s }, Cmd.none )
@@ -762,30 +756,29 @@ update msg model =
                     ( model, Cmd.none )
 
         GotProposedBeds (Ok []) ->
-            ( { model | idealFlow = False, error = Just "Aucune planche ne tient dans cette zone (trop petite ou déjà occupée)." }, Cmd.none )
+            ( { model | error = Just "Aucune planche ne tient dans cette zone (trop petite ou déjà occupée)." }, Cmd.none )
 
         GotProposedBeds (Ok beds) ->
             ( { model | proposedBeds = beds }, Cmd.none )
 
         GotProposedBeds (Err e) ->
-            ( { model | idealFlow = False, error = Just e }, Cmd.none )
+            ( { model | error = Just e }, Cmd.none )
 
-        CreateProposedBeds ->
+        CreateProposedBeds thenPlan ->
             let
                 existing =
                     List.length (List.filter (\pc -> pc.shape /= Nothing) model.parcels)
             in
             ( { model
                 | proposedBeds = []
-                , idealFlow = False
-                , idealPending = if model.idealFlow then Just (List.length model.proposedBeds) else Nothing
+                , idealPending = if thenPlan then Just (List.length model.proposedBeds) else Nothing
               }
             , Cmd.batch
                 (List.indexedMap (\i pts -> createBed model.backendUrl ("Planche " ++ String.fromInt (existing + i + 1)) pts) model.proposedBeds)
             )
 
         CancelProposedBeds ->
-            ( { model | proposedBeds = [], idealFlow = False }, Cmd.none )
+            ( { model | proposedBeds = [] }, Cmd.none )
 
         UndoBedPoint ->
             ( { model | drawingBed = Maybe.map (List.reverse >> List.drop 1 >> List.reverse) model.drawingBed }, Cmd.none )
@@ -1442,7 +1435,7 @@ update msg model =
                     { model | parcelForm = emptyParcelForm, editingParcel = Nothing }
             in
             case model.idealPending of
-                -- Dernière planche du jardin idéal créée : le plan peut tourner.
+                -- Dernière planche proposée créée : le plan peut tourner.
                 Just 1 ->
                     let
                         ( planned, planCmd ) =
@@ -5930,15 +5923,14 @@ viewBedToolbar model =
                             ++ " m² cultivables"
                         )
                     ]
-                , button [ E.onClick CreateProposedBeds ]
-                    [ text (if model.idealFlow then "✔ Créer et planifier" else "✔ Créer ces planches") ]
+                , button [ E.onClick (CreateProposedBeds False) ] [ text "✔ Créer" ]
+                , button [ E.onClick (CreateProposedBeds True), A.title "Crée les planches puis choisit les légumes pour nourrir ton foyer" ] [ text "✨ Créer et planifier" ]
                 , button [ E.onClick CancelProposedBeds ] [ text "✖ Annuler" ]
                 ]
 
             ( Nothing, [] ) ->
                 button [ E.onClick StartDrawBed ] [ text "✏ Dessiner une planche" ]
-                    :: button [ E.onClick StartDrawZone, A.title "Trace la zone cultivable, Hortus la remplit de planches de 1,2 m séparées d'allées de 40 cm" ] [ text "⬚ Proposer des planches" ]
-                    :: button [ E.onClick StartIdealGarden, A.title "Trace la zone : Hortus crée les planches puis choisit les légumes pour nourrir ton foyer" ] [ text "✨ Jardin idéal" ]
+                    :: button [ E.onClick StartDrawZone, A.title "Trace la zone cultivable, Hortus la remplit de planches de 1,2 m séparées d'allées de 40 cm, puis peut planifier les légumes du foyer" ] [ text "✨ Proposer des planches" ]
                     :: List.map chip beds
         )
 
