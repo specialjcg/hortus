@@ -4008,6 +4008,7 @@ frostSensitiveSpecies : List String
 frostSensitiveSpecies =
     [ "tomato", "tomato_cherry", "pepper", "eggplant", "zucchini"
     , "butternut_squash", "pumpkin", "cucumber", "melon", "basil"
+    , "red_kuri_squash", "spaghetti_squash", "gherkin"
     ]
 
 
@@ -6867,6 +6868,18 @@ speciesEmoji id =
         "artichoke" -> "🌻"
         "asparagus" -> "🌱"
         "rhubarb" -> "🌿"
+        "black_radish" -> "⚫"
+        "escarole" -> "🥬"
+        "sugarloaf_chicory" -> "🥬"
+        "kohlrabi" -> "🥦"
+        "chinese_cabbage" -> "🥬"
+        "celery" -> "🌿"
+        "fennel" -> "🌿"
+        "red_kuri_squash" -> "🎃"
+        "spaghetti_squash" -> "🎃"
+        "gherkin" -> "🥒"
+        "snow_pea" -> "🫛"
+        "white_onion" -> "🧅"
         _ -> "🌱"
 
 
@@ -6939,6 +6952,18 @@ speciesShortName id =
         "artichoke" -> "artich."
         "asparagus" -> "asperge"
         "rhubarb" -> "rhubarb."
+        "black_radish" -> "r. noir"
+        "escarole" -> "scarole"
+        "sugarloaf_chicory" -> "chicorée"
+        "kohlrabi" -> "ch.-rave"
+        "chinese_cabbage" -> "ch. chin."
+        "celery" -> "cél. br."
+        "fennel" -> "fenouil"
+        "red_kuri_squash" -> "potim."
+        "spaghetti_squash" -> "spaghet."
+        "gherkin" -> "cornich."
+        "snow_pea" -> "mange-t."
+        "white_onion" -> "oign. bl."
         _ -> id
 
 
