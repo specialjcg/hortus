@@ -46,6 +46,42 @@ struct Placed {
     len: usize,
 }
 
+/// Plant posé vu par la grille : x, y, espacement (cm).
+type Spot = (f64, f64, f64);
+
+/// Plants en terre en même temps que la culture à placer, rangés par cases
+/// de grille : un candidat n'est comparé qu'aux plants des 9 cases autour.
+struct Neighbours {
+    /// Côté d'une case (cm) ≥ plus grande distance minimale possible.
+    cell: f64,
+    cells: HashMap<(i64, i64), Vec<Spot>>,
+}
+
+impl Neighbours {
+    fn new(cell: f64) -> Self {
+        Neighbours { cell, cells: HashMap::new() }
+    }
+
+    fn key(&self, x: f64, y: f64) -> (i64, i64) {
+        ((x / self.cell).floor() as i64, (y / self.cell).floor() as i64)
+    }
+
+    fn add(&mut self, x: f64, y: f64, spacing: f64) {
+        let key = self.key(x, y);
+        self.cells.entry(key).or_default().push((x, y, spacing));
+    }
+
+    /// Aucun plant trop proche d'un plant d'espacement `spacing` posé en (x, y).
+    fn clear_of(&self, x: f64, y: f64, spacing: f64) -> bool {
+        let (cx, cy) = self.key(x, y);
+        (cx - 1..=cx + 1)
+            .flat_map(|i| (cy - 1..=cy + 1).map(move |j| (i, j)))
+            .filter_map(|k| self.cells.get(&k))
+            .flatten()
+            .all(|&(px, py, ps)| (px - x).hypot(py - y) >= MIN_DIST_FACTOR * (ps + spacing) / 2.0)
+    }
+}
+
 /// Intervalles de semaines (année cyclique, base 0) qui se chevauchent.
 fn overlaps(a_start: usize, a_len: usize, b_start: usize, b_len: usize) -> bool {
     (0..a_len).any(|k| ((a_start + k) % WEEKS + WEEKS - b_start) % WEEKS < b_len)
@@ -88,13 +124,19 @@ pub fn place(items: &[PlanItem], beds: &[(i64, &Polygon)], species: &[Species], 
                 start: (item.week as usize + WEEKS - 1) % WEEKS,
                 len: item.weeks_on_bed as usize,
             };
-            let fits = |x: f64, y: f64, placed: &[Placed]| {
+            // Seuls les plants en terre en même temps comptent ; les cases couvrent
+            // la plus grande distance minimale, d'où une recherche sur 3×3 cases.
+            let concurrent: Vec<&Placed> =
+                placed.iter().filter(|p| overlaps(p.start, p.len, new.start, new.len)).collect();
+            let widest = concurrent.iter().map(|p| p.spacing).fold(spacing, f64::max);
+            let mut neighbours = Neighbours::new(MIN_DIST_FACTOR * widest);
+            for p in concurrent {
+                neighbours.add(p.x, p.y, p.spacing);
+            }
+            let fits = |x: f64, y: f64, neighbours: &Neighbours| {
                 shape.contains(x, y)
                     && shape.edge_distance(x, y) >= (spacing / 4.0).min(MAX_EDGE_MARGIN_CM)
-                    && !placed.iter().any(|p| {
-                        let min_d = MIN_DIST_FACTOR * (p.spacing + spacing) / 2.0;
-                        (p.x - x).hypot(p.y - y) < min_d && overlaps(p.start, p.len, new.start, new.len)
-                    })
+                    && neighbours.clear_of(x, y, spacing)
             };
             let d = MIN_DIST_FACTOR * spacing;
             // Bridson : l'îlot grandit autour de ses plants « actifs » ; bloqué,
@@ -103,7 +145,7 @@ pub fn place(items: &[PlanItem], beds: &[(i64, &Polygon)], species: &[Species], 
             let mut count = 0;
             while count < n {
                 let next = match active.front() {
-                    None => match north_seed(shape, &mut rng, |x, y| fits(x, y, &placed)) {
+                    None => match north_seed(shape, &mut rng, |x, y| fits(x, y, &neighbours)) {
                         Some(pt) => Some(pt),
                         None => break, // planche pleine pour cette culture
                     },
@@ -111,7 +153,7 @@ pub fn place(items: &[PlanItem], beds: &[(i64, &Polygon)], species: &[Species], 
                         let found = (0..CANDIDATES).find_map(|_| {
                             let (angle, radius) = (rng.gen_range(0.0..TAU), rng.gen_range(d..2.0 * d));
                             let (x, y) = (ax + radius * angle.cos(), ay + radius * angle.sin());
-                            fits(x, y, &placed).then_some((x, y))
+                            fits(x, y, &neighbours).then_some((x, y))
                         });
                         if found.is_none() {
                             active.pop_front();
@@ -121,6 +163,7 @@ pub fn place(items: &[PlanItem], beds: &[(i64, &Polygon)], species: &[Species], 
                 };
                 if let Some((x, y)) = next {
                     active.push_back((x, y));
+                    neighbours.add(x, y, spacing);
                     placed.push(Placed { x, y, ..new });
                     out.push(Placement {
                         bed_id,
