@@ -311,6 +311,7 @@ type alias SeasonPlan =
     , placements : List Placement -- plants du plan positionnés (tirage de Poisson)
     , needs : List NeedCover -- besoins du foyer (vide sans foyer)
     , needCoverRatio : Maybe Float
+    , needMissingM2 : Maybe Float -- m² de culture à ajouter pour couvrir 100 %
     }
 
 
@@ -593,6 +594,7 @@ type Msg
     | UndoPlan Int
     | GotPlanUndone (Result Http.Error Int)
     | RemoveExclude String
+    | ExcludeAndReplan String
     | ComputePlan
     | GotPlan (Result String SeasonPlan)
     | GotPlanJob (Result String Int)
@@ -1392,6 +1394,9 @@ update msg model =
         RemoveExclude sid ->
             ( { model | excludes = List.filter ((/=) sid) model.excludes }, Cmd.none )
 
+        ExcludeAndReplan sid ->
+            update ComputePlan (Tuple.first (update (AddExclude sid) model))
+
         ComputePlan ->
             ( { model | planLoading = True, planError = Nothing, planElapsed = Nothing }
             , fetchPlan model.backendUrl model.selectedCity model.planYear model.planShare model.wishes model.excludes model.persons
@@ -1795,6 +1800,7 @@ seasonPlanDecoder =
                 )
             )
         |> andMap (D.field "need_cover_ratio" (D.nullable D.float))
+        |> andMap (D.field "need_missing_m2" (D.nullable D.float))
 
 
 fetchParcels : String -> Cmd Msg
@@ -5626,8 +5632,26 @@ viewPlanResult model beds plan =
         (summary
             :: viewNeeds model plan
             ++ List.map unmet plan.unmetWishes
-            ++ [ viewPlanApply model plan, viewPlanGantt model beds plan ]
+            ++ [ viewPlanExcluder model plan, viewPlanApply model plan, viewPlanGantt model beds plan ]
         )
+
+
+-- Une culture du plan déplaît : l'exclure et relancer le calcul.
+viewPlanExcluder : Model -> SeasonPlan -> Html Msg
+viewPlanExcluder model plan =
+    let
+        speciesIds =
+            List.foldr (\it acc -> if List.member it.speciesId acc then acc else it.speciesId :: acc) [] plan.items
+
+        chip sid =
+            button
+                [ E.onClick (ExcludeAndReplan sid)
+                , A.disabled model.planLoading
+                , A.title "Exclure cette espèce et recalculer le plan"
+                ]
+                [ text (speciesEmoji sid ++ " " ++ planSpeciesName model sid ++ " ✖") ]
+    in
+    p [ A.class "muted" ] (text "Retirer du plan et recalculer : " :: List.map chip speciesIds)
 
 
 -- Couverture des besoins du foyer ; les plus gros manques d'abord.
@@ -5658,6 +5682,17 @@ viewNeeds model plan =
 
               else
                 p [ A.class "muted" ] [ text ("Manque surtout : " ++ String.join " · " (List.map gap missing)) ]
+            , case plan.needMissingM2 of
+                Just m2 ->
+                    if m2 >= 1 then
+                        p [ A.class "muted" ]
+                            [ text ("📐 Pour 100 % : ~" ++ String.fromInt (round m2) ++ " m² de culture en plus (une culture par m², sans succession, allées non comptées)") ]
+
+                    else
+                        text ""
+
+                Nothing ->
+                    text ""
             ]
 
 

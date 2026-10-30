@@ -107,6 +107,8 @@ pub struct NeedCover {
     pub species_id: String,
     pub need_kg: f64,
     pub planned_kg: f64,
+    /// Surface cultivée qu'il faudrait en plus pour couvrir le besoin (une culture par m²).
+    pub missing_m2: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -124,6 +126,8 @@ pub struct Plan {
     pub needs: Vec<NeedCover>,
     /// Part des besoins couverts (excédents non comptés) ; `None` sans foyer.
     pub need_cover_ratio: Option<f64>,
+    /// Somme des `missing_m2` : planches à ajouter pour 100 % ; `None` sans foyer.
+    pub need_missing_m2: Option<f64>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -420,12 +424,19 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
         .filter_map(|c| {
             let need = need_kg(c.species, params.persons)?;
             let planned = items.iter().filter(|i| i.species_id == c.species.id).map(|i| i.expected_kg).sum::<f64>();
-            Some(NeedCover { species_id: c.species.id.clone(), need_kg: need, planned_kg: (planned * 10.0).round() / 10.0 })
+            let missing_m2 = (need - planned).max(0.0) / c.species.yield_kg_m2.unwrap_or(1.0) as f64;
+            Some(NeedCover {
+                species_id: c.species.id.clone(),
+                need_kg: need,
+                planned_kg: (planned * 10.0).round() / 10.0,
+                missing_m2: (missing_m2 * 10.0).round() / 10.0,
+            })
         })
         .collect();
     let need_total: f64 = needs.iter().map(|n| n.need_kg).sum();
     let need_cover_ratio = (need_total > 0.0)
         .then(|| needs.iter().map(|n| n.planned_kg.min(n.need_kg)).sum::<f64>() / need_total);
+    let need_missing_m2 = (need_total > 0.0).then(|| (needs.iter().map(|n| n.missing_m2).sum::<f64>()).round());
     Ok(Plan {
         items,
         total_kg: (total_kg * 10.0).round() / 10.0,
@@ -435,6 +446,7 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
         optimal,
         needs,
         need_cover_ratio,
+        need_missing_m2,
     })
 }
 
@@ -718,6 +730,11 @@ mod tests {
         assert_eq!(plan.needs.len(), 2);
         let ratio = plan.need_cover_ratio.expect("foyer donné");
         assert!(ratio > 0.0 && ratio <= 1.0, "{ratio}");
+        // 100 kg de laitue voulus sur 10 m² : il manque de la surface, à 3 kg/m².
+        let lettuce = plan.needs.iter().find(|n| n.species_id == "laitue").expect("besoin laitue");
+        let expected = (lettuce.need_kg - lettuce.planned_kg) / 3.0;
+        assert!((lettuce.missing_m2 - expected).abs() < 0.1, "{} vs {expected}", lettuce.missing_m2);
+        assert!(plan.need_missing_m2.expect("foyer donné") >= lettuce.missing_m2.floor());
     }
 
     #[test]
@@ -737,5 +754,6 @@ mod tests {
         let plan = plan(&[bed(1, 2.0)], &[crop(&s[0], (100, 110))], &[], &params()).unwrap();
         assert!(plan.needs.is_empty());
         assert!(plan.need_cover_ratio.is_none());
+        assert!(plan.need_missing_m2.is_none());
     }
 }
