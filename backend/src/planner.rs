@@ -28,9 +28,6 @@ const W_COVER: f64 = 0.04;
 const W_FRIEND: f64 = 1.2;
 /// Bonus d'étagement : une strate haute et une strate rase sur une planche (€).
 const W_STRATA: f64 = 1.2;
-/// Bonus par kg qui couvre un besoin du foyer (€) : nourrir passe avant la valeur
-/// marchande, sans écraser les envies.
-const W_NEED: f64 = 10.0;
 /// Pénalité par m² d'envie non satisfaite : domine toute valeur de récolte.
 const W_WISH: f64 = 1000.0;
 /// Prix par défaut quand l'espèce n'en a pas (€/kg).
@@ -301,15 +298,6 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
     for (_, _, slack) in &wish_slacks {
         objective -= W_WISH * *slack;
     }
-    // Foyer : chaque kg qui couvre un besoin vaut W_NEED de plus (au-delà, le prix seul).
-    let need_covers: Vec<(usize, Variable)> = crops
-        .iter()
-        .enumerate()
-        .filter_map(|(ci, c)| Some((ci, vars.add(variable().min(0.0).max(need_kg(c.species, params.persons)?)))))
-        .collect();
-    for (_, covered) in &need_covers {
-        objective += W_NEED * *covered;
-    }
     for (z, _, _) in &friend_pairs {
         objective += W_FRIEND * *z;
     }
@@ -367,14 +355,6 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
     }
     for (ci, m2, slack) in &wish_slacks {
         model = model.with(constraint!(sown(*ci) + *slack >= *m2));
-    }
-    for (ci, covered) in &need_covers {
-        let kg: Expression = a
-            .iter()
-            .filter(|((_, c, _), _)| c == ci)
-            .map(|((_, _, k), v)| kg_per_m2(crops[*ci].species, &options[*ci][*k]) * *v)
-            .sum();
-        model = model.with(constraint!(*covered <= kg));
     }
     for bi in 0..beds.len() {
         // Rotation dans l'année : une seule espèce par famille à délai de retour.
@@ -755,21 +735,6 @@ mod tests {
         let expected = (lettuce.need_kg - lettuce.planned_kg) / 3.0;
         assert!((lettuce.missing_m2 - expected).abs() < 0.1, "{} vs {expected}", lettuce.missing_m2);
         assert!(plan.need_missing_m2.expect("foyer donné") >= lettuce.missing_m2.floor());
-    }
-
-    #[test]
-    fn household_need_beats_pricier_crop() {
-        // Carotte bon marché à nourrir (2 × 10 kg) contre une culture chère sans besoin
-        // déclaré : le foyer passe d'abord.
-        let c = sp("carotte", "Apiaceae", 60, Some(3.0), json!({"price_eur_kg": 1.0, "need_kg_person_year": 10.0}));
-        let f = sp("fleur", "Asteraceae", 60, Some(3.0), json!({"price_eur_kg": 8.0}));
-        let s = [c, f];
-        let crops = vec![crop(&s[0], (100, 110)), crop(&s[1], (100, 110))];
-        let p = PlanParams { persons: Some(2), ..params() };
-        let plan = plan(&[bed(1, 10.0)], &crops, &[], &p).unwrap();
-        let carrot: f64 = plan.items.iter().filter(|i| i.species_id == "carotte").map(|i| i.expected_kg).sum();
-        assert!(carrot >= 20.0 - 0.5, "{carrot} kg");
-        assert!(plan.need_cover_ratio.expect("foyer donné") > 0.95);
     }
 
     #[test]
