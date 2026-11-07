@@ -5,7 +5,7 @@
 //! occupe la planche jusqu'en avril. Plusieurs espèces partagent une planche
 //! (plants mélangés) tant que l'occupation hebdomadaire ≤ surface.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use good_lp::{
     constraint, highs, variable, Expression, ProblemVariables, ResolutionError, Solution,
@@ -24,8 +24,6 @@ const TRANSPLANT_HEAD_START_DAYS: u16 = 21;
 const SINGLE_HARVEST_DAYS: u16 = 14;
 /// Objectif en € de récolte. Bonus « sol couvert » par m²·semaine.
 const W_COVER: f64 = 0.04;
-/// Bonus par paire de compagnes sur une même planche (€).
-const W_FRIEND: f64 = 1.2;
 /// Bonus d'étagement : une strate haute et une strate rase sur une planche (€).
 const W_STRATA: f64 = 1.2;
 /// Pénalité par m² d'envie non satisfaite : domine toute valeur de récolte.
@@ -41,6 +39,10 @@ const MIN_PATCH_M2: f64 = 0.1;
 const MIP_GAP: f32 = 0.05;
 /// Production tolérée au-delà du besoin du foyer (pertes, dons, conserves).
 const NEED_MARGIN: f64 = 1.1;
+/// Une semaine de semis candidate sur N dans chaque fenêtre (plus la dernière).
+/// Les semaines voisines rapportent presque autant ; moins d'options = MILP
+/// résolu à MIP_GAP en ~8 s au lieu de dépasser 60 s.
+const SOW_WEEK_STEP: usize = 4;
 
 pub struct Bed {
     pub id: i64,
@@ -211,6 +213,13 @@ fn crop_options(crop: &Crop) -> Vec<CropOption> {
         .collect()
 }
 
+/// Options élaguées : une semaine sur `SOW_WEEK_STEP`, bornes de fenêtre gardées.
+fn sparse_options(crop: &Crop) -> Vec<CropOption> {
+    let all = crop_options(crop);
+    let last = all.len().saturating_sub(1);
+    all.into_iter().enumerate().filter(|(k, _)| k % SOW_WEEK_STEP == 0 || *k == last).map(|(_, o)| o).collect()
+}
+
 fn kg_per_m2(sp: &Species, o: &CropOption) -> f64 {
     sp.yield_kg_m2.unwrap_or(0.0) as f64 * o.yield_factor
 }
@@ -234,7 +243,7 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
         return Err(PlanError::NoBeds);
     }
     let total_area: f64 = beds.iter().map(|b| b.area_m2).sum();
-    let options: Vec<Vec<CropOption>> = crops.iter().map(crop_options).collect();
+    let options: Vec<Vec<CropOption>> = crops.iter().map(sparse_options).collect();
 
     let blocked: HashSet<(i64, Family)> = history
         .iter()
@@ -244,7 +253,8 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
 
     let mut vars = ProblemVariables::new();
     // y[(b, c)] : la culture c apparaît sur la planche b dans l'année.
-    let mut y: HashMap<(usize, usize), Variable> = HashMap::new();
+    // BTreeMap : ordre des contraintes stable, donc même plan d'un appel à l'autre.
+    let mut y: BTreeMap<(usize, usize), Variable> = BTreeMap::new();
     // a[(b, c, k)] : m² pour l'option k.
     let mut a: Vec<((usize, usize, usize), Variable)> = Vec::new();
     for (bi, bed) in beds.iter().enumerate() {
@@ -266,20 +276,10 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
             .sum()
     };
 
-    // Bonus compagnes et étagement : variables auxiliaires ≤ présences.
-    let mut friend_pairs: Vec<(Variable, Variable, Variable)> = Vec::new();
-    let mut strata: Vec<(Variable, usize)> = Vec::new();
-    for bi in 0..beds.len() {
-        for (c1, s1) in crops.iter().enumerate() {
-            for (c2, s2) in crops.iter().enumerate().skip(c1 + 1) {
-                let friends = s1.species.friends.contains(&s2.species.id) || s2.species.friends.contains(&s1.species.id);
-                if let (true, Some(&y1), Some(&y2)) = (friends, y.get(&(bi, c1)), y.get(&(bi, c2))) {
-                    friend_pairs.push((vars.add(variable().binary()), y1, y2));
-                }
-            }
-        }
-        strata.push((vars.add(variable().binary()), bi));
-    }
+    // Bonus d'étagement : variable auxiliaire ≤ présences. Pas de bonus par paire
+    // de compagnes : ~450 binaires dont la relaxation LP vaut ~500 € fictifs,
+    // le solveur ne convergeait plus et semait des bouts de 0,1 m² pour le bonus.
+    let strata: Vec<(Variable, usize)> = (0..beds.len()).map(|bi| (vars.add(variable().binary()), bi)).collect();
 
     let mut objective = Expression::default();
     for ((_, ci, k), v) in &a {
@@ -297,9 +297,6 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
         .collect();
     for (_, _, slack) in &wish_slacks {
         objective -= W_WISH * *slack;
-    }
-    for (z, _, _) in &friend_pairs {
-        objective += W_FRIEND * *z;
     }
     for (s, _) in &strata {
         objective += W_STRATA * *s;
@@ -358,7 +355,13 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
     }
     for bi in 0..beds.len() {
         // Rotation dans l'année : une seule espèce par famille à délai de retour.
-        let families: HashSet<Family> = crops.iter().map(|c| c.species.family).collect();
+        // Ordre d'apparition (pas de HashSet) : modèle identique d'un appel à l'autre.
+        let mut families: Vec<Family> = Vec::new();
+        for c in crops {
+            if !families.contains(&c.species.family) {
+                families.push(c.species.family);
+            }
+        }
         for f in families.into_iter().filter(|f| return_delay_years(*f) > 0) {
             let n = used(bi, &|s: &Species| s.family == f);
             model = model.with(constraint!(n <= 1));
@@ -372,9 +375,6 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
                 }
             }
         }
-    }
-    for (z, y1, y2) in &friend_pairs {
-        model = model.with(constraint!(*z <= *y1)).with(constraint!(*z <= *y2));
     }
     for (s, bi) in &strata {
         let tall = used(*bi, &|sp: &Species| sp.height() == HeightClass::Tall);
