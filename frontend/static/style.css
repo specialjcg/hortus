@@ -741,3 +741,6 @@ button.chip:hover:not(:disabled) {
 .muted { color: #888; }
 /* Police texte d'abord : l'ordre emoji-first de `svg text` étire les lettres. */
 .plan-gantt svg text { font-family: system-ui, sans-serif, "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji"; }
+.plan-week { background: #f4f8ee; border-left: 3px solid #5a8f3c; padding: 0.3rem 0.7rem; margin: 0.5rem 0; }
+.plan-week h4 { margin: 0.2rem 0; }
+.plan-week ul { margin: 0.2rem 0; padding-left: 1.2rem; }

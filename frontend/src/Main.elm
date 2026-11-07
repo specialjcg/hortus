@@ -12,7 +12,7 @@ import Browser
 import Browser.Events
 import File exposing (File)
 import File.Select
-import Html exposing (Html, button, div, h1, h2, h3, input, option, p, select, span, text, textarea)
+import Html exposing (Html, button, div, h1, h2, h3, h4, input, li, option, p, select, span, text, textarea, ul)
 import Html.Attributes as A
 import Html.Events as E
 import Http
@@ -5630,9 +5630,75 @@ viewPlanResult model beds plan =
     in
     div []
         (summary
+            :: viewPlanThisWeek model beds plan
             :: viewNeeds model plan
             ++ List.map unmet plan.unmetWishes
             ++ [ viewPlanExcluder model plan, viewPlanApply model plan, viewPlanGantt model beds plan ]
+        )
+
+
+-- Semis du plan tombant cette semaine ou la suivante, et ceux dont la semaine vient
+-- de passer. Le plan est cyclique (52 semaines) : seule la semaine compte, pas l'année.
+viewPlanThisWeek : Model -> List Parcel -> SeasonPlan -> Html Msg
+viewPlanThisWeek model beds plan =
+    let
+        week =
+            min 52 ((isoToDoy model.today - 1) // 7 + 1)
+
+        -- Écart cyclique semaine du plan − semaine courante, dans -26..25.
+        offset it =
+            modBy 52 (it.week - week + 26) - 26
+
+        bedName id =
+            beds |> List.filter (\b -> b.id == id) |> List.head |> Maybe.map .name |> Maybe.withDefault ("planche " ++ String.fromInt id)
+
+        group items =
+            items
+                |> List.map (\it -> ( it.speciesId, it.mode ))
+                |> List.foldl (\k acc -> if List.member k acc then acc else acc ++ [ k ]) []
+                |> List.map
+                    (\( sid, mode ) ->
+                        let
+                            mine =
+                                List.filter (\it -> it.speciesId == sid && it.mode == mode) items
+
+                            area =
+                                List.sum (List.map .areaM2 mine)
+
+                            names =
+                                mine |> List.map (.bedId >> bedName) |> List.foldl (\n acc -> if List.member n acc then acc else acc ++ [ n ]) []
+                        in
+                        li []
+                            [ text
+                                ((if mode == "transplant" then "Repiquer " else "Semer ")
+                                    ++ planSpeciesName model sid ++ " — " ++ String.fromFloat (round1 area) ++ " m² ("
+                                    ++ String.join ", " names ++ ")"
+                                )
+                            ]
+                    )
+
+        upcoming =
+            List.filter (\it -> offset it >= 0 && offset it <= 1) plan.items
+
+        missed =
+            List.filter (\it -> offset it >= -2 && offset it < 0) plan.items
+    in
+    div [ A.class "plan-week" ]
+        (h4 [] [ text ("📌 À faire cette semaine (semaine " ++ String.fromInt week ++ ")") ]
+            :: (if List.isEmpty upcoming then
+                    p [] [ text "Aucun semis du plan cette semaine ni la suivante." ]
+
+                else
+                    ul [] (group upcoming)
+               )
+            :: (if List.isEmpty missed then
+                    []
+
+                else
+                    [ p [ A.class "plan-error" ] [ text "⚠ Fenêtre tout juste passée — à faire au plus vite, sinon pailler la planche :" ]
+                    , ul [] (group missed)
+                    ]
+               )
         )
 
 
