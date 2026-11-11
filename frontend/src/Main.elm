@@ -112,6 +112,7 @@ type alias Model =
     , wishSpecies : String
     , wishM2 : String
     , excludes : List String -- espèces exclues, contrainte dure du plan
+    , excludesSeeded : Bool -- engrais verts exclus d'office au premier chargement
     , persons : Maybe Int -- taille du foyer : plafonne chaque espèce à sa consommation
     , idealPending : Maybe Int -- planches en cours de création avant de calculer le plan
     , showGhosts : Bool -- plants du plan en fantômes sur le terrain
@@ -466,6 +467,7 @@ init flags =
       , wishSpecies = ""
       , wishM2 = "1"
       , excludes = []
+      , excludesSeeded = False
       , persons = Just 2
       , idealPending = Nothing
       , showGhosts = True
@@ -686,7 +688,16 @@ update msg model =
             ( { model | error = Just (httpErr e) }, Cmd.none )
 
         GotCalendar (Ok c) ->
-            ( { model | calendar = Just c, loading = False, refreshingClimate = False, error = Nothing }, Cmd.none )
+            ( { model
+                | calendar = Just c
+                , loading = False
+                , refreshingClimate = False
+                , error = Nothing
+                , excludes = seedExcludes model c
+                , excludesSeeded = True
+              }
+            , Cmd.none
+            )
 
         GotCalendar (Err e) ->
             ( { model | error = Just (httpErr e), loading = False, refreshingClimate = False }, Cmd.none )
@@ -1659,6 +1670,28 @@ fetchCalendar url slug refresh =
         { url = url ++ "/calendar" ++ q
         , expect = Http.expectJson GotCalendar calendarResponseDecoder
         }
+
+
+-- Jardin simple : pas d'engrais vert (seigle à faucher et enfouir…) sauf si
+-- l'utilisateur retire l'exclusion. Une seule fois, pas à chaque changement de ville.
+seedExcludes : Model -> CalendarResponse -> List String
+seedExcludes model c =
+    let
+        wished sid =
+            List.any (\( w, _ ) -> w == sid) model.wishes
+
+        greenManures =
+            c.species
+                |> List.map .species
+                |> List.filter (\sp -> sp.category == "GreenManure")
+                |> List.map .id
+                |> List.filter (\sid -> not (wished sid) && not (List.member sid model.excludes))
+    in
+    if model.excludesSeeded then
+        model.excludes
+
+    else
+        model.excludes ++ greenManures
 
 
 fetchPlan : String -> String -> Int -> Float -> List ( String, Float ) -> List String -> Maybe Int -> Cmd Msg
