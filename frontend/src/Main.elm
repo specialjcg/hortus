@@ -12,7 +12,7 @@ import Browser
 import Browser.Events
 import File exposing (File)
 import File.Select
-import Html exposing (Html, button, div, h1, h2, h3, input, option, p, select, span, text, textarea)
+import Html exposing (Html, button, div, h1, h2, h3, h4, input, li, option, p, select, span, text, textarea, ul)
 import Html.Attributes as A
 import Html.Events as E
 import Http
@@ -112,6 +112,7 @@ type alias Model =
     , wishSpecies : String
     , wishM2 : String
     , excludes : List String -- espèces exclues, contrainte dure du plan
+    , excludesSeeded : Bool -- engrais verts exclus d'office au premier chargement
     , persons : Maybe Int -- taille du foyer : plafonne chaque espèce à sa consommation
     , idealPending : Maybe Int -- planches en cours de création avant de calculer le plan
     , showGhosts : Bool -- plants du plan en fantômes sur le terrain
@@ -466,6 +467,7 @@ init flags =
       , wishSpecies = ""
       , wishM2 = "1"
       , excludes = []
+      , excludesSeeded = False
       , persons = Just 2
       , idealPending = Nothing
       , showGhosts = True
@@ -686,7 +688,16 @@ update msg model =
             ( { model | error = Just (httpErr e) }, Cmd.none )
 
         GotCalendar (Ok c) ->
-            ( { model | calendar = Just c, loading = False, refreshingClimate = False, error = Nothing }, Cmd.none )
+            ( { model
+                | calendar = Just c
+                , loading = False
+                , refreshingClimate = False
+                , error = Nothing
+                , excludes = seedExcludes model c
+                , excludesSeeded = True
+              }
+            , Cmd.none
+            )
 
         GotCalendar (Err e) ->
             ( { model | error = Just (httpErr e), loading = False, refreshingClimate = False }, Cmd.none )
@@ -1659,6 +1670,28 @@ fetchCalendar url slug refresh =
         { url = url ++ "/calendar" ++ q
         , expect = Http.expectJson GotCalendar calendarResponseDecoder
         }
+
+
+-- Jardin simple : pas d'engrais vert (seigle à faucher et enfouir…) sauf si
+-- l'utilisateur retire l'exclusion. Une seule fois, pas à chaque changement de ville.
+seedExcludes : Model -> CalendarResponse -> List String
+seedExcludes model c =
+    let
+        wished sid =
+            List.any (\( w, _ ) -> w == sid) model.wishes
+
+        greenManures =
+            c.species
+                |> List.map .species
+                |> List.filter (\sp -> sp.category == "GreenManure")
+                |> List.map .id
+                |> List.filter (\sid -> not (wished sid) && not (List.member sid model.excludes))
+    in
+    if model.excludesSeeded then
+        model.excludes
+
+    else
+        model.excludes ++ greenManures
 
 
 fetchPlan : String -> String -> Int -> Float -> List ( String, Float ) -> List String -> Maybe Int -> Cmd Msg
@@ -5630,9 +5663,75 @@ viewPlanResult model beds plan =
     in
     div []
         (summary
+            :: viewPlanThisWeek model beds plan
             :: viewNeeds model plan
             ++ List.map unmet plan.unmetWishes
             ++ [ viewPlanExcluder model plan, viewPlanApply model plan, viewPlanGantt model beds plan ]
+        )
+
+
+-- Semis du plan tombant cette semaine ou la suivante, et ceux dont la semaine vient
+-- de passer. Le plan est cyclique (52 semaines) : seule la semaine compte, pas l'année.
+viewPlanThisWeek : Model -> List Parcel -> SeasonPlan -> Html Msg
+viewPlanThisWeek model beds plan =
+    let
+        week =
+            min 52 ((isoToDoy model.today - 1) // 7 + 1)
+
+        -- Écart cyclique semaine du plan − semaine courante, dans -26..25.
+        offset it =
+            modBy 52 (it.week - week + 26) - 26
+
+        bedName id =
+            beds |> List.filter (\b -> b.id == id) |> List.head |> Maybe.map .name |> Maybe.withDefault ("planche " ++ String.fromInt id)
+
+        group items =
+            items
+                |> List.map (\it -> ( it.speciesId, it.mode ))
+                |> List.foldl (\k acc -> if List.member k acc then acc else acc ++ [ k ]) []
+                |> List.map
+                    (\( sid, mode ) ->
+                        let
+                            mine =
+                                List.filter (\it -> it.speciesId == sid && it.mode == mode) items
+
+                            area =
+                                List.sum (List.map .areaM2 mine)
+
+                            names =
+                                mine |> List.map (.bedId >> bedName) |> List.foldl (\n acc -> if List.member n acc then acc else acc ++ [ n ]) []
+                        in
+                        li []
+                            [ text
+                                ((if mode == "transplant" then "Repiquer " else "Semer ")
+                                    ++ planSpeciesName model sid ++ " — " ++ String.fromFloat (round1 area) ++ " m² ("
+                                    ++ String.join ", " names ++ ")"
+                                )
+                            ]
+                    )
+
+        upcoming =
+            List.filter (\it -> offset it >= 0 && offset it <= 1) plan.items
+
+        missed =
+            List.filter (\it -> offset it >= -2 && offset it < 0) plan.items
+    in
+    div [ A.class "plan-week" ]
+        (h4 [] [ text ("📌 À faire cette semaine (semaine " ++ String.fromInt week ++ ")") ]
+            :: (if List.isEmpty upcoming then
+                    p [] [ text "Aucun semis du plan cette semaine ni la suivante." ]
+
+                else
+                    ul [] (group upcoming)
+               )
+            :: (if List.isEmpty missed then
+                    []
+
+                else
+                    [ p [ A.class "plan-error" ] [ text "⚠ Fenêtre tout juste passée — à faire au plus vite, sinon pailler la planche :" ]
+                    , ul [] (group missed)
+                    ]
+               )
         )
 
 
