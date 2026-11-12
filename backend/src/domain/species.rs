@@ -21,6 +21,12 @@ impl CalendarWindow {
             doy >= self.doy_start || doy <= self.doy_end
         }
     }
+
+    /// Fenêtre décalée de `days` jours (positif = plus tard), cyclique sur 365 jours.
+    pub fn shifted(self, days: i16) -> Self {
+        let shift = |doy: u16| ((doy as i32 - 1 + days as i32).rem_euclid(365) + 1) as u16;
+        CalendarWindow { doy_start: shift(self.doy_start), doy_end: shift(self.doy_end) }
+    }
 }
 
 /// Famille botanique — utile pour les rotations.
