@@ -54,10 +54,10 @@ jobs:
               -e "s|style\\.css\"|style.css?v=${GITHUB_SHA}\"|g" \
               static/index.html > ../package/static/index.html
 
-      - name: Package species.json
+      - name: Package species.json and roadmap.json
         run: |
           mkdir -p package/data
-          cp backend/data/species.json package/data/
+          cp backend/data/species.json backend/data/roadmap.json package/data/
 
       # --- Deploy to VPS ---
       - name: Setup SSH key
@@ -94,6 +94,7 @@ jobs:
           tar czf static.tgz -C package static
           retry scp $OPTS static.tgz "$HOST:/opt/hortus/static.tgz"
           retry scp $OPTS package/data/species.json "$HOST:/opt/hortus/species.json.new"
+          retry scp $OPTS package/data/roadmap.json "$HOST:/opt/hortus/roadmap.json.new"
 
           # 3. Finalisation en une connexion. La DB SQLite (/opt/hortus/data/
           #    hortus.db) n'est jamais touchée, sauvegarde .bak avant restart.
@@ -121,6 +122,9 @@ jobs:
           fi
           if [ -f /opt/hortus/species.json.new ]; then
             mv -f /opt/hortus/species.json.new /opt/hortus/data/species.json
+          fi
+          if [ -f /opt/hortus/roadmap.json.new ]; then
+            mv -f /opt/hortus/roadmap.json.new /opt/hortus/data/roadmap.json
           fi
           chmod 750 /opt/hortus/hortus-backend
           chown -R hortus:hortus /opt/hortus
