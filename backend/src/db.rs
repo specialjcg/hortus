@@ -22,6 +22,7 @@ pub fn open() -> Result<Db, String> {
     run_additive_migrations(&conn)?;
     crate::problems::migrate(&conn)?;
     crate::restrictions::migrate(&conn)?;
+    crate::roadmap::migrate(&conn)?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")
         .map_err(|e| format!("pragma : {e}"))?;
     Ok(Arc::new(Mutex::new(conn)))
