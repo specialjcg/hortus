@@ -147,6 +147,6 @@ jobs:
       - name: Smoke test
         run: |
           sleep 3
-          curl -sf https://hortus.eigenplay.com/health
+          curl -sf https://hortus.eigenplay.com/api/health
           curl -sf -o /dev/null https://hortus.eigenplay.com/
           echo "Site OK"
