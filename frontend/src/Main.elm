@@ -313,7 +313,12 @@ type alias SeasonPlan =
     , needs : List NeedCover -- besoins du foyer (vide sans foyer)
     , needCoverRatio : Maybe Float
     , needMissingM2 : Maybe Float -- m² de culture à ajouter pour couvrir 100 %
+    , rotationWarnings : List RotationWarning -- familles souples replantées trop tôt
     }
+
+
+type alias RotationWarning =
+    { bedId : Int, speciesId : String, lastYear : Int }
 
 
 type alias NeedCover =
@@ -1834,6 +1839,16 @@ seasonPlanDecoder =
             )
         |> andMap (D.field "need_cover_ratio" (D.nullable D.float))
         |> andMap (D.field "need_missing_m2" (D.nullable D.float))
+        |> andMap
+            (D.field "rotation_warnings"
+                (D.list
+                    (D.map3 RotationWarning
+                        (D.field "bed_id" D.int)
+                        (D.field "species_id" D.string)
+                        (D.field "last_year" D.int)
+                    )
+                )
+            )
 
 
 fetchParcels : String -> Cmd Msg
@@ -5660,12 +5675,25 @@ viewPlanResult model beds plan =
         unmet ( sid, missing ) =
             p [ A.class "plan-error" ]
                 [ text ("⚠ Envie non tenue : " ++ planSpeciesName model sid ++ " (manque " ++ String.fromFloat (round1 missing) ++ " m² — fenêtre, rotation ou antagonistes)") ]
+
+        bedName id =
+            beds |> List.filter (\b -> b.id == id) |> List.head |> Maybe.map .name |> Maybe.withDefault ("planche " ++ String.fromInt id)
+
+        rotation w =
+            p [ A.class "muted" ]
+                [ text
+                    ("↻ " ++ planSpeciesName model w.speciesId ++ " sur " ++ bedName w.bedId
+                        ++ " : même famille qu'en " ++ String.fromInt w.lastYear
+                        ++ ". Décale d'un mètre ou deux par rapport à l'an dernier."
+                    )
+                ]
     in
     div []
         (summary
             :: viewPlanThisWeek model beds plan
             :: viewNeeds model plan
             ++ List.map unmet plan.unmetWishes
+            ++ List.map rotation plan.rotationWarnings
             ++ [ viewPlanExcluder model plan, viewPlanApply model plan, viewPlanGantt model beds plan ]
         )
 
