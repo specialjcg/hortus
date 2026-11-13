@@ -93,6 +93,9 @@ type alias Model =
     , today : String
     , forecast : List ForecastDay
     , water : Maybe WaterRestrictions -- restrictions VigiEau (réseau, cours d'eau, puits)
+    , roadmap : Maybe Roadmap -- feuille de route « jardin autonome »
+    , roadmapOpen : Maybe String -- étape dépliée
+    , roadmapAll : Bool -- toute la feuille de route visible
     , historical : List HistoricalDay
     , historicalLoading : Bool
     , paletteSpecies : Maybe String
@@ -314,6 +317,40 @@ type alias SeasonPlan =
     , needCoverRatio : Maybe Float
     , needMissingM2 : Maybe Float -- m² de culture à ajouter pour couvrir 100 %
     , rotationWarnings : List RotationWarning -- familles souples replantées trop tôt
+    , bedSupplies : List BedSupplies -- goutte-à-goutte, compost, paillis par planche
+    }
+
+
+type alias BedSupplies =
+    { bedId : Int
+    , dripM : Float
+    , dripSpacingM : Float
+    , compostKg : Float
+    , mulchM2 : Float
+    }
+
+
+type alias Roadmap =
+    { setupDone : Int
+    , setupTotal : Int
+    , yearlyDone : Int
+    , yearlyTotal : Int
+    , steps : List RoadmapStep
+    }
+
+
+type alias RoadmapStep =
+    { id : String
+    , theme : String
+    , kind : String -- "setup" (une fois) | "yearly" (chaque année)
+    , title : String
+    , why : String
+    , how : List String
+    , status : String -- "now" | "late" | "upcoming" | "done"
+    , startsInDays : Int
+    , doneOn : Maybe String
+    , waitingFor : List String
+    , manual : Bool
     }
 
 
@@ -427,9 +464,15 @@ emptyActionForm today =
     }
 
 
+-- Toutes les routes du backend vivent sous /api.
+apiBase : Flags -> String
+apiBase flags =
+    flags.backendUrl ++ "/api"
+
+
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( { backendUrl = flags.backendUrl
+    ( { backendUrl = apiBase flags
       , today = flags.today
       , viewMode = CoachView
       , cities = []
@@ -453,6 +496,9 @@ init flags =
       , filterActionKind = Nothing
       , forecast = []
       , water = Nothing
+      , roadmap = Nothing
+      , roadmapOpen = Nothing
+      , roadmapAll = False
       , historical = []
       , historicalLoading = False
       , paletteSpecies = Nothing
@@ -503,14 +549,15 @@ init flags =
       , panning = Nothing
       }
     , Cmd.batch
-        [ fetchCities flags.backendUrl
-        , fetchCalendar flags.backendUrl "le_bois_doingt" False
-        , fetchParcels flags.backendUrl
-        , fetchActions flags.backendUrl
-        , fetchActionKinds flags.backendUrl
-        , fetchForecast flags.backendUrl "le_bois_doingt"
-        , fetchWater flags.backendUrl "le_bois_doingt"
-        , fetchProblems flags.backendUrl
+        [ fetchCities (apiBase flags)
+        , fetchCalendar (apiBase flags) "le_bois_doingt" False
+        , fetchParcels (apiBase flags)
+        , fetchActions (apiBase flags)
+        , fetchActionKinds (apiBase flags)
+        , fetchForecast (apiBase flags) "le_bois_doingt"
+        , fetchWater (apiBase flags) "le_bois_doingt"
+        , fetchRoadmap (apiBase flags) "le_bois_doingt" flags.today
+        , fetchProblems (apiBase flags)
         ]
     )
 
@@ -566,6 +613,11 @@ type Msg
     | GotForecast (Result Http.Error (List ForecastDay))
     | GotWater (Result Http.Error WaterRestrictions)
     | DismissWaterChanges -- ferme le bandeau de changement de niveau
+    | GotRoadmap (Result Http.Error Roadmap)
+    | RoadmapToggle String
+    | RoadmapShowAll
+    | RoadmapMark String Bool -- étape, fait (True) ou annulé (False)
+    | RoadmapSaved (Result Http.Error ())
     | WaterSeen (Result Http.Error ())
     | LoadHistorical
     | GotHistorical (Result Http.Error (List HistoricalDay))
@@ -713,6 +765,7 @@ update msg model =
                 [ fetchCalendar model.backendUrl slug False
                 , fetchForecast model.backendUrl slug
                 , fetchWater model.backendUrl slug
+                , fetchRoadmap model.backendUrl slug model.today
                 ]
             )
 
@@ -720,6 +773,31 @@ update msg model =
         GotForecast (Err _) -> ( model, Cmd.none )
 
         GotWater (Ok w) -> ( { model | water = Just w }, Cmd.none )
+
+        GotRoadmap (Ok r) -> ( { model | roadmap = Just r }, Cmd.none )
+        GotRoadmap (Err _) -> ( model, Cmd.none )
+
+        RoadmapToggle id ->
+            ( { model | roadmapOpen = if model.roadmapOpen == Just id then Nothing else Just id }, Cmd.none )
+
+        RoadmapShowAll ->
+            ( { model | roadmapAll = not model.roadmapAll }, Cmd.none )
+
+        RoadmapMark id done ->
+            ( model
+            , Http.request
+                { method = if done then "POST" else "DELETE"
+                , headers = []
+                , url = model.backendUrl ++ "/roadmap/" ++ id ++ "/done" ++ (if done then "?date=" ++ model.today else "")
+                , body = Http.emptyBody
+                , expect = Http.expectWhatever RoadmapSaved
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+            )
+
+        RoadmapSaved (Ok _) -> ( model, fetchRoadmap model.backendUrl model.selectedCity model.today )
+        RoadmapSaved (Err e) -> ( { model | error = Just (httpErr e) }, Cmd.none )
         GotWater (Err _) -> ( model, Cmd.none )
 
         DismissWaterChanges ->
@@ -1473,7 +1551,7 @@ update msg model =
 
         GotParcels (Ok ps) -> ( { model | parcels = ps }, Cmd.none )
         GotParcels (Err e) -> ( { model | error = Just (httpErr e) }, Cmd.none )
-        GotActions (Ok xs) -> ( { model | actions = xs }, Cmd.none )
+        GotActions (Ok xs) -> ( { model | actions = xs }, fetchRoadmap model.backendUrl model.selectedCity model.today )
         GotActions (Err e) -> ( { model | error = Just (httpErr e) }, Cmd.none )
         GotActionKinds (Ok ks) -> ( { model | actionKinds = ks }, Cmd.none )
         GotActionKinds (Err _) -> ( model, Cmd.none )
@@ -1849,6 +1927,55 @@ seasonPlanDecoder =
                     )
                 )
             )
+        |> andMap
+            (D.oneOf
+                [ D.field "bed_supplies"
+                    (D.list
+                        (D.map5 BedSupplies
+                            (D.field "bed_id" D.int)
+                            (D.field "drip_m" D.float)
+                            (D.field "drip_spacing_m" D.float)
+                            (D.field "compost_kg" D.float)
+                            (D.field "mulch_m2" D.float)
+                        )
+                    )
+                , D.succeed []
+                ]
+            )
+
+
+fetchRoadmap : String -> String -> String -> Cmd Msg
+fetchRoadmap url slug today =
+    Http.get
+        { url = url ++ "/roadmap?city=" ++ slug ++ "&date=" ++ today
+        , expect = Http.expectJson GotRoadmap roadmapDecoder
+        }
+
+
+roadmapDecoder : Decoder Roadmap
+roadmapDecoder =
+    D.map5 Roadmap
+        (D.field "setup_done" D.int)
+        (D.field "setup_total" D.int)
+        (D.field "yearly_done" D.int)
+        (D.field "yearly_total" D.int)
+        (D.field "steps"
+            (D.list
+                (D.map8 RoadmapStep
+                    (D.field "id" D.string)
+                    (D.field "theme" D.string)
+                    (D.field "kind" D.string)
+                    (D.field "title" D.string)
+                    (D.field "why" D.string)
+                    (D.field "how" (D.list D.string))
+                    (D.field "status" D.string)
+                    (D.field "starts_in_days" D.int)
+                    |> andMap (D.field "done_on" (D.nullable D.string))
+                    |> andMap (D.field "waiting_for" (D.list D.string))
+                    |> andMap (D.field "manual" D.bool)
+                )
+            )
+        )
 
 
 fetchParcels : String -> Cmd Msg
@@ -2792,7 +2919,7 @@ viewCoachPage model =
                 , div [ A.class "bento-side" ] [ viewCoachWatch model cal ]
                 , div [ A.class "bento-a" ] [ viewCoachWeek model ]
                 , div [ A.class "bento-b" ] [ viewCoachObservations model ]
-                , div [ A.class "bento-c" ] [ viewCoachTip model ]
+                , div [ A.class "bento-c" ] [ viewCoachRoadmap model ]
                 , div [ A.class "bento-d" ] [ viewCoachWater model ]
                 ]
             ]
@@ -4197,49 +4324,191 @@ viewAlertDetail activeParcelsBy alert =
 -- Panneau "Conseil de la semaine"
 
 
-viewCoachTip : Model -> Html Msg
-viewCoachTip model =
+-- Feuille de route « jardin autonome » : étapes du moment, progression, détail au clic.
+viewCoachRoadmap : Model -> Html Msg
+viewCoachRoadmap model =
+    case model.roadmap of
+        Nothing ->
+            div [ A.class "panel accent-sky" ]
+                [ h2 [] [ text "🧭 Vers un jardin autonome" ]
+                , p [] [ text "Chargement de la feuille de route..." ]
+                ]
+
+        Just rm ->
+            let
+                active =
+                    List.filter (\st -> st.status == "now" || st.status == "late") rm.steps
+
+                upcoming =
+                    List.filter (\st -> st.status == "upcoming") rm.steps
+
+                shown =
+                    if model.roadmapAll then
+                        rm.steps
+
+                    else if List.isEmpty active then
+                        List.take 2 upcoming
+
+                    else
+                        List.take 3 active
+
+                hidden =
+                    List.length rm.steps - List.length shown
+            in
+            div [ A.class "panel accent-sky" ]
+                ([ h2 [] [ text "🧭 Vers un jardin autonome" ]
+                 , roadmapProgress "Installation" rm.setupDone rm.setupTotal
+                 , roadmapProgress "Gestes de la saison" rm.yearlyDone rm.yearlyTotal
+                 , if List.isEmpty active && not model.roadmapAll then
+                    p [ A.style "font-size" "0.85rem", A.style "color" "#46584c" ] [ text "Rien d'urgent : voici les prochaines étapes." ]
+
+                   else
+                    text ""
+                 ]
+                    ++ List.map (viewRoadmapStep model rm) shown
+                    ++ [ if hidden > 0 || model.roadmapAll then
+                            button [ E.onClick RoadmapShowAll, A.style "margin-top" "0.5rem" ]
+                                [ text
+                                    (if model.roadmapAll then
+                                        "Replier"
+
+                                     else
+                                        "Voir toute la feuille de route (" ++ String.fromInt hidden ++ " de plus)"
+                                    )
+                                ]
+
+                         else
+                            text ""
+                       ]
+                )
+
+
+roadmapProgress : String -> Int -> Int -> Html Msg
+roadmapProgress label done total =
     let
-        today = effectiveToday model
-        season = seasonOf today
-        tip = seasonalTip season (isoToDoy today)
+        pct =
+            if total == 0 then
+                0
+
+            else
+                done * 100 // total
     in
-    div [ A.class "panel accent-sky" ]
-        [ h2 [] [ text "🎓 Conseil" ]
-        , p [ A.style "font-size" "0.92rem", A.style "line-height" "1.5" ] [ text tip ]
+    div [ A.style "margin" "0.2rem 0 0.4rem" ]
+        [ div [ A.style "display" "flex", A.style "justify-content" "space-between", A.style "font-size" "0.8rem" ]
+            [ span [] [ text label ], span [] [ text (String.fromInt done ++ " / " ++ String.fromInt total) ] ]
+        , div [ A.style "background" "#e3e8e0", A.style "border-radius" "999px", A.style "height" "6px" ]
+            [ div
+                [ A.style "background" "#4a7a3a"
+                , A.style "border-radius" "999px"
+                , A.style "height" "6px"
+                , A.style "width" (String.fromInt pct ++ "%")
+                ]
+                []
+            ]
         ]
 
 
-seasonalTip : Season -> Int -> String
-seasonalTip season doy =
-    case season of
-        Spring ->
-            if doy < 75 then
-                "Début de saison : démarre tes semis sous abri (tomates, poivrons, aubergines). Prépare tes planches, corrige le pH si besoin."
-            else if doy < 110 then
-                "Plein printemps : semis directs possibles (carottes, épinards, radis, pois). Attention aux gelées tardives jusqu'aux Saints de Glace (11-13 mai)."
-            else
-                "Après les Saints de Glace : sortie des plants frileux (tomates, courgettes, basilic). Paille pour conserver l'humidité dès l'installation."
+roadmapThemeIcon : String -> String
+roadmapThemeIcon theme =
+    case theme of
+        "irrigation" -> "💧"
+        "eau" -> "🌧️"
+        "sol" -> "🍂"
+        "compost" -> "🌱"
+        "rotation" -> "🔄"
+        "semis" -> "🌾"
+        _ -> "•"
 
-        Summer ->
-            if doy < 200 then
-                "Début d'été : arrosage matin ou soir, jamais au soleil. Récoltes hâtives : radis, salades, petit pois. Pense à pailler copieusement."
-            else if doy < 230 then
-                "Cœur d'été : monte à graines des légumes-feuilles — semer mâche et chicorée en fin de mois pour l'automne. Surveille l'oïdium sur courgettes."
-            else
-                "Fin d'été : récoltes abondantes (tomates, courgettes, haricots). Commence les semis d'automne (mâche, épinard, navet)."
 
-        Autumn ->
-            if doy < 280 then
-                "Début automne : installation des cultures d'hiver (poireaux, mâche). Ramasse les courges avant les premières gelées. Plant des fraisiers en place."
-            else
-                "Automne avancé : plantation d'ail et d'échalotes. Semis des fèves. Paillis épais sur les parcelles nues pour l'hiver."
+roadmapBadge : RoadmapStep -> ( String, String )
+roadmapBadge st =
+    case st.status of
+        "late" -> ( "En retard", "#d9730d" )
+        "now" -> ( "Maintenant", "#4a7a3a" )
+        "done" -> ( "✓ " ++ (st.doneOn |> Maybe.map isoDayMonth |> Maybe.withDefault "fait"), "#7d8f83" )
+        _ -> ( "Dans " ++ String.fromInt st.startsInDays ++ " j", "#46584c" )
 
-        Winter ->
-            if doy > 334 || doy < 32 then
-                "Hiver : planification de la saison. Commande des graines. Taille des arbres fruitiers à pépins (pommier, poirier) par temps sec. Nourris les oiseaux."
+
+viewRoadmapStep : Model -> Roadmap -> RoadmapStep -> Html Msg
+viewRoadmapStep model rm st =
+    let
+        ( badge, color ) =
+            roadmapBadge st
+
+        isOpen =
+            model.roadmapOpen == Just st.id
+
+        titleOf id =
+            rm.steps |> List.filter (\o -> o.id == id) |> List.head |> Maybe.map .title |> Maybe.withDefault id
+
+        action =
+            if st.status /= "done" then
+                button [ E.onClick (RoadmapMark st.id True), A.title "Marquer comme fait aujourd'hui" ] [ text "✓ Fait" ]
+
+            else if st.manual then
+                button [ E.onClick (RoadmapMark st.id False), A.title "Annuler" ] [ text "↺" ]
+
             else
-                "Fin d'hiver : derniers jours pour tailler. Démarre les premiers semis sous abri chauffé (tomates, poivrons, aubergines). Prépare les châssis."
+                text ""
+    in
+    div
+        [ A.style "border" "1px solid #e3e8e0"
+        , A.style "border-radius" "8px"
+        , A.style "padding" "0.45rem 0.6rem"
+        , A.style "margin-top" "0.4rem"
+        , A.style "opacity" (if st.status == "done" then "0.65" else "1")
+        ]
+        (div [ A.style "display" "flex", A.style "align-items" "center", A.style "gap" "0.5rem" ]
+            [ span [] [ text (roadmapThemeIcon st.theme) ]
+            , span
+                [ E.onClick (RoadmapToggle st.id)
+                , A.style "flex" "1"
+                , A.style "cursor" "pointer"
+                , A.style "font-weight" "600"
+                , A.style "font-size" "0.9rem"
+                ]
+                [ text st.title ]
+            , span
+                [ A.style "background" color
+                , A.style "color" "white"
+                , A.style "border-radius" "999px"
+                , A.style "padding" "0.05rem 0.5rem"
+                , A.style "font-size" "0.72rem"
+                , A.style "white-space" "nowrap"
+                ]
+                [ text badge ]
+            , action
+            ]
+            :: (if isOpen then
+                    [ p [ A.style "font-size" "0.85rem", A.style "margin" "0.4rem 0" ] [ text st.why ]
+                    , ul [ A.style "font-size" "0.85rem", A.style "margin" "0", A.style "padding-left" "1.2rem" ]
+                        (List.map (\h -> li [] [ text h ]) st.how)
+                    , if List.isEmpty st.waitingFor then
+                        text ""
+
+                      else
+                        p [ A.style "font-size" "0.8rem", A.style "color" "#d9730d", A.style "margin" "0.3rem 0 0" ]
+                            [ text ("D'abord : " ++ String.join ", " (List.map titleOf st.waitingFor)) ]
+                    , p [ A.style "font-size" "0.75rem", A.style "color" "#7d8f83", A.style "margin" "0.3rem 0 0" ]
+                        [ text
+                            (if st.kind == "setup" then
+                                "Installation, à faire une fois."
+
+                             else
+                                "Geste de saison, chaque année."
+                            )
+                        ]
+                    ]
+
+                else if not (List.isEmpty st.waitingFor) && st.status /= "done" then
+                    [ p [ A.style "font-size" "0.75rem", A.style "color" "#d9730d", A.style "margin" "0.2rem 0 0" ]
+                        [ text ("D'abord : " ++ String.join ", " (List.map titleOf st.waitingFor)) ]
+                    ]
+
+                else
+                    []
+               )
+        )
 
 
 viewCalendarPage : Model -> Html Msg
@@ -4566,7 +4835,7 @@ viewJournalPage model =
                         [ div [ A.class "bento-main" ] [ viewCoachTodo model cal ]
                         , div [ A.class "bento-side" ] [ viewCoachWatch model cal ]
                         , div [ A.class "bento-a" ] [ viewCoachWeek model ]
-                        , div [ A.class "bento-b" ] [ viewCoachTip model ]
+                        , div [ A.class "bento-b" ] [ viewCoachRoadmap model ]
                         ]
                 Nothing ->
                     text ""
@@ -5692,7 +5961,8 @@ viewPlanResult model beds plan =
         (summary
             :: viewPlanThisWeek model beds plan
             :: viewNeeds model plan
-            ++ List.map unmet plan.unmetWishes
+            ++ viewPlanSupplies beds plan
+            :: List.map unmet plan.unmetWishes
             ++ List.map rotation plan.rotationWarnings
             ++ [ viewPlanExcluder model plan, viewPlanApply model plan, viewPlanGantt model beds plan ]
         )
@@ -5743,6 +6013,31 @@ viewPlanThisWeek model beds plan =
 
         missed =
             List.filter (\it -> offset it >= -2 && offset it < 0) plan.items
+
+        -- Planches à préparer 2 à 4 semaines avant leur prochain semis.
+        prep =
+            plan.items
+                |> List.filter (\it -> offset it >= 2 && offset it <= 4)
+                |> List.map .bedId
+                |> List.foldl (\b acc -> if List.member b acc then acc else acc ++ [ b ]) []
+                |> List.map
+                    (\b ->
+                        let
+                            next =
+                                plan.items
+                                    |> List.filter (\it -> it.bedId == b && offset it >= 2 && offset it <= 4)
+                                    |> List.map (.speciesId >> planSpeciesName model)
+                                    |> List.foldl (\n acc -> if List.member n acc then acc else acc ++ [ n ]) []
+
+                            compost =
+                                plan.bedSupplies
+                                    |> List.filter (\bs -> bs.bedId == b)
+                                    |> List.head
+                                    |> Maybe.map (\bs -> " (≈ " ++ String.fromInt (round bs.compostKg) ++ " kg sur l'année)")
+                                    |> Maybe.withDefault ""
+                        in
+                        li [] [ text ("Préparer " ++ bedName b ++ " pour " ++ String.join ", " next ++ " : compost" ++ compost ++ ", goutte-à-goutte en place, paillis écarté") ]
+                    )
     in
     div [ A.class "plan-week" ]
         (h4 [] [ text ("📌 À faire cette semaine (semaine " ++ String.fromInt week ++ ")") ]
@@ -5760,7 +6055,57 @@ viewPlanThisWeek model beds plan =
                     , ul [] (group missed)
                     ]
                )
+            ++ (if List.isEmpty prep then
+                    []
+
+                else
+                    [ p [] [ text "🧰 À préparer d'ici 2 à 4 semaines :" ], ul [] prep ]
+               )
         )
+
+
+-- Goutte-à-goutte, compost et paillis du plan : totaux puis détail par planche.
+viewPlanSupplies : List Parcel -> SeasonPlan -> Html Msg
+viewPlanSupplies beds plan =
+    let
+        bedName id =
+            beds |> List.filter (\b -> b.id == id) |> List.head |> Maybe.map .name |> Maybe.withDefault ("planche " ++ String.fromInt id)
+
+        total f =
+            List.sum (List.map f plan.bedSupplies)
+
+        drip =
+            total .dripM
+
+        mulch =
+            total .mulchM2
+
+        line bs =
+            li []
+                [ text
+                    (bedName bs.bedId ++ " : " ++ String.fromInt (round bs.dripM) ++ " m de gaine (lignes tous les "
+                        ++ String.fromInt (round (bs.dripSpacingM * 100)) ++ " cm), "
+                        ++ String.fromInt (round bs.compostKg) ++ " kg de compost, "
+                        ++ String.fromFloat (round1 bs.mulchM2) ++ " m² à pailler"
+                    )
+                ]
+    in
+    if List.isEmpty plan.bedSupplies then
+        text ""
+
+    else
+        div [ A.class "plan-week" ]
+            [ h4 [] [ text "🧰 Matériel & préparation (goutte-à-goutte, compost, paillis)" ]
+            , p []
+                [ text
+                    ("💧 " ++ String.fromInt (ceiling (drip * 1.1)) ++ " m de gaine 16 mm à goutteurs intégrés (marge 10 % incluse) · 🌱 "
+                        ++ String.fromInt (round (total .compostKg)) ++ " kg de compost mûr · 🍂 "
+                        ++ String.fromFloat (round1 mulch) ++ " m² de paillis (≈ "
+                        ++ String.fromInt (ceiling (mulch / 10)) ++ " bottes de paille)"
+                    )
+                ]
+            , ul [] (List.map line plan.bedSupplies)
+            ]
 
 
 -- Une culture du plan déplaît : l'exclure et relancer le calcul.

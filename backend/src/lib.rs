@@ -6,3 +6,4 @@ pub mod placement;
 pub mod planner;
 pub mod problems;
 pub mod restrictions;
+pub mod roadmap;

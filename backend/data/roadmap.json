@@ -1,0 +1,291 @@
+[
+  {
+    "id": "garden_plan",
+    "theme": "rotation",
+    "kind": "setup",
+    "title": "Dessiner les planches et la rotation",
+    "why": "Des planches fixes de 1 à 1,2 m de large permettent un goutte-à-goutte permanent, un paillage continu et une rotation suivie année après année.",
+    "how": [
+      "Dessine tes planches dans 📓 Mon jardin (allées de 40 à 50 cm, jamais piétinées).",
+      "Regroupe les cultures par famille : solanacées, cucurbitacées, choux, légumineuses, racines.",
+      "Lance le plan de saison : il respecte les délais de retour de chaque famille."
+    ],
+    "window": { "doy_start": 305, "doy_end": 45 },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": null
+  },
+  {
+    "id": "compost_start",
+    "theme": "compost",
+    "kind": "setup",
+    "title": "Installer un composteur",
+    "why": "Le compost maison nourrit les planches gratuitement et recycle les déchets du jardin : c'est la base de la fertilité bio et autonome.",
+    "how": [
+      "Un bac de 600 à 1000 L par tranche de 50 m² de potager, à l'ombre, posé à même le sol.",
+      "Alterne matières vertes (épluchures, tontes) et brunes (feuilles, broyat, carton brun).",
+      "Garde-le humide comme une éponge essorée."
+    ],
+    "window": { "doy_start": 245, "doy_end": 340 },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": null
+  },
+  {
+    "id": "mulch_stock",
+    "theme": "sol",
+    "kind": "setup",
+    "title": "Constituer une réserve de paillis",
+    "why": "Un sol toujours couvert garde l'humidité, limite le désherbage et nourrit la vie du sol : le goutte-à-goutte sous paillis divise l'arrosage par deux ou trois.",
+    "how": [
+      "Paille, foin, feuilles mortes, BRF ou tontes séchées : compte une botte de paille pour 10 m² environ.",
+      "Le bloc « Matériel & préparation » du plan de saison donne la surface à couvrir.",
+      "Stocke au sec ; les feuilles mortes se ramassent gratuitement en novembre."
+    ],
+    "window": { "doy_start": 280, "doy_end": 350 },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": null
+  },
+  {
+    "id": "water_survey",
+    "theme": "irrigation",
+    "kind": "setup",
+    "title": "Relever la source d'eau",
+    "why": "Le goutte-à-goutte se dimensionne à partir du débit et de la pression disponibles : sans ce relevé, les dernières lignes arrosent mal.",
+    "how": [
+      "Débit : chronomètre le remplissage d'un seau de 10 L robinet ouvert (10 L en 20 s = 1800 L/h).",
+      "Note la distance robinet → potager et la pente (le goutte-à-goutte aime le plat ou des lignes à niveau).",
+      "Repère une gouttière proche pour une future cuve de récupération."
+    ],
+    "window": { "doy_start": 320, "doy_end": 40 },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": null
+  },
+  {
+    "id": "drip_design",
+    "theme": "irrigation",
+    "kind": "setup",
+    "title": "Dimensionner et commander le goutte-à-goutte",
+    "why": "Un arrosage automatique et économe, au pied des plants, sans mouiller les feuilles (moins de maladies) : le cœur d'un jardin autonome.",
+    "how": [
+      "Longueur de gaine : reprends le total du bloc « Matériel & préparation » du plan de saison (+10 % de marge).",
+      "Gaine 16 mm à goutteurs intégrés tous les 30 cm (≈ 2 L/h) ; débit total des lignes ouvertes ensemble ≤ débit du robinet.",
+      "Tête de réseau : programmateur à piles, filtre 120 mesh, réducteur de pression 1,5 bar, raccords et bouchons de fin de ligne.",
+      "Au-delà de 25 m par ligne, alimente par le milieu ou découpe en secteurs."
+    ],
+    "window": { "doy_start": 335, "doy_end": 60 },
+    "climate_shift": false,
+    "requires": ["water_survey", "garden_plan"],
+    "done_by": null
+  },
+  {
+    "id": "rain_tank",
+    "theme": "eau",
+    "kind": "setup",
+    "title": "Récupérer l'eau de pluie",
+    "why": "Une cuve sur gouttière rend le potager moins dépendant du réseau et des restrictions d'eau estivales.",
+    "how": [
+      "Cuve de 500 à 1000 L sur une descente de gouttière, avec collecteur filtrant et trop-plein.",
+      "Surélève la cuve d'au moins 50 cm ou ajoute une petite pompe : le goutte-à-goutte a besoin d'un peu de pression.",
+      "Mets un filtre entre cuve et réseau ; vérifie les restrictions VigiEau qui s'appliquent aussi aux puits."
+    ],
+    "window": { "doy_start": 1, "doy_end": 90 },
+    "climate_shift": false,
+    "requires": ["water_survey"],
+    "done_by": null
+  },
+  {
+    "id": "drip_install",
+    "theme": "irrigation",
+    "kind": "setup",
+    "title": "Poser le goutte-à-goutte sur les planches",
+    "why": "Installé avant les plantations, le réseau reste en place toute la saison sous le paillis.",
+    "how": [
+      "Déroule la gaine au soleil pour l'assouplir, puis pose 2 à 3 lignes par planche (espacement donné par le plan).",
+      "Purge les lignes avant de poser les bouchons de fin.",
+      "Plante ou sème au plus près des goutteurs, puis paille par-dessus les lignes."
+    ],
+    "window": { "doy_start": 60, "doy_end": 120 },
+    "climate_shift": true,
+    "requires": ["drip_design"],
+    "done_by": null
+  },
+  {
+    "id": "drip_tune",
+    "theme": "irrigation",
+    "kind": "setup",
+    "title": "Tester et régler le programmateur",
+    "why": "Arroser peu souvent mais longtemps pousse les racines en profondeur : les plantes supportent mieux la chaleur.",
+    "how": [
+      "Lance un cycle et creuse à 15 cm après 1 h : la terre doit être humide sur toute la largeur de la planche.",
+      "Au printemps : 2 cycles par semaine, tôt le matin ; ajuste selon la météo du coach.",
+      "Vérifie qu'aucun goutteur n'est bouché (filtre à nettoyer chaque mois)."
+    ],
+    "window": { "doy_start": 100, "doy_end": 150 },
+    "climate_shift": true,
+    "requires": ["drip_install"],
+    "done_by": null
+  },
+  {
+    "id": "seed_order",
+    "theme": "semis",
+    "kind": "yearly",
+    "title": "Commander les graines et calculer le plan de saison",
+    "why": "Le plan de saison dit quoi semer, où et quand pour remplir les planches toute l'année.",
+    "how": [
+      "Calcule le plan de l'année prochaine (aperçu du plan) avec la taille de ton foyer.",
+      "Fais l'inventaire des graines restantes ; privilégie des variétés reproductibles pour garder tes semences.",
+      "Commande tôt : les variétés bio partent vite."
+    ],
+    "window": { "doy_start": 335, "doy_end": 31 },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": null
+  },
+  {
+    "id": "indoor_sowing",
+    "theme": "semis",
+    "kind": "yearly",
+    "title": "Lancer les semis sous abri",
+    "why": "Produire ses propres plants (tomates, poivrons, choux, courges) est moins cher et donne plus de choix de variétés.",
+    "how": [
+      "Suis la liste « À semer » du coach : elle tient compte du climat local.",
+      "Terreau de semis, lumière maximale, 18-22 °C pour les solanacées.",
+      "Repique en godets dès la première vraie feuille."
+    ],
+    "window": { "doy_start": 45, "doy_end": 100 },
+    "climate_shift": true,
+    "requires": [],
+    "done_by": "semis_abri"
+  },
+  {
+    "id": "spring_compost",
+    "theme": "compost",
+    "kind": "yearly",
+    "title": "Apporter le compost sur les planches",
+    "why": "Les cultures gourmandes (tomates, courges, choux) demandent 3 à 5 kg de compost mûr par m², les légumineuses presque rien.",
+    "how": [
+      "Quantités par planche : bloc « Matériel & préparation » du plan de saison.",
+      "Écarte le paillis, étale le compost en surface, griffe légèrement : pas de bêchage.",
+      "Remets le paillis en place."
+    ],
+    "window": { "doy_start": 60, "doy_end": 115 },
+    "climate_shift": true,
+    "requires": [],
+    "done_by": "compost"
+  },
+  {
+    "id": "compost_turn",
+    "theme": "compost",
+    "kind": "yearly",
+    "title": "Retourner et tamiser le compost",
+    "why": "Un compost aéré mûrit en 6 à 9 mois au lieu de 18.",
+    "how": [
+      "Retourne le tas à la fourche, humidifie s'il est sec.",
+      "Tamise la partie mûre (brune, odeur de sous-bois) pour les semis et les planches.",
+      "Remets les morceaux grossiers dans le bac suivant."
+    ],
+    "window": { "doy_start": 75, "doy_end": 130 },
+    "climate_shift": false,
+    "requires": ["compost_start"],
+    "done_by": null
+  },
+  {
+    "id": "spring_mulch",
+    "theme": "sol",
+    "kind": "yearly",
+    "title": "Pailler dès que le sol s'est réchauffé",
+    "why": "Paillé trop tôt, le sol reste froid ; paillé à temps, il garde l'eau du goutte-à-goutte tout l'été.",
+    "how": [
+      "Après les dernières gelées et un bon arrosage, 5 à 10 cm de paille au pied des plants.",
+      "Laisse le paillis par-dessus les lignes de goutte-à-goutte.",
+      "Éloigne-le de quelques cm du collet des jeunes plants (limaces)."
+    ],
+    "window": { "doy_start": 125, "doy_end": 165 },
+    "climate_shift": true,
+    "requires": [],
+    "done_by": "paillage"
+  },
+  {
+    "id": "summer_watering",
+    "theme": "irrigation",
+    "kind": "yearly",
+    "title": "Ajuster l'arrosage pour l'été",
+    "why": "En été, le besoin double ; un programmateur bien réglé évite le stress hydrique et le gaspillage.",
+    "how": [
+      "Passe à 3 cycles par semaine plus longs plutôt qu'un peu chaque jour ; toujours tôt le matin.",
+      "Surveille les alertes canicule du coach et les restrictions VigiEau (le goutte-à-goutte est souvent toléré).",
+      "Recharge le paillis là où il s'est décomposé."
+    ],
+    "window": { "doy_start": 166, "doy_end": 245 },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": null
+  },
+  {
+    "id": "succession",
+    "theme": "semis",
+    "kind": "yearly",
+    "title": "Ressemer derrière chaque récolte",
+    "why": "Un sol jamais nu et une planche qui produit deux ou trois fois dans l'année : c'est ce qui rend le jardin vraiment productif.",
+    "how": [
+      "Dès qu'une culture est arrachée, regarde le plan de saison : la suivante est déjà prévue.",
+      "Sinon, sème une culture rapide (radis, salade, mâche) ou recouvre de paillis.",
+      "Note l'arrachage dans le carnet pour garder l'historique de rotation."
+    ],
+    "window": { "doy_start": 166, "doy_end": 260 },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": null
+  },
+  {
+    "id": "drip_winterize",
+    "theme": "irrigation",
+    "kind": "yearly",
+    "title": "Purger le goutte-à-goutte avant le gel",
+    "why": "L'eau qui gèle dans le filtre, le réducteur ou le programmateur les fait éclater.",
+    "how": [
+      "Ouvre les bouchons de fin de ligne pour vider les gaines (elles peuvent rester en place).",
+      "Rentre programmateur, filtre et réducteur à l'abri ; enlève les piles.",
+      "Nettoie le filtre avant de le ranger."
+    ],
+    "window": { "doy_start": 290, "doy_end": 330 },
+    "climate_shift": true,
+    "requires": ["drip_install"],
+    "done_by": null
+  },
+  {
+    "id": "autumn_mulch",
+    "theme": "sol",
+    "kind": "yearly",
+    "title": "Couvrir les planches libres pour l'hiver",
+    "why": "Un sol nu en hiver se tasse et se lessive ; couvert, il est meuble et prêt à planter au printemps sans bêcher.",
+    "how": [
+      "10 à 15 cm de feuilles mortes ou de paille sur chaque planche libérée.",
+      "Tu peux glisser du compost demi-mûr dessous : il finira de se décomposer en place.",
+      "Garde les planches de printemps précoce (pois, fèves) moins couvertes pour qu'elles se réchauffent."
+    ],
+    "window": { "doy_start": 290, "doy_end": 345 },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": "paillage"
+  },
+  {
+    "id": "leaves_collect",
+    "theme": "compost",
+    "kind": "yearly",
+    "title": "Ramasser les feuilles mortes",
+    "why": "Gratuites et abondantes, elles servent à la fois de paillis et de matière brune pour le compost.",
+    "how": [
+      "Ramasse-les à la tondeuse : broyées, elles se décomposent plus vite.",
+      "Stocke-en une partie en sacs ou en cage pour le compost de l'été.",
+      "Évite les feuilles de noyer et de laurier en grande quantité."
+    ],
+    "window": { "doy_start": 295, "doy_end": 345 },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": null
+  }
+]

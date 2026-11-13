@@ -44,6 +44,8 @@ start.sh            # script dev tout-en-un
 
 ## Endpoints HTTP
 
+Tous sous le préfixe `/api` (nginx ne proxifie que `/api/`, le reste est le front).
+
 - `GET /health`
 - `GET /cities` — liste des villes
 - `GET /species` — catalogue complet
@@ -52,6 +54,7 @@ start.sh            # script dev tout-en-un
 - `GET /action-kinds` — types d'action acceptés
 - `GET/POST /parcels`, `PUT/DELETE /parcels/{id}`
 - `GET/POST /actions`, `PUT/DELETE /actions/{id}`
+- `GET /roadmap?city=X&date=YYYY-MM-DD`, `POST/DELETE /roadmap/{id}/done` — feuille de route « jardin autonome »
 
 ## Modèle calendaire
 

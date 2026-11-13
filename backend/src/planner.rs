@@ -161,6 +161,61 @@ fn strict_rotation(f: Family) -> bool {
     matches!(f, Family::Brassicaceae | Family::Alliaceae)
 }
 
+/// Écartement des lignes de goutte-à-goutte (m) : celui des plants, borné.
+const DRIP_LINE_MIN_M: f64 = 0.3;
+const DRIP_LINE_MAX_M: f64 = 0.5;
+
+/// Matériel et apports d'une planche pour le plan de l'année.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct BedSupplies {
+    pub bed_id: i64,
+    /// Mètres de gaine goutte-à-goutte (lignes parallèles sur toute la planche).
+    pub drip_m: f64,
+    /// Écartement retenu entre lignes (m).
+    pub drip_spacing_m: f64,
+    /// Compost mûr à apporter sur l'année (kg), selon la gourmandise des cultures.
+    pub compost_kg: f64,
+    /// Surface à pailler (m²).
+    pub mulch_m2: f64,
+}
+
+/// Compost recommandé (kg/m²) selon la famille : gourmandes, moyennes, sobres.
+pub fn compost_kg_per_m2(sp: &Species) -> f64 {
+    if sp.green_manure {
+        return 0.0;
+    }
+    match sp.family {
+        Family::Solanaceae | Family::Cucurbitaceae | Family::Brassicaceae | Family::Poaceae => 4.0,
+        Family::Fabaceae | Family::Alliaceae | Family::Lamiaceae | Family::Apiaceae => 1.0,
+        _ => 2.0,
+    }
+}
+
+/// Goutte-à-goutte, compost et paillis par planche cultivée dans le plan.
+pub fn bed_supplies(beds: &[Bed], items: &[PlanItem], species: &[Species]) -> Vec<BedSupplies> {
+    let by_id: HashMap<&str, &Species> = species.iter().map(|s| (s.id.as_str(), s)).collect();
+    beds.iter()
+        .filter_map(|bed| {
+            let crops: Vec<(&PlanItem, &Species)> = items
+                .iter()
+                .filter(|it| it.bed_id == bed.id)
+                .filter_map(|it| Some((it, *by_id.get(it.species_id.as_str())?)))
+                .filter(|(_, sp)| !sp.green_manure)
+                .collect();
+            let tightest = crops.iter().map(|(_, sp)| sp.spacing_cm as f64 / 100.0).reduce(f64::min)?;
+            let spacing = tightest.clamp(DRIP_LINE_MIN_M, DRIP_LINE_MAX_M);
+            let compost: f64 = crops.iter().map(|(it, sp)| it.area_m2 * compost_kg_per_m2(sp)).sum();
+            Some(BedSupplies {
+                bed_id: bed.id,
+                drip_m: (bed.area_m2 / spacing).ceil(),
+                drip_spacing_m: spacing,
+                compost_kg: compost.round(),
+                mulch_m2: (bed.area_m2 * 10.0).round() / 10.0,
+            })
+        })
+        .collect()
+}
+
 /// Années minimales avant de remettre la même famille sur une planche (0 = libre).
 pub fn return_delay_years(f: Family) -> i32 {
     match f {
@@ -841,5 +896,34 @@ mod tests {
         assert!(plan.needs.is_empty());
         assert!(plan.need_cover_ratio.is_none());
         assert!(plan.need_missing_m2.is_none());
+    }
+
+    #[test]
+    fn bed_supplies_follow_spacing_and_appetite() {
+        let catalog = Species::load_from_json("data/species.json").expect("species.json valide");
+        let heavy = catalog.iter().find(|s| s.family == Family::Solanaceae && !s.green_manure).expect("une solanacée");
+        let light = catalog.iter().find(|s| s.family == Family::Fabaceae && !s.green_manure).expect("une fabacée");
+        let beds = vec![
+            Bed { id: 1, name: "A".into(), area_m2: 6.0 },
+            Bed { id: 2, name: "B".into(), area_m2: 4.0 },
+        ];
+        let item = |bed_id, sp: &Species, area_m2| PlanItem {
+            bed_id,
+            species_id: sp.id.clone(),
+            mode: Mode::Direct,
+            week: 10,
+            weeks_on_bed: 10,
+            area_m2,
+            expected_kg: 0.0,
+            expected_eur: 0.0,
+        };
+        let items = vec![item(1, heavy, 6.0), item(1, light, 2.0)];
+        let out = bed_supplies(&beds, &items, &catalog);
+        assert_eq!(out.len(), 1, "planche sans culture ignorée");
+        let a = &out[0];
+        assert!((DRIP_LINE_MIN_M..=DRIP_LINE_MAX_M).contains(&a.drip_spacing_m));
+        assert_eq!(a.drip_m, (6.0 / a.drip_spacing_m).ceil());
+        assert_eq!(a.compost_kg, 26.0);
+        assert_eq!(a.mulch_m2, 6.0);
     }
 }

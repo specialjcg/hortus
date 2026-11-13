@@ -27,6 +27,7 @@ use crate::planner;
 use crate::problems::{self, EntryInput, Problem, ProblemInput, ProblemUpdate};
 use crate::domain::vigieau::{self, Restriction};
 use crate::restrictions::{self, LevelChange};
+use crate::roadmap::{self, Roadmap, Step};
 
 /// État partagé.
 #[derive(Clone)]
@@ -36,6 +37,7 @@ pub struct AppState {
     /// Cache VigiEau par ville : (instant du fetch, restrictions).
     pub water_cache: Arc<Mutex<HashMap<String, (Instant, Vec<Restriction>)>>>,
     pub plan_job: Arc<Mutex<Option<PlanJob>>>,
+    pub roadmap: Arc<Vec<Step>>,
 }
 
 /// Durée de vie du cache VigiEau (les arrêtés changent au plus quelques fois par semaine).
@@ -143,6 +145,13 @@ pub fn router() -> Router {
             eprintln!("[warn] data/species.json introuvable — catalogue vide");
             Vec::new()
         });
+    let roadmap = ["data/roadmap.json", "backend/data/roadmap.json"]
+        .iter()
+        .find_map(|path| Step::load_from_json(path).ok())
+        .unwrap_or_else(|| {
+            eprintln!("[warn] data/roadmap.json introuvable — feuille de route vide");
+            Vec::new()
+        });
     let db = db::open().unwrap_or_else(|e| {
         eprintln!("[fatal] DB non ouverte : {e}");
         std::process::exit(1);
@@ -152,9 +161,11 @@ pub fn router() -> Router {
         db,
         water_cache: Arc::new(Mutex::new(HashMap::new())),
         plan_job: Arc::new(Mutex::new(None)),
+        roadmap: Arc::new(roadmap),
     };
 
-    Router::new()
+    // Toute l'API sous /api : nginx n'a qu'un préfixe à proxifier, le reste est le front.
+    let api = Router::new()
         .route("/health", get(health))
         .route("/species", get(list_species))
         .route("/cities", get(list_cities))
@@ -176,9 +187,13 @@ pub fn router() -> Router {
         .route("/plan", get(get_plan))
         .route("/plan/jobs", post(start_plan_job))
         .route("/plan/jobs/{id}", get(get_plan_job))
+        .route("/roadmap", get(get_roadmap))
+        .route("/roadmap/{id}/done", post(roadmap_mark_done).delete(roadmap_unmark_done))
         .route("/problems", get(get_problems).post(create_problem))
         .route("/problems/{id}", put(put_problem).delete(del_problem))
-        .route("/problems/{id}/entries", post(create_problem_entry))
+        .route("/problems/{id}/entries", post(create_problem_entry));
+    Router::new()
+        .nest("/api", api)
         .with_state(state)
         .layer(DefaultBodyLimit::max(8 * 1024 * 1024))
         .layer(CorsLayer::permissive())
@@ -460,6 +475,70 @@ async fn create_actions_bulk(
     Ok((StatusCode::CREATED, Json(results)))
 }
 
+#[derive(Debug, Deserialize)]
+struct RoadmapQuery {
+    city: Option<String>,
+    /// Date du jour vue par le client (YYYY-MM-DD) ; par défaut la date serveur.
+    date: Option<String>,
+}
+
+fn parse_day(raw: Option<&str>) -> Result<chrono::NaiveDate, (StatusCode, String)> {
+    match raw {
+        None => Ok(chrono::Local::now().date_naive()),
+        Some(d) => chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d")
+            .map_err(|_| (StatusCode::BAD_REQUEST, format!("date invalide : {d}"))),
+    }
+}
+
+/// Feuille de route « jardin autonome » à la date donnée, calée sur le climat local.
+async fn get_roadmap(
+    State(s): State<AppState>,
+    Query(q): Query<RoadmapQuery>,
+) -> Result<Json<Roadmap>, (StatusCode, String)> {
+    let today = parse_day(q.date.as_deref())?;
+    let loc = Location::by_slug(q.city.as_deref().unwrap_or("le_bois_doingt"));
+    let shift = spring_shift_days(&ClimateProfile::paris(), &loc.climate);
+    let manual = roadmap::list_done(&s.db).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    let journal: Vec<(String, chrono::NaiveDate)> = journal::list_actions(&s.db, &ActionFilter::default())
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?
+        .into_iter()
+        .filter_map(|a| Some((a.kind, chrono::NaiveDate::parse_from_str(a.date.get(..10)?, "%Y-%m-%d").ok()?)))
+        .collect();
+    Ok(Json(roadmap::roadmap_status(&s.roadmap, today, shift, &manual, &journal)))
+}
+
+fn known_step(s: &AppState, id: &str) -> Result<(), (StatusCode, String)> {
+    if s.roadmap.iter().any(|st| st.id == id) {
+        Ok(())
+    } else {
+        Err((StatusCode::NOT_FOUND, format!("étape inconnue : {id}")))
+    }
+}
+
+/// Coche une étape à la main (date du jour ou `?date=`).
+async fn roadmap_mark_done(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    Query(q): Query<RoadmapQuery>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    known_step(&s, &id)?;
+    let day = parse_day(q.date.as_deref())?;
+    roadmap::mark_done(&s.db, &id, day)
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+/// Annule la dernière coche manuelle d'une étape.
+async fn roadmap_unmark_done(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    known_step(&s, &id)?;
+    roadmap::unmark_done(&s.db, &id)
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
 async fn get_problems(
     State(s): State<AppState>,
 ) -> Result<Json<Vec<Problem>>, (StatusCode, String)> {
@@ -657,10 +736,10 @@ async fn calendar(
         .iter()
         .map(|s| {
             SpeciesLocal {
-                indoor_sow_local: s.indoor_sow.map(|w| shift_window(w, shift)),
-                direct_sow_local: s.direct_sow.map(|w| shift_window(w, shift)),
-                transplant_local: s.transplant.map(|w| shift_window(w, shift)),
-                harvest_local: shift_window(s.harvest, shift),
+                indoor_sow_local: s.indoor_sow.map(|w| w.shifted(shift)),
+                direct_sow_local: s.direct_sow.map(|w| w.shifted(shift)),
+                transplant_local: s.transplant.map(|w| w.shifted(shift)),
+                harvest_local: s.harvest.shifted(shift),
                 species: s.clone(),
                 shift_days: shift,
             }
@@ -734,6 +813,8 @@ pub struct PlanResponse {
     pub plan: planner::Plan,
     /// Positions des plants (tirage de Poisson), pour l'aperçu sur le terrain.
     pub placements: Vec<placement::Placement>,
+    /// Goutte-à-goutte, compost et paillis par planche.
+    pub bed_supplies: Vec<planner::BedSupplies>,
 }
 
 /// Entrées validées d'un calcul de plan, prêtes à partir sur un thread bloquant.
@@ -787,9 +868,9 @@ fn compute_plan(input: PlanInput, time_limit_s: f64) -> Result<PlanResponse, Htt
         .filter(|sp| !excludes.contains(&sp.id))
         .map(|sp| planner::Crop {
             species: sp,
-            direct: sp.direct_sow.map(|w| shift_window(w, shift)),
-            transplant: sp.transplant.map(|w| shift_window(w, shift)),
-            harvest: shift_window(sp.harvest, shift),
+            direct: sp.direct_sow.map(|w| w.shifted(shift)),
+            transplant: sp.transplant.map(|w| w.shifted(shift)),
+            harvest: sp.harvest.shifted(shift),
         })
         .collect();
     let params = planner::PlanParams { year, max_species_share: share, time_limit_s, wishes, persons };
@@ -799,7 +880,8 @@ fn compute_plan(input: PlanInput, time_limit_s: f64) -> Result<PlanResponse, Htt
     })?;
     let shapes: Vec<(i64, &Polygon)> = parcels.iter().filter_map(|p| Some((p.id, p.shape.as_ref()?))).collect();
     let placements = placement::place(&plan.items, &shapes, &species, year as u64);
-    Ok(PlanResponse { year, plan, placements })
+    let bed_supplies = planner::bed_supplies(&beds, &plan.items, &species);
+    Ok(PlanResponse { year, plan, placements, bed_supplies })
 }
 
 /// Plan de saison optimisé sur les planches dessinées (MILP HiGHS), en synchrone.
@@ -890,24 +972,6 @@ fn spring_shift_days(reference: &ClimateProfile, target: &ClimateProfile) -> i16
     let tgt_spring = (target.temp_min_c[2] + target.temp_min_c[3]) / 2.0;
     let delta = tgt_spring - ref_spring;
     (-delta * 4.0).round() as i16
-}
-
-fn shift_window(w: CalendarWindow, shift: i16) -> CalendarWindow {
-    CalendarWindow {
-        doy_start: shift_doy(w.doy_start, shift),
-        doy_end: shift_doy(w.doy_end, shift),
-    }
-}
-
-fn shift_doy(doy: u16, shift: i16) -> u16 {
-    let mut v = doy as i32 + shift as i32;
-    while v < 1 {
-        v += 365;
-    }
-    while v > 365 {
-        v -= 365;
-    }
-    v as u16
 }
 
 /// Récupère 5 ans de météo quotidienne et calcule un ClimateProfile.
