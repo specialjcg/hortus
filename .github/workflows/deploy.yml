@@ -135,6 +135,14 @@ jobs:
           systemctl restart hortus
           sleep 2
           systemctl is-active hortus
+          # nginx : l'API ne vit plus que sous /api/. Migration idempotente de
+          # l'ancienne liste blanche de chemins ; restauration si nginx -t échoue.
+          NGX=/etc/nginx/sites-available/hortus
+          if [ -f "$NGX" ] && grep -q 'location ~ ^/(api|' "$NGX"; then
+            cp -f "$NGX" /root/nginx-hortus.bak-ci
+            sed -i 's#^\(\s*\)location ~ ^/(api|[^{]*{#\1location /api/ {#' "$NGX"
+            if nginx -t; then systemctl reload nginx; else cp -f /root/nginx-hortus.bak-ci "$NGX"; fi
+          fi
           echo "=== SERVICE ===" && systemctl status hortus --no-pager | head -6
           FINALIZE
           )
@@ -148,5 +156,7 @@ jobs:
         run: |
           sleep 3
           curl -sf https://hortus.eigenplay.com/api/health
+          # Plus de liste blanche : un chemin hors /api/ est servi par le front.
+          curl -sf https://hortus.eigenplay.com/health | grep -qi "<html"
           curl -sf -o /dev/null https://hortus.eigenplay.com/
           echo "Site OK"
