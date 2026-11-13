@@ -9,6 +9,12 @@ on:
       - 'docs/**'
       - '.claude/**'
 
+# Un seul déploiement à la fois : deux runs simultanés se marchent dessus
+# (static.new, arrêt du service) et laissent le site en 502.
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
 env:
   CARGO_TERM_COLOR: always
 
