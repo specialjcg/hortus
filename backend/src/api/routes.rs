@@ -164,7 +164,8 @@ pub fn router() -> Router {
         roadmap: Arc::new(roadmap),
     };
 
-    Router::new()
+    // Toute l'API sous /api : nginx n'a qu'un préfixe à proxifier, le reste est le front.
+    let api = Router::new()
         .route("/health", get(health))
         .route("/species", get(list_species))
         .route("/cities", get(list_cities))
@@ -190,7 +191,9 @@ pub fn router() -> Router {
         .route("/roadmap/{id}/done", post(roadmap_mark_done).delete(roadmap_unmark_done))
         .route("/problems", get(get_problems).post(create_problem))
         .route("/problems/{id}", put(put_problem).delete(del_problem))
-        .route("/problems/{id}/entries", post(create_problem_entry))
+        .route("/problems/{id}/entries", post(create_problem_entry));
+    Router::new()
+        .nest("/api", api)
         .with_state(state)
         .layer(DefaultBodyLimit::max(8 * 1024 * 1024))
         .layer(CorsLayer::permissive())

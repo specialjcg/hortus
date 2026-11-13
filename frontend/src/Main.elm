@@ -459,9 +459,15 @@ emptyActionForm today =
     }
 
 
+-- Toutes les routes du backend vivent sous /api.
+apiBase : Flags -> String
+apiBase flags =
+    flags.backendUrl ++ "/api"
+
+
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( { backendUrl = flags.backendUrl
+    ( { backendUrl = apiBase flags
       , today = flags.today
       , viewMode = CoachView
       , cities = []
@@ -538,15 +544,15 @@ init flags =
       , panning = Nothing
       }
     , Cmd.batch
-        [ fetchCities flags.backendUrl
-        , fetchCalendar flags.backendUrl "le_bois_doingt" False
-        , fetchParcels flags.backendUrl
-        , fetchActions flags.backendUrl
-        , fetchActionKinds flags.backendUrl
-        , fetchForecast flags.backendUrl "le_bois_doingt"
-        , fetchWater flags.backendUrl "le_bois_doingt"
-        , fetchRoadmap flags.backendUrl "le_bois_doingt" flags.today
-        , fetchProblems flags.backendUrl
+        [ fetchCities (apiBase flags)
+        , fetchCalendar (apiBase flags) "le_bois_doingt" False
+        , fetchParcels (apiBase flags)
+        , fetchActions (apiBase flags)
+        , fetchActionKinds (apiBase flags)
+        , fetchForecast (apiBase flags) "le_bois_doingt"
+        , fetchWater (apiBase flags) "le_bois_doingt"
+        , fetchRoadmap (apiBase flags) "le_bois_doingt" flags.today
+        , fetchProblems (apiBase flags)
         ]
     )
 
