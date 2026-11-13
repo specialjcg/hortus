@@ -5,7 +5,7 @@
 //! occupe la planche jusqu'en avril. Plusieurs espèces partagent une planche
 //! (plants mélangés) tant que l'occupation hebdomadaire ≤ surface.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use good_lp::{
     constraint, highs, variable, Expression, ProblemVariables, ResolutionError, Solution,
@@ -39,6 +39,9 @@ const MIN_PATCH_M2: f64 = 0.1;
 const MIP_GAP: f32 = 0.05;
 /// Production tolérée au-delà du besoin du foyer (pertes, dons, conserves).
 const NEED_MARGIN: f64 = 1.1;
+/// Pénalité par m² d'une famille « souple » remise trop tôt sur une planche (€) :
+/// le plan l'évite quand il peut, l'accepte dans un petit jardin.
+const W_ROTATION: f64 = 3.0;
 /// Une semaine de semis candidate sur N dans chaque fenêtre (plus la dernière).
 /// Les semaines voisines rapportent presque autant ; moins d'options = MILP
 /// résolu à MIP_GAP en ~8 s au lieu de dépasser 60 s.
@@ -113,6 +116,16 @@ pub struct NeedCover {
     pub missing_m2: f64,
 }
 
+/// Famille remise sur une planche avant son délai de retour (rotation souple).
+#[derive(Debug, Serialize)]
+pub struct RotationWarning {
+    pub bed_id: i64,
+    pub species_id: String,
+    pub family: Family,
+    /// Dernière année où la famille était sur la planche.
+    pub last_year: i32,
+}
+
 #[derive(Debug, Serialize)]
 pub struct Plan {
     pub items: Vec<PlanItem>,
@@ -130,6 +143,8 @@ pub struct Plan {
     pub need_cover_ratio: Option<f64>,
     /// Somme des `missing_m2` : planches à ajouter pour 100 % ; `None` sans foyer.
     pub need_missing_m2: Option<f64>,
+    /// Familles souples replantées trop tôt sur la même planche.
+    pub rotation_warnings: Vec<RotationWarning>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -138,6 +153,12 @@ pub enum PlanError {
     NoBeds,
     #[error("solveur : {0}")]
     Solver(#[from] ResolutionError),
+}
+
+/// Familles à rotation stricte : maladies persistantes du sol (hernie du chou,
+/// pourriture blanche). Les autres sont souples : déconseillées, jamais interdites.
+fn strict_rotation(f: Family) -> bool {
+    matches!(f, Family::Brassicaceae | Family::Alliaceae)
 }
 
 /// Écartement des lignes de goutte-à-goutte (m) : celui des plants, borné.
@@ -300,11 +321,14 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
     let total_area: f64 = beds.iter().map(|b| b.area_m2).sum();
     let options: Vec<Vec<CropOption>> = crops.iter().map(sparse_options).collect();
 
-    let blocked: HashSet<(i64, Family)> = history
-        .iter()
-        .filter(|h| h.year < params.year && params.year - h.year < return_delay_years(h.family))
-        .map(|h| (h.bed_id, h.family))
-        .collect();
+    // Dernière année de chaque famille encore dans son délai de retour, par planche.
+    let mut recent: HashMap<(i64, Family), i32> = HashMap::new();
+    for h in history.iter().filter(|h| h.year < params.year && params.year - h.year < return_delay_years(h.family)) {
+        let last = recent.entry((h.bed_id, h.family)).or_insert(h.year);
+        *last = (*last).max(h.year);
+    }
+    let blocked = |bed_id: i64, f: Family| strict_rotation(f) && recent.contains_key(&(bed_id, f));
+    let repeated = |bed_id: i64, f: Family| !strict_rotation(f) && recent.contains_key(&(bed_id, f));
 
     let mut vars = ProblemVariables::new();
     // y[(b, c)] : la culture c apparaît sur la planche b dans l'année.
@@ -314,7 +338,7 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
     let mut a: Vec<((usize, usize, usize), Variable)> = Vec::new();
     for (bi, bed) in beds.iter().enumerate() {
         for (ci, crop) in crops.iter().enumerate() {
-            if options[ci].is_empty() || blocked.contains(&(bed.id, crop.species.family)) {
+            if options[ci].is_empty() || blocked(bed.id, crop.species.family) {
                 continue;
             }
             y.insert((bi, ci), vars.add(variable().binary()));
@@ -337,9 +361,10 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
     let strata: Vec<(Variable, usize)> = (0..beds.len()).map(|bi| (vars.add(variable().binary()), bi)).collect();
 
     let mut objective = Expression::default();
-    for ((_, ci, k), v) in &a {
+    for ((bi, ci, k), v) in &a {
         let o = &options[*ci][*k];
-        objective += (eur_per_m2(crops[*ci].species, o) + W_COVER * o.weeks_on_bed as f64) * *v;
+        let penalty = if repeated(beds[*bi].id, crops[*ci].species.family) { W_ROTATION } else { 0.0 };
+        objective += (eur_per_m2(crops[*ci].species, o) + W_COVER * o.weeks_on_bed as f64 - penalty) * *v;
     }
     // Envies : manque de m² pénalisé (souple → toujours un plan, manques signalés).
     let wish_slacks: Vec<(usize, f64, Variable)> = params
@@ -409,7 +434,8 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
         model = model.with(constraint!(sown(*ci) + *slack >= *m2));
     }
     for bi in 0..beds.len() {
-        // Rotation dans l'année : une seule espèce par famille à délai de retour.
+        // Familles strictes : une seule espèce par planche dans l'année (rotation
+        // possible l'an prochain). Les souples se mélangent librement.
         // Ordre d'apparition (pas de HashSet) : modèle identique d'un appel à l'autre.
         let mut families: Vec<Family> = Vec::new();
         for c in crops {
@@ -417,7 +443,7 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
                 families.push(c.species.family);
             }
         }
-        for f in families.into_iter().filter(|f| return_delay_years(*f) > 0) {
+        for f in families.into_iter().filter(|f| strict_rotation(*f)) {
             let n = used(bi, &|s: &Species| s.family == f);
             model = model.with(constraint!(n <= 1));
         }
@@ -492,6 +518,14 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
     let need_cover_ratio = (need_total > 0.0)
         .then(|| needs.iter().map(|n| n.planned_kg.min(n.need_kg)).sum::<f64>() / need_total);
     let need_missing_m2 = (need_total > 0.0).then(|| (needs.iter().map(|n| n.missing_m2).sum::<f64>()).round());
+    let mut rotation_warnings: Vec<RotationWarning> = Vec::new();
+    for it in &items {
+        let Some(sp) = crops.iter().map(|c| c.species).find(|s| s.id == it.species_id) else { continue };
+        let Some(&last_year) = recent.get(&(it.bed_id, sp.family)).filter(|_| !strict_rotation(sp.family)) else { continue };
+        if !rotation_warnings.iter().any(|w| w.bed_id == it.bed_id && w.species_id == it.species_id) {
+            rotation_warnings.push(RotationWarning { bed_id: it.bed_id, species_id: it.species_id.clone(), family: sp.family, last_year });
+        }
+    }
     Ok(Plan {
         items,
         total_kg: (total_kg * 10.0).round() / 10.0,
@@ -502,6 +536,7 @@ pub fn plan(beds: &[Bed], crops: &[Crop], history: &[PastCrop], params: &PlanPar
         needs,
         need_cover_ratio,
         need_missing_m2,
+        rotation_warnings,
     })
 }
 
@@ -564,6 +599,7 @@ pub fn history_from_actions(parcels: &[Parcel], actions: &[Action], species: &[S
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::collections::HashSet;
 
     fn sp(id: &str, family: &str, days: u16, yield_kg: Option<f32>, extra: serde_json::Value) -> Species {
         let mut v = json!({
@@ -673,15 +709,65 @@ mod tests {
     }
 
     #[test]
-    fn rotation_history_blocks_family() {
-        let t = sp("tomate", "Solanaceae", 90, Some(5.0), json!({}));
+    fn strict_rotation_blocks_cabbage_family() {
+        let c = sp("chou", "Brassicaceae", 90, Some(5.0), json!({}));
         let l = sp("laitue", "Asteraceae", 60, Some(1.0), json!({}));
-        let s = [t, l];
+        let s = [c, l];
         let crops = vec![crop(&s[0], (100, 160)), crop(&s[1], (60, 220))];
-        let history = [PastCrop { bed_id: 1, year: 2025, family: Family::Solanaceae }];
+        let history = [PastCrop { bed_id: 1, year: 2025, family: Family::Brassicaceae }];
         let plan = plan(&[bed(1, 2.0)], &crops, &history, &params()).unwrap();
-        assert!(plan.items.iter().all(|i| i.species_id != "tomate"));
+        assert!(plan.items.iter().all(|i| i.species_id != "chou"));
         assert!(plan.items.iter().any(|i| i.species_id == "laitue"));
+    }
+
+    #[test]
+    fn soft_rotation_allows_repeat_with_warning() {
+        // Petit jardin : tomates l'an dernier, seule culture possible → replantées, signalées.
+        let t = sp("tomate", "Solanaceae", 90, Some(5.0), json!({}));
+        let s = [t];
+        let crops = vec![crop(&s[0], (100, 160))];
+        let history = [PastCrop { bed_id: 1, year: 2026, family: Family::Solanaceae }];
+        let plan = plan(&[bed(1, 2.0)], &crops, &history, &params()).unwrap();
+        assert!(plan.items.iter().any(|i| i.species_id == "tomate"));
+        assert_eq!(plan.rotation_warnings.len(), 1, "{:?}", plan.rotation_warnings);
+        assert_eq!(plan.rotation_warnings[0].species_id, "tomate");
+        assert_eq!(plan.rotation_warnings[0].last_year, 2026);
+    }
+
+    #[test]
+    fn soft_rotation_prefers_another_bed() {
+        let t = sp("tomate", "Solanaceae", 90, Some(5.0), json!({}));
+        let s = [t];
+        let crops = vec![crop(&s[0], (100, 160))];
+        let history = [PastCrop { bed_id: 1, year: 2026, family: Family::Solanaceae }];
+        let p = PlanParams { max_species_share: 0.5, ..params() };
+        let plan = plan(&[bed(1, 2.0), bed(2, 2.0)], &crops, &history, &p).unwrap();
+        assert!(plan.items.iter().all(|i| i.bed_id == 2), "{:?}", plan.items);
+        assert!(plan.rotation_warnings.is_empty());
+    }
+
+    #[test]
+    fn same_soft_family_species_share_a_bed() {
+        let t = sp("tomate", "Solanaceae", 90, Some(5.0), json!({}));
+        let p = sp("poivron", "Solanaceae", 90, Some(5.0), json!({}));
+        let s = [t, p];
+        let crops = vec![crop(&s[0], (100, 110)), crop(&s[1], (100, 110))];
+        let params = PlanParams { max_species_share: 0.5, ..params() };
+        let plan = plan(&[bed(1, 2.0)], &crops, &[], &params).unwrap();
+        assert!(plan.items.iter().any(|i| i.species_id == "tomate"));
+        assert!(plan.items.iter().any(|i| i.species_id == "poivron"));
+    }
+
+    #[test]
+    fn strict_family_one_species_per_bed_per_year() {
+        let c = sp("chou", "Brassicaceae", 90, Some(5.0), json!({}));
+        let b = sp("brocoli", "Brassicaceae", 90, Some(5.0), json!({}));
+        let s = [c, b];
+        let crops = vec![crop(&s[0], (100, 110)), crop(&s[1], (100, 110))];
+        let params = PlanParams { max_species_share: 0.5, ..params() };
+        let plan = plan(&[bed(1, 2.0)], &crops, &[], &params).unwrap();
+        let species: HashSet<&str> = plan.items.iter().map(|i| i.species_id.as_str()).collect();
+        assert_eq!(species.len(), 1, "{species:?}");
     }
 
     #[test]
@@ -750,11 +836,11 @@ mod tests {
 
     #[test]
     fn impossible_wish_is_reported_not_fatal() {
-        let t = sp("tomate", "Solanaceae", 60, Some(3.0), json!({}));
+        let t = sp("chou", "Brassicaceae", 60, Some(3.0), json!({}));
         let s = [t];
         let crops = vec![crop(&s[0], (100, 110))];
-        let history = [PastCrop { bed_id: 1, year: 2026, family: Family::Solanaceae }];
-        let p = PlanParams { wishes: vec![("tomate".into(), 1.0)], ..params() };
+        let history = [PastCrop { bed_id: 1, year: 2026, family: Family::Brassicaceae }];
+        let p = PlanParams { wishes: vec![("chou".into(), 1.0)], ..params() };
         let plan = plan(&[bed(1, 2.0)], &crops, &history, &p).unwrap();
         assert_eq!(plan.unmet_wishes.len(), 1);
         assert_eq!(plan.unmet_wishes[0].missing_m2, 1.0);
