@@ -28,6 +28,8 @@ use crate::problems::{self, EntryInput, Problem, ProblemInput, ProblemUpdate};
 use crate::domain::vigieau::{self, Restriction};
 use crate::restrictions::{self, LevelChange};
 use crate::roadmap::{self, Roadmap, Step};
+use crate::domain::soil::Soil;
+use crate::settings;
 
 /// État partagé.
 #[derive(Clone)]
@@ -187,6 +189,7 @@ pub fn router() -> Router {
         .route("/plan", get(get_plan))
         .route("/plan/jobs", post(start_plan_job))
         .route("/plan/jobs/{id}", get(get_plan_job))
+        .route("/settings", get(get_settings).put(put_settings))
         .route("/roadmap", get(get_roadmap))
         .route("/roadmap/{id}/done", post(roadmap_mark_done).delete(roadmap_unmark_done))
         .route("/problems", get(get_problems).post(create_problem))
@@ -504,7 +507,30 @@ async fn get_roadmap(
         .into_iter()
         .filter_map(|a| Some((a.kind, chrono::NaiveDate::parse_from_str(a.date.get(..10)?, "%Y-%m-%d").ok()?)))
         .collect();
-    Ok(Json(roadmap::roadmap_status(&s.roadmap, today, shift, &manual, &journal)))
+    let soil = settings::soil(&s.db).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    let garden = roadmap::Garden { today, shift, soil };
+    Ok(Json(roadmap::roadmap_status(&s.roadmap, garden, &manual, &journal)))
+}
+
+/// Réglages du jardin exposés au front.
+#[derive(Debug, Serialize, Deserialize)]
+struct GardenSettings {
+    soil: Soil,
+}
+
+async fn get_settings(State(s): State<AppState>) -> Result<Json<GardenSettings>, (StatusCode, String)> {
+    let soil = settings::soil(&s.db).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(GardenSettings { soil }))
+}
+
+/// Un sol inconnu est rejeté par la désérialisation (422) avant d'arriver ici.
+async fn put_settings(
+    State(s): State<AppState>,
+    Json(input): Json<GardenSettings>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    settings::set_soil(&s.db, input.soil)
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
 fn known_step(s: &AppState, id: &str) -> Result<(), (StatusCode, String)> {

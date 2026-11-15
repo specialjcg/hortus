@@ -96,6 +96,7 @@ type alias Model =
     , roadmap : Maybe Roadmap -- feuille de route « jardin autonome »
     , roadmapOpen : Maybe String -- étape dépliée
     , roadmapAll : Bool -- toute la feuille de route visible
+    , soil : String -- type de sol du jardin : clay | loam | sandy | unknown
     , historical : List HistoricalDay
     , historicalLoading : Bool
     , paletteSpecies : Maybe String
@@ -216,6 +217,7 @@ type alias Species =
     , friends : List String
     , foes : List String
     , multiHarvest : Bool
+    , clayFit : Maybe String -- "good" | "poor" en terre argileuse
     }
 
 
@@ -499,6 +501,7 @@ init flags =
       , roadmap = Nothing
       , roadmapOpen = Nothing
       , roadmapAll = False
+      , soil = "unknown"
       , historical = []
       , historicalLoading = False
       , paletteSpecies = Nothing
@@ -558,6 +561,7 @@ init flags =
         , fetchWater (apiBase flags) "le_bois_doingt"
         , fetchRoadmap (apiBase flags) "le_bois_doingt" flags.today
         , fetchProblems (apiBase flags)
+        , fetchSettings (apiBase flags)
         ]
     )
 
@@ -618,6 +622,9 @@ type Msg
     | RoadmapShowAll
     | RoadmapMark String Bool -- étape, fait (True) ou annulé (False)
     | RoadmapSaved (Result Http.Error ())
+    | GotSettings (Result Http.Error String)
+    | SetSoil String
+    | SoilSaved (Result Http.Error ())
     | WaterSeen (Result Http.Error ())
     | LoadHistorical
     | GotHistorical (Result Http.Error (List HistoricalDay))
@@ -779,6 +786,25 @@ update msg model =
 
         RoadmapToggle id ->
             ( { model | roadmapOpen = if model.roadmapOpen == Just id then Nothing else Just id }, Cmd.none )
+
+        GotSettings (Ok soil) -> ( { model | soil = soil }, Cmd.none )
+        GotSettings (Err _) -> ( model, Cmd.none )
+
+        SetSoil soil ->
+            ( { model | soil = soil }
+            , Http.request
+                { method = "PUT"
+                , headers = []
+                , url = model.backendUrl ++ "/settings"
+                , body = Http.jsonBody (Encode.object [ ( "soil", Encode.string soil ) ])
+                , expect = Http.expectWhatever SoilSaved
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+            )
+
+        SoilSaved (Ok _) -> ( model, fetchRoadmap model.backendUrl model.selectedCity model.today )
+        SoilSaved (Err e) -> ( { model | error = Just (httpErr e) }, Cmd.none )
 
         RoadmapShowAll ->
             ( { model | roadmapAll = not model.roadmapAll }, Cmd.none )
@@ -1952,6 +1978,14 @@ fetchRoadmap url slug today =
         }
 
 
+fetchSettings : String -> Cmd Msg
+fetchSettings url =
+    Http.get
+        { url = url ++ "/settings"
+        , expect = Http.expectJson GotSettings (D.field "soil" D.string)
+        }
+
+
 roadmapDecoder : Decoder Roadmap
 roadmapDecoder =
     D.map5 Roadmap
@@ -2708,6 +2742,7 @@ speciesDecoder =
         |> andMap (D.field "friends" (D.list D.string))
         |> andMap (D.field "foes" (D.list D.string))
         |> andMap (D.oneOf [ D.field "multi_harvest" D.bool, D.succeed False ])
+        |> andMap (D.oneOf [ D.field "clay_fit" (D.nullable D.string), D.succeed Nothing ])
 
 
 andMap : Decoder a -> Decoder (a -> b) -> Decoder b
@@ -3891,7 +3926,7 @@ viewCoachTodo model cal =
             div []
                 [ h3 [] [ text "🌱 À semer" ]
                 , div [ A.class "scrollbox scrollbox-sm" ]
-                    (List.map viewSowSuggestion sowSuggestions)
+                    (List.map (viewSowSuggestion model.soil) sowSuggestions)
                 ]
           else text ""
         ]
@@ -4039,12 +4074,13 @@ viewHarvestWeightForm d =
         ]
 
 
-viewSowSuggestion : SowSuggest -> Html Msg
-viewSowSuggestion s =
+viewSowSuggestion : String -> SowSuggest -> Html Msg
+viewSowSuggestion soil s =
     let
         tags =
             (if s.indoor then [ "🌡 abri" ] else [])
                 ++ (if s.direct then [ "🌱 pleine terre" ] else [])
+                ++ (if soil == "clay" then clayFitTag s.species else [])
     in
     div
         [ A.class "pantry-row"
@@ -4077,6 +4113,15 @@ viewSowSuggestion s =
                 )
             ]
         ]
+
+
+-- Aptitude à la terre argileuse, affichée seulement quand le jardin est réglé en argile.
+clayFitTag : Species -> List String
+clayFitTag species =
+    case species.clayFit of
+        Just "good" -> [ "👍 aime l'argile" ]
+        Just "poor" -> [ "⚠ argile peu adaptée" ]
+        _ -> []
 
 
 type alias SowSuggest =
@@ -4357,6 +4402,7 @@ viewCoachRoadmap model =
             in
             div [ A.class "panel accent-sky" ]
                 ([ h2 [] [ text "🧭 Vers un jardin autonome" ]
+                 , viewSoilPicker model.soil
                  , roadmapProgress "Installation" rm.setupDone rm.setupTotal
                  , roadmapProgress "Gestes de la saison" rm.yearlyDone rm.yearlyTotal
                  , if List.isEmpty active && not model.roadmapAll then
@@ -4381,6 +4427,25 @@ viewCoachRoadmap model =
                             text ""
                        ]
                 )
+
+
+viewSoilPicker : String -> Html Msg
+viewSoilPicker current =
+    let
+        choice ( value, label ) =
+            option [ A.value value, A.selected (value == current) ] [ text label ]
+    in
+    div [ A.style "display" "flex", A.style "align-items" "center", A.style "gap" "0.5rem", A.style "font-size" "0.85rem", A.style "margin-bottom" "0.3rem" ]
+        [ span [] [ text "Sol :" ]
+        , select [ E.onInput SetSoil ]
+            (List.map choice
+                [ ( "unknown", "à identifier" )
+                , ( "clay", "argileux" )
+                , ( "loam", "limoneux" )
+                , ( "sandy", "sableux" )
+                ]
+            )
+        ]
 
 
 roadmapProgress : String -> Int -> Int -> Html Msg
@@ -4800,6 +4865,10 @@ viewSelectedSpecies model cal =
                             , detailRow "Cycle" sp.lifeCycle
                             , detailRow "Catégorie" sp.category
                             , detailRow "Difficulté" sp.difficulty
+                            , case sp.clayFit of
+                                Just "good" -> detailRow "Sol argileux" "👍 bien adapté"
+                                Just "poor" -> detailRow "Sol argileux" "⚠ peu adapté (asphyxie des racines)"
+                                _ -> text ""
                             , detailRow "Profondeur semis" (String.fromFloat sp.depthCm ++ " cm")
                             , detailRow "Espacement" (String.fromInt sp.spacingCm ++ " cm")
                             , detailRow "Semis → récolte" (String.fromInt sp.daysToHarvest ++ " jours")

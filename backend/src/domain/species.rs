@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::domain::soil::ClayFit;
+
 /// Fenêtre calendaire en jours julien (1..=365). Peut enjamber le 1er janvier
 /// (`doy_start > doy_end`).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -141,6 +143,9 @@ pub struct Species {
     /// Strate à maturité ; `None` → défaut selon cycle/catégorie (voir `height`).
     #[serde(default)]
     pub height_class: Option<HeightClass>,
+    /// Aptitude à la terre argileuse ; `None` = pas d'avis de la source.
+    #[serde(default)]
+    pub clay_fit: Option<ClayFit>,
     /// Engrais vert : couvre le sol entre deux cultures, fauché puis laissé en surface.
     #[serde(default)]
     pub green_manure: bool,

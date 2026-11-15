@@ -2,11 +2,14 @@
 //! récurrentes chaque année), statut calculé d'après la date du jour, le climat
 //! local et le carnet. Catalogue d'étapes : `data/roadmap.json`.
 
+use std::collections::HashMap;
+
 use chrono::{Datelike, Duration, NaiveDate};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 use crate::db::Db;
+use crate::domain::soil::Soil;
 use crate::domain::species::CalendarWindow;
 
 /// Une étape en retard reste signalée ce nombre de jours après sa fenêtre.
@@ -36,9 +39,26 @@ pub struct Step {
     pub requires: Vec<String>,
     /// Type d'action du carnet qui valide l'étape automatiquement.
     pub done_by: Option<String>,
+    /// Sols concernés ; vide = tous les sols.
+    #[serde(default)]
+    pub soils: Vec<Soil>,
+    /// Conseils ajoutés à `how` selon le sol du jardin (fusionnés à la lecture).
+    #[serde(default, skip_serializing)]
+    pub how_by_soil: HashMap<Soil, Vec<String>>,
 }
 
 impl Step {
+    fn applies_to(&self, soil: Soil) -> bool {
+        self.soils.is_empty() || self.soils.contains(&soil)
+    }
+
+    /// L'étape vue pour ce sol : conseils spécifiques ajoutés à la fin de `how`.
+    fn for_soil(&self, soil: Soil) -> Step {
+        let mut step = self.clone();
+        step.how.extend(self.how_by_soil.get(&soil).into_iter().flatten().cloned());
+        step
+    }
+
     pub fn load_from_json(path: &str) -> Result<Vec<Step>, String> {
         let raw = std::fs::read_to_string(path).map_err(|e| format!("lecture {path} : {e}"))?;
         serde_json::from_str(&raw).map_err(|e| format!("parse {path} : {e}"))
@@ -73,6 +93,7 @@ pub struct StepStatus {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Roadmap {
+    pub soil: Soil,
     pub setup_done: usize,
     pub setup_total: usize,
     pub yearly_done: usize,
@@ -112,15 +133,26 @@ fn days_until_start(w: CalendarWindow, today: NaiveDate) -> i64 {
     (w.doy_start as i64 - doy(today) as i64).rem_euclid(365)
 }
 
-/// Statut de chaque étape à la date `today`.
+/// Contexte du jardin pour évaluer la feuille de route.
+#[derive(Debug, Clone, Copy)]
+pub struct Garden {
+    pub today: NaiveDate,
+    /// Avance (-) ou retard (+) de printemps local, en jours.
+    pub shift: i16,
+    pub soil: Soil,
+}
+
+/// Statut de chaque étape applicable au sol du jardin, à la date `garden.today`.
 /// `manual` : étapes cochées à la main ; `journal` : (type d'action, date) du carnet.
 pub fn roadmap_status(
-    steps: &[Step],
-    today: NaiveDate,
-    shift: i16,
+    catalog: &[Step],
+    garden: Garden,
     manual: &[Completion],
     journal: &[(String, NaiveDate)],
 ) -> Roadmap {
+    let Garden { today, shift, soil } = garden;
+    let steps: Vec<Step> = catalog.iter().filter(|s| s.applies_to(soil)).map(|s| s.for_soil(soil)).collect();
+    let steps = steps.as_slice();
     let windows: Vec<CalendarWindow> = steps
         .iter()
         .map(|s| if s.climate_shift { s.window.shifted(shift) } else { s.window })
@@ -191,7 +223,7 @@ pub fn roadmap_status(
         Status::Done => 3,
     };
     out.sort_by_key(|s| (rank(s), !s.waiting_for.is_empty(), s.starts_in_days));
-    Roadmap { setup_done, setup_total, yearly_done, yearly_total, steps: out }
+    Roadmap { soil, setup_done, setup_total, yearly_done, yearly_total, steps: out }
 }
 
 // ---------------------------------------------------------------- SQLite
@@ -268,7 +300,13 @@ mod tests {
             climate_shift: false,
             requires: vec![],
             done_by: None,
+            soils: vec![],
+            how_by_soil: HashMap::new(),
         }
+    }
+
+    fn garden(today: NaiveDate, shift: i16) -> Garden {
+        Garden { today, shift, soil: Soil::Unknown }
     }
 
     fn status_of(r: &Roadmap, id: &str) -> Status {
@@ -296,7 +334,7 @@ mod tests {
             step("later", StepKind::Yearly, 60, 120),
             step("wraps", StepKind::Setup, 305, 45),
         ];
-        let r = roadmap_status(&steps, d(2026, 11, 12), 0, &[], &[]);
+        let r = roadmap_status(&steps, garden(d(2026, 11, 12), 0), &[], &[]);
         assert_eq!(status_of(&r, "now"), Status::Now);
         assert_eq!(status_of(&r, "late"), Status::Late);
         assert_eq!(status_of(&r, "later"), Status::Upcoming);
@@ -311,7 +349,7 @@ mod tests {
             Completion { step_id: "install".into(), date: d(2024, 4, 1) },
             Completion { step_id: "mulch".into(), date: d(2025, 11, 1) },
         ];
-        let r = roadmap_status(&steps, d(2026, 11, 12), 0, &manual, &[]);
+        let r = roadmap_status(&steps, garden(d(2026, 11, 12), 0), &manual, &[]);
         assert_eq!(status_of(&r, "install"), Status::Done);
         assert_eq!(status_of(&r, "mulch"), Status::Now, "le paillage 2025 ne vaut pas pour 2026");
         assert_eq!((r.setup_done, r.yearly_done), (1, 0));
@@ -322,7 +360,7 @@ mod tests {
         let mut mulch = step("mulch", StepKind::Yearly, 290, 340);
         mulch.done_by = Some("paillage".into());
         let journal = vec![("paillage".to_string(), d(2026, 11, 2))];
-        let r = roadmap_status(&[mulch], d(2026, 11, 12), 0, &[], &journal);
+        let r = roadmap_status(&[mulch], garden(d(2026, 11, 12), 0), &[], &journal);
         assert_eq!(r.steps[0].status, Status::Done);
         assert!(!r.steps[0].manual);
         assert_eq!(r.steps[0].done_on, Some(d(2026, 11, 2)));
@@ -335,11 +373,31 @@ mod tests {
         drip.climate_shift = true;
         let steps = vec![step("survey", StepKind::Setup, 1, 40), drip];
         // Climat plus froid de 20 jours : la fenêtre s'ouvre au jour 320.
-        let r = roadmap_status(&steps, d(2026, 11, 12), 20, &[], &[]);
+        let r = roadmap_status(&steps, garden(d(2026, 11, 12), 20), &[], &[]);
         let drip = r.steps.iter().find(|s| s.step.id == "drip").expect("présente");
         assert_eq!(drip.window_local.doy_start, 320);
         assert_eq!(drip.status, Status::Upcoming);
         assert_eq!(drip.starts_in_days, 4);
         assert_eq!(drip.waiting_for, vec!["survey".to_string()]);
+    }
+
+    #[test]
+    fn soil_filters_steps_and_adds_advice() {
+        let mut clay_only = step("no_dig", StepKind::Setup, 300, 330);
+        clay_only.soils = vec![Soil::Clay];
+        let mut mulch = step("mulch", StepKind::Yearly, 300, 330);
+        mulch.how = vec!["5 cm".into()];
+        mulch.how_by_soil = HashMap::from([(Soil::Clay, vec!["10 cm en argile".to_string()])]);
+        let steps = vec![clay_only, mulch];
+        let today = d(2026, 11, 12);
+
+        let loam = roadmap_status(&steps, Garden { today, shift: 0, soil: Soil::Loam }, &[], &[]);
+        let clay = roadmap_status(&steps, Garden { today, shift: 0, soil: Soil::Clay }, &[], &[]);
+
+        assert_eq!(loam.steps.len(), 1);
+        assert_eq!(loam.steps[0].step.how, vec!["5 cm".to_string()]);
+        assert_eq!(clay.steps.len(), 2);
+        let clay_mulch = clay.steps.iter().find(|s| s.step.id == "mulch").expect("présente");
+        assert_eq!(clay_mulch.step.how, vec!["5 cm".to_string(), "10 cm en argile".to_string()]);
     }
 }
