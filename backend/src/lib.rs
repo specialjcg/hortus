@@ -7,3 +7,4 @@ pub mod planner;
 pub mod problems;
 pub mod restrictions;
 pub mod roadmap;
+pub mod settings;

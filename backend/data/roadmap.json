@@ -1,5 +1,25 @@
 [
   {
+    "id": "soil_test",
+    "theme": "sol",
+    "kind": "setup",
+    "title": "Identifier ton type de sol",
+    "why": "Argile, limon ou sable ne se travaillent ni ne s'arrosent pareil : Hortus adapte ses conseils à ton sol.",
+    "how": [
+      "Test de l'anneau : humidifie une poignée de terre et roule-la en boudin ; si tu formes facilement un anneau, ton sol est argileux.",
+      "Si le boudin s'effrite sans tenir, le sol est sableux ; entre les deux, limoneux.",
+      "Indices argileux : chardon, liseron, plantain, pissenlit abondants ; terre qui colle l'hiver et se fendille l'été.",
+      "Règle ensuite le type de sol dans cette carte (menu « Sol »)."
+    ],
+    "window": {
+      "doy_start": 1,
+      "doy_end": 365
+    },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": null
+  },
+  {
     "id": "garden_plan",
     "theme": "rotation",
     "kind": "setup",
@@ -10,7 +30,10 @@
       "Regroupe les cultures par famille : solanacées, cucurbitacées, choux, légumineuses, racines.",
       "Lance le plan de saison : il respecte les délais de retour de chaque famille."
     ],
-    "window": { "doy_start": 305, "doy_end": 45 },
+    "window": {
+      "doy_start": 305,
+      "doy_end": 45
+    },
     "climate_shift": false,
     "requires": [],
     "done_by": null
@@ -26,7 +49,10 @@
       "Alterne matières vertes (épluchures, tontes) et brunes (feuilles, broyat, carton brun).",
       "Garde-le humide comme une éponge essorée."
     ],
-    "window": { "doy_start": 245, "doy_end": 340 },
+    "window": {
+      "doy_start": 245,
+      "doy_end": 340
+    },
     "climate_shift": false,
     "requires": [],
     "done_by": null
@@ -42,10 +68,18 @@
       "Le bloc « Matériel & préparation » du plan de saison donne la surface à couvrir.",
       "Stocke au sec ; les feuilles mortes se ramassent gratuitement en novembre."
     ],
-    "window": { "doy_start": 280, "doy_end": 350 },
+    "window": {
+      "doy_start": 280,
+      "doy_end": 350
+    },
     "climate_shift": false,
     "requires": [],
-    "done_by": null
+    "done_by": null,
+    "how_by_soil": {
+      "clay": [
+        "En argile : garde un paillis épais toute l'année — il limite le tassement, les fissures en sécheresse et amortit les grosses pluies."
+      ]
+    }
   },
   {
     "id": "water_survey",
@@ -58,7 +92,10 @@
       "Note la distance robinet → potager et la pente (le goutte-à-goutte aime le plat ou des lignes à niveau).",
       "Repère une gouttière proche pour une future cuve de récupération."
     ],
-    "window": { "doy_start": 320, "doy_end": 40 },
+    "window": {
+      "doy_start": 320,
+      "doy_end": 40
+    },
     "climate_shift": false,
     "requires": [],
     "done_by": null
@@ -75,9 +112,15 @@
       "Tête de réseau : programmateur à piles, filtre 120 mesh, réducteur de pression 1,5 bar, raccords et bouchons de fin de ligne.",
       "Au-delà de 25 m par ligne, alimente par le milieu ou découpe en secteurs."
     ],
-    "window": { "doy_start": 335, "doy_end": 60 },
+    "window": {
+      "doy_start": 335,
+      "doy_end": 60
+    },
     "climate_shift": false,
-    "requires": ["water_survey", "garden_plan"],
+    "requires": [
+      "water_survey",
+      "garden_plan"
+    ],
     "done_by": null
   },
   {
@@ -91,9 +134,14 @@
       "Surélève la cuve d'au moins 50 cm ou ajoute une petite pompe : le goutte-à-goutte a besoin d'un peu de pression.",
       "Mets un filtre entre cuve et réseau ; vérifie les restrictions VigiEau qui s'appliquent aussi aux puits."
     ],
-    "window": { "doy_start": 1, "doy_end": 90 },
+    "window": {
+      "doy_start": 1,
+      "doy_end": 90
+    },
     "climate_shift": false,
-    "requires": ["water_survey"],
+    "requires": [
+      "water_survey"
+    ],
     "done_by": null
   },
   {
@@ -107,9 +155,14 @@
       "Purge les lignes avant de poser les bouchons de fin.",
       "Plante ou sème au plus près des goutteurs, puis paille par-dessus les lignes."
     ],
-    "window": { "doy_start": 60, "doy_end": 120 },
+    "window": {
+      "doy_start": 60,
+      "doy_end": 120
+    },
     "climate_shift": true,
-    "requires": ["drip_design"],
+    "requires": [
+      "drip_design"
+    ],
     "done_by": null
   },
   {
@@ -123,10 +176,23 @@
       "Au printemps : 2 cycles par semaine, tôt le matin ; ajuste selon la météo du coach.",
       "Vérifie qu'aucun goutteur n'est bouché (filtre à nettoyer chaque mois)."
     ],
-    "window": { "doy_start": 100, "doy_end": 150 },
+    "window": {
+      "doy_start": 100,
+      "doy_end": 150
+    },
     "climate_shift": true,
-    "requires": ["drip_install"],
-    "done_by": null
+    "requires": [
+      "drip_install"
+    ],
+    "done_by": null,
+    "how_by_soil": {
+      "clay": [
+        "En argile : l'eau est retenue longtemps — moins de cycles mais plus longs, et vérifie qu'aucune flaque ne reste au pied des plants."
+      ],
+      "sandy": [
+        "En sol sableux : l'eau file vite — cycles plus courts et plus fréquents."
+      ]
+    }
   },
   {
     "id": "seed_order",
@@ -139,7 +205,10 @@
       "Fais l'inventaire des graines restantes ; privilégie des variétés reproductibles pour garder tes semences.",
       "Commande tôt : les variétés bio partent vite."
     ],
-    "window": { "doy_start": 335, "doy_end": 31 },
+    "window": {
+      "doy_start": 335,
+      "doy_end": 31
+    },
     "climate_shift": false,
     "requires": [],
     "done_by": null
@@ -155,7 +224,10 @@
       "Terreau de semis, lumière maximale, 18-22 °C pour les solanacées.",
       "Repique en godets dès la première vraie feuille."
     ],
-    "window": { "doy_start": 45, "doy_end": 100 },
+    "window": {
+      "doy_start": 45,
+      "doy_end": 100
+    },
     "climate_shift": true,
     "requires": [],
     "done_by": "semis_abri"
@@ -171,10 +243,21 @@
       "Écarte le paillis, étale le compost en surface, griffe légèrement : pas de bêchage.",
       "Remets le paillis en place."
     ],
-    "window": { "doy_start": 60, "doy_end": 115 },
+    "window": {
+      "doy_start": 60,
+      "doy_end": 115
+    },
     "climate_shift": true,
     "requires": [],
-    "done_by": "compost"
+    "done_by": "compost",
+    "how_by_soil": {
+      "clay": [
+        "En argile : compost toujours en surface, jamais enfoui ; les vers de terre l'incorporent et aèrent le sol."
+      ],
+      "sandy": [
+        "En sol sableux : la matière organique disparaît vite, prévois des apports plus réguliers."
+      ]
+    }
   },
   {
     "id": "compost_turn",
@@ -187,9 +270,14 @@
       "Tamise la partie mûre (brune, odeur de sous-bois) pour les semis et les planches.",
       "Remets les morceaux grossiers dans le bac suivant."
     ],
-    "window": { "doy_start": 75, "doy_end": 130 },
+    "window": {
+      "doy_start": 75,
+      "doy_end": 130
+    },
     "climate_shift": false,
-    "requires": ["compost_start"],
+    "requires": [
+      "compost_start"
+    ],
     "done_by": null
   },
   {
@@ -203,10 +291,18 @@
       "Laisse le paillis par-dessus les lignes de goutte-à-goutte.",
       "Éloigne-le de quelques cm du collet des jeunes plants (limaces)."
     ],
-    "window": { "doy_start": 125, "doy_end": 165 },
+    "window": {
+      "doy_start": 125,
+      "doy_end": 165
+    },
     "climate_shift": true,
     "requires": [],
-    "done_by": "paillage"
+    "done_by": "paillage",
+    "how_by_soil": {
+      "clay": [
+        "En argile : garde un paillis épais toute l'année — il limite le tassement, les fissures en sécheresse et amortit les grosses pluies."
+      ]
+    }
   },
   {
     "id": "summer_watering",
@@ -219,10 +315,18 @@
       "Surveille les alertes canicule du coach et les restrictions VigiEau (le goutte-à-goutte est souvent toléré).",
       "Recharge le paillis là où il s'est décomposé."
     ],
-    "window": { "doy_start": 166, "doy_end": 245 },
+    "window": {
+      "doy_start": 166,
+      "doy_end": 245
+    },
     "climate_shift": false,
     "requires": [],
-    "done_by": null
+    "done_by": null,
+    "how_by_soil": {
+      "clay": [
+        "En argile : la terre garde bien l'humidité sous paillis ; espace les arrosages et surveille les fissures, signe qu'il faut recharger le paillis."
+      ]
+    }
   },
   {
     "id": "succession",
@@ -235,7 +339,10 @@
       "Sinon, sème une culture rapide (radis, salade, mâche) ou recouvre de paillis.",
       "Note l'arrachage dans le carnet pour garder l'historique de rotation."
     ],
-    "window": { "doy_start": 166, "doy_end": 260 },
+    "window": {
+      "doy_start": 166,
+      "doy_end": 260
+    },
     "climate_shift": false,
     "requires": [],
     "done_by": null
@@ -251,9 +358,14 @@
       "Rentre programmateur, filtre et réducteur à l'abri ; enlève les piles.",
       "Nettoie le filtre avant de le ranger."
     ],
-    "window": { "doy_start": 290, "doy_end": 330 },
+    "window": {
+      "doy_start": 290,
+      "doy_end": 330
+    },
     "climate_shift": true,
-    "requires": ["drip_install"],
+    "requires": [
+      "drip_install"
+    ],
     "done_by": null
   },
   {
@@ -267,10 +379,18 @@
       "Tu peux glisser du compost demi-mûr dessous : il finira de se décomposer en place.",
       "Garde les planches de printemps précoce (pois, fèves) moins couvertes pour qu'elles se réchauffent."
     ],
-    "window": { "doy_start": 290, "doy_end": 345 },
+    "window": {
+      "doy_start": 290,
+      "doy_end": 345
+    },
     "climate_shift": false,
     "requires": [],
-    "done_by": "paillage"
+    "done_by": "paillage",
+    "how_by_soil": {
+      "clay": [
+        "En argile : garde un paillis épais toute l'année — il limite le tassement, les fissures en sécheresse et amortit les grosses pluies."
+      ]
+    }
   },
   {
     "id": "leaves_collect",
@@ -283,8 +403,103 @@
       "Stocke-en une partie en sacs ou en cage pour le compost de l'été.",
       "Évite les feuilles de noyer et de laurier en grande quantité."
     ],
-    "window": { "doy_start": 295, "doy_end": 345 },
+    "window": {
+      "doy_start": 295,
+      "doy_end": 345
+    },
     "climate_shift": false,
+    "requires": [],
+    "done_by": null
+  },
+  {
+    "id": "clay_no_dig",
+    "theme": "sol",
+    "kind": "setup",
+    "soils": [
+      "clay"
+    ],
+    "title": "Arrêter de retourner la terre",
+    "why": "Retourner une argile la déstructure et brûle la matière organique ; laissée en place sous paillis, elle devient grumeleuse grâce aux vers de terre.",
+    "how": [
+      "Plus de bêchage : au besoin, décompacte sans retourner (grelinette) sur une terre ressuyée.",
+      "Ne marche jamais sur les planches, et jamais sur une argile détrempée.",
+      "Laisse compost et paillis en surface : la vie du sol fait le travail."
+    ],
+    "window": {
+      "doy_start": 274,
+      "doy_end": 334
+    },
+    "climate_shift": false,
+    "requires": [
+      "soil_test"
+    ],
+    "done_by": null
+  },
+  {
+    "id": "clay_surface_compost",
+    "theme": "compost",
+    "kind": "yearly",
+    "soils": [
+      "clay"
+    ],
+    "title": "Étaler le compost en surface",
+    "why": "En automne, le compost posé sur l'argile nourrit les vers de terre tout l'hiver : au printemps, la terre est plus légère.",
+    "how": [
+      "Étale le compost sur les planches libérées, sans l'enfouir.",
+      "Recouvre-le aussitôt d'un paillis épais (feuilles, paille).",
+      "Note l'apport dans le carnet (action « compost »)."
+    ],
+    "window": {
+      "doy_start": 274,
+      "doy_end": 334
+    },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": "compost"
+  },
+  {
+    "id": "clay_raised_beds",
+    "theme": "sol",
+    "kind": "setup",
+    "soils": [
+      "clay"
+    ],
+    "title": "Surélever les planches où l'eau stagne",
+    "why": "L'argile retient l'eau : après de fortes pluies, les racines peuvent s'asphyxier. Des buttes ou planches surélevées drainent naturellement.",
+    "how": [
+      "Après une grosse pluie, repère les planches où une flaque reste plus d'une journée.",
+      "Sur celles-là, monte une butte ou une planche surélevée avec un apport extérieur de terre et de compost.",
+      "Garde les allées plus basses que les planches pour évacuer l'eau."
+    ],
+    "window": {
+      "doy_start": 305,
+      "doy_end": 60
+    },
+    "climate_shift": false,
+    "requires": [
+      "soil_test"
+    ],
+    "done_by": null
+  },
+  {
+    "id": "clay_spring_wait",
+    "theme": "semis",
+    "kind": "yearly",
+    "soils": [
+      "clay"
+    ],
+    "title": "Attendre que la terre se ressuie et se réchauffe",
+    "why": "L'argile se réchauffe lentement au printemps : semer dans une terre froide et collante fait pourrir les graines.",
+    "how": [
+      "Test : serre une poignée de terre ; si elle forme une boule collante, attends encore quelques jours.",
+      "Écarte le paillis une à deux semaines avant de semer pour laisser le soleil chauffer le sol.",
+      "Pour les premiers semis, préfère des plants élevés sous abri et repiqués."
+    ],
+    "window": {
+      "doy_start": 60,
+      "doy_end": 120
+    },
+    "climate_shift": true,
     "requires": [],
     "done_by": null
   }

@@ -54,7 +54,8 @@ Tous sous le préfixe `/api` (nginx ne proxifie que `/api/`, le reste est le fro
 - `GET /action-kinds` — types d'action acceptés
 - `GET/POST /parcels`, `PUT/DELETE /parcels/{id}`
 - `GET/POST /actions`, `PUT/DELETE /actions/{id}`
-- `GET /roadmap?city=X&date=YYYY-MM-DD`, `POST/DELETE /roadmap/{id}/done` — feuille de route « jardin autonome »
+- `GET /roadmap?city=X&date=YYYY-MM-DD`, `POST/DELETE /roadmap/{id}/done` — feuille de route « jardin autonome », filtrée et enrichie selon le sol
+- `GET/PUT /settings` — réglages du jardin (`{"soil": "clay|loam|sandy|unknown"}`)
 
 ## Modèle calendaire
 
