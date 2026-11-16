@@ -329,6 +329,8 @@ type alias BedSupplies =
     , dripSpacingM : Float
     , compostKg : Float
     , mulchM2 : Float
+    , reachM : Float -- distance max au bord (m)
+    , tooWide : Bool -- centre hors de portée depuis l'allée
     }
 
 
@@ -1957,12 +1959,14 @@ seasonPlanDecoder =
             (D.oneOf
                 [ D.field "bed_supplies"
                     (D.list
-                        (D.map5 BedSupplies
-                            (D.field "bed_id" D.int)
-                            (D.field "drip_m" D.float)
-                            (D.field "drip_spacing_m" D.float)
-                            (D.field "compost_kg" D.float)
-                            (D.field "mulch_m2" D.float)
+                        (D.succeed BedSupplies
+                            |> andMap (D.field "bed_id" D.int)
+                            |> andMap (D.field "drip_m" D.float)
+                            |> andMap (D.field "drip_spacing_m" D.float)
+                            |> andMap (D.field "compost_kg" D.float)
+                            |> andMap (D.field "mulch_m2" D.float)
+                            |> andMap (D.oneOf [ D.field "reach_m" D.float, D.succeed 0 ])
+                            |> andMap (D.oneOf [ D.field "too_wide" D.bool, D.succeed False ])
                         )
                     )
                 , D.succeed []
@@ -6157,6 +6161,16 @@ viewPlanSupplies beds plan =
                         ++ String.fromInt (round bs.compostKg) ++ " kg de compost, "
                         ++ String.fromFloat (round1 bs.mulchM2) ++ " m² à pailler"
                     )
+                , if bs.tooWide then
+                    span [ A.class "plan-warning" ]
+                        [ text
+                            (" ⚠ centre à " ++ String.fromInt (round (bs.reachM * 100))
+                                ++ " cm du bord : tu marcheras dessus, vise 75 cm à 1,2 m de large"
+                            )
+                        ]
+
+                  else
+                    text ""
                 ]
     in
     if List.isEmpty plan.bedSupplies then

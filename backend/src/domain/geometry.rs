@@ -108,6 +108,19 @@ impl Polygon {
             .fold(f64::INFINITY, f64::min)
     }
 
+    /// Distance maximale (m) entre un point de la planche et le bord le plus
+    /// proche : au-delà d'un bras (~60 cm), on marche sur la planche pour
+    /// atteindre le centre.
+    pub fn max_reach_m(&self) -> f64 {
+        let (x_min, y_min, x_max, y_max) = self.bbox();
+        let xs = (x_min..=x_max).step_by(SAMPLE_STEP_CM as usize);
+        xs.flat_map(|x| (y_min..=y_max).step_by(SAMPLE_STEP_CM as usize).map(move |y| (x as f64, y as f64)))
+            .filter(|&(x, y)| self.contains(x, y))
+            .map(|(x, y)| self.edge_distance(x, y))
+            .fold(0.0, f64::max)
+            / PX_PER_M
+    }
+
     /// Boîte englobante (x_min, y_min, x_max, y_max).
     pub fn bbox(&self) -> (i64, i64, i64, i64) {
         self.0.iter().fold((i64::MAX, i64::MAX, i64::MIN, i64::MIN), |(a, b, c, d), &[x, y]| {
@@ -227,6 +240,15 @@ mod tests {
 
     fn poly(pts: &[Pt]) -> Result<Polygon, ShapeError> {
         Polygon::try_from(pts.to_vec())
+    }
+
+    #[test]
+    fn reach_is_half_the_width_of_a_rectangular_bed() {
+        let narrow = poly(&[[0, 0], [100, 0], [100, 300], [0, 300]]).unwrap();
+        let wide = poly(&[[0, 0], [160, 0], [160, 300], [0, 300]]).unwrap();
+
+        assert!((narrow.max_reach_m() - 0.5).abs() < 0.03);
+        assert!((wide.max_reach_m() - 0.8).abs() < 0.03);
     }
 
     #[test]
