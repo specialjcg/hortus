@@ -51,6 +51,8 @@ pub struct Bed {
     pub id: i64,
     pub name: String,
     pub area_m2: f64,
+    /// Distance max d'un point de la planche au bord (m) : > [`ARM_REACH_M`] = on marche dessus.
+    pub reach_m: f64,
 }
 
 /// Espèce avec fenêtres déjà décalées au climat local.
@@ -164,6 +166,8 @@ fn strict_rotation(f: Family) -> bool {
 /// Écartement des lignes de goutte-à-goutte (m) : celui des plants, borné.
 const DRIP_LINE_MIN_M: f64 = 0.3;
 const DRIP_LINE_MAX_M: f64 = 0.5;
+/// Portée d'un bras depuis l'allée : planches permanentes de 75 cm à 1,2 m.
+pub const ARM_REACH_M: f64 = 0.6;
 
 /// Matériel et apports d'une planche pour le plan de l'année.
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -177,6 +181,10 @@ pub struct BedSupplies {
     pub compost_kg: f64,
     /// Surface à pailler (m²).
     pub mulch_m2: f64,
+    /// Distance max au bord (m).
+    pub reach_m: f64,
+    /// Centre hors de portée depuis l'allée : on piétinera la planche.
+    pub too_wide: bool,
 }
 
 /// Compost recommandé (kg/m²) selon la famille : gourmandes, moyennes, sobres.
@@ -211,6 +219,8 @@ pub fn bed_supplies(beds: &[Bed], items: &[PlanItem], species: &[Species]) -> Ve
                 drip_spacing_m: spacing,
                 compost_kg: compost.round(),
                 mulch_m2: (bed.area_m2 * 10.0).round() / 10.0,
+                reach_m: (bed.reach_m * 100.0).round() / 100.0,
+                too_wide: bed.reach_m > ARM_REACH_M,
             })
         })
         .collect()
@@ -574,6 +584,7 @@ pub fn beds_from_parcels(parcels: &[Parcel], actions: &[Action], species: &[Spec
                 id: p.id,
                 name: p.name.clone(),
                 area_m2: (p.surface_m2.unwrap_or(0.0) - perennial_m2).max(0.0),
+                reach_m: p.shape.as_ref().map_or(0.0, |shape| shape.max_reach_m()),
             }
         })
         .filter(|b| b.area_m2 > 0.0)
@@ -626,7 +637,7 @@ mod tests {
     }
 
     fn bed(id: i64, area: f64) -> Bed {
-        Bed { id, name: format!("P{id}"), area_m2: area }
+        Bed { id, name: format!("P{id}"), area_m2: area, reach_m: 0.5 }
     }
 
     fn params() -> PlanParams {
@@ -904,8 +915,8 @@ mod tests {
         let heavy = catalog.iter().find(|s| s.family == Family::Solanaceae && !s.green_manure).expect("une solanacée");
         let light = catalog.iter().find(|s| s.family == Family::Fabaceae && !s.green_manure).expect("une fabacée");
         let beds = vec![
-            Bed { id: 1, name: "A".into(), area_m2: 6.0 },
-            Bed { id: 2, name: "B".into(), area_m2: 4.0 },
+            Bed { id: 1, name: "A".into(), area_m2: 6.0, reach_m: 0.8 },
+            Bed { id: 2, name: "B".into(), area_m2: 4.0, reach_m: 0.5 },
         ];
         let item = |bed_id, sp: &Species, area_m2| PlanItem {
             bed_id,
@@ -925,5 +936,6 @@ mod tests {
         assert_eq!(a.drip_m, (6.0 / a.drip_spacing_m).ceil());
         assert_eq!(a.compost_kg, 26.0);
         assert_eq!(a.mulch_m2, 6.0);
+        assert!(a.too_wide, "centre à 0,8 m du bord : hors de portée");
     }
 }

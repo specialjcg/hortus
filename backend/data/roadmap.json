@@ -24,7 +24,7 @@
     "theme": "rotation",
     "kind": "setup",
     "title": "Dessiner les planches et la rotation",
-    "why": "Des planches fixes de 1 à 1,2 m de large permettent un goutte-à-goutte permanent, un paillage continu et une rotation suivie année après année.",
+    "why": "Des planches fixes de 75 cm à 1,2 m de large, atteignables depuis l'allée, permettent un goutte-à-goutte permanent, un paillage continu et une rotation suivie année après année.",
     "how": [
       "Dessine tes planches dans 📓 Mon jardin (allées de 40 à 50 cm, jamais piétinées).",
       "Regroupe les cultures par famille : solanacées, cucurbitacées, choux, légumineuses, racines.",
@@ -37,6 +37,57 @@
     "climate_shift": false,
     "requires": [],
     "done_by": null
+  },
+  {
+    "id": "permanent_beds",
+    "theme": "sol",
+    "kind": "setup",
+    "title": "Fixer les planches permanentes sur le terrain",
+    "why": "Cultures et passages toujours aux mêmes endroits : le sol des planches n'est plus jamais tassé, et le goutte-à-goutte suit les planches.",
+    "how": [
+      "Trace les planches au cordeau : 75 cm à 1,2 m de large, pour atteindre le centre sans y poser le pied.",
+      "Allées de 40 à 50 cm, couvertes de carton puis de BRF ou de copeaux pour bloquer l'herbe.",
+      "Ameublis une seule fois la planche si la terre est très tassée ou enherbée (grelinette), puis croc et râteau en surface.",
+      "Charge les planches en matière organique (compost, feuilles, tonte sèche) ; sur un sol pauvre, en plusieurs apports plutôt qu'un seul gros."
+    ],
+    "window": {
+      "doy_start": 274,
+      "doy_end": 59
+    },
+    "climate_shift": false,
+    "requires": [
+      "garden_plan"
+    ],
+    "done_by": null,
+    "how_by_soil": {
+      "clay": [
+        "En argile : les sols riches en argile se tassent vite ; là où l'eau stagne, surélève la planche (voir l'étape dédiée)."
+      ]
+    }
+  },
+  {
+    "id": "no_dig",
+    "theme": "sol",
+    "kind": "setup",
+    "title": "Arrêter de retourner la terre",
+    "why": "Bêche et motobineuse retournent les couches du sol, brûlent l'humus et créent une semelle tassée ; laissé en place sous paillis, le sol se structure grâce aux vers de terre.",
+    "how": [
+      "Plus de bêche ni de motobineuse : au besoin, décompacte sans retourner (grelinette) sur une terre ressuyée.",
+      "Ne marche jamais sur les planches : seulement dans les allées.",
+      "Laisse compost et paillis en surface : la vie du sol fait le travail."
+    ],
+    "window": {
+      "doy_start": 274,
+      "doy_end": 334
+    },
+    "climate_shift": false,
+    "requires": [],
+    "done_by": null,
+    "how_by_soil": {
+      "clay": [
+        "En argile : jamais de travail ni de passage sur une terre détrempée, elle se tasse durablement."
+      ]
+    }
   },
   {
     "id": "compost_start",
@@ -119,7 +170,7 @@
     "climate_shift": false,
     "requires": [
       "water_survey",
-      "garden_plan"
+      "permanent_beds"
     ],
     "done_by": null
   },
@@ -233,6 +284,32 @@
     "done_by": "semis_abri"
   },
   {
+    "id": "broadfork",
+    "theme": "sol",
+    "kind": "yearly",
+    "title": "Aérer à la grelinette, sans retourner",
+    "why": "Ameublir en profondeur sans mélanger les couches garde la vie du sol intacte ; inutile chaque année si le sol reste souple sous paillis.",
+    "how": [
+      "Seulement si la terre est tassée : enfonce une fourche, si elle résiste, passe la grelinette.",
+      "Enfonce, bascule légèrement en arrière, recule de 15 à 20 cm : la terre se fissure sans se retourner.",
+      "Termine au croc en surface, puis remets le paillis."
+    ],
+    "window": {
+      "doy_start": 50,
+      "doy_end": 100
+    },
+    "climate_shift": true,
+    "requires": [
+      "permanent_beds"
+    ],
+    "done_by": null,
+    "how_by_soil": {
+      "clay": [
+        "En argile : jamais sur une terre collante — elle doit s'émietter en main, sinon attends quelques jours secs."
+      ]
+    }
+  },
+  {
     "id": "spring_compost",
     "theme": "compost",
     "kind": "yearly",
@@ -241,7 +318,8 @@
     "how": [
       "Quantités par planche : bloc « Matériel & préparation » du plan de saison.",
       "Écarte le paillis, étale le compost en surface, griffe légèrement : pas de bêchage.",
-      "Remets le paillis en place."
+      "Remets le paillis en place.",
+      "Sur un sol pauvre, fractionne : deux ou trois apports dans l'année plutôt qu'un seul gros."
     ],
     "window": {
       "doy_start": 60,
@@ -409,30 +487,6 @@
     },
     "climate_shift": false,
     "requires": [],
-    "done_by": null
-  },
-  {
-    "id": "clay_no_dig",
-    "theme": "sol",
-    "kind": "setup",
-    "soils": [
-      "clay"
-    ],
-    "title": "Arrêter de retourner la terre",
-    "why": "Retourner une argile la déstructure et brûle la matière organique ; laissée en place sous paillis, elle devient grumeleuse grâce aux vers de terre.",
-    "how": [
-      "Plus de bêchage : au besoin, décompacte sans retourner (grelinette) sur une terre ressuyée.",
-      "Ne marche jamais sur les planches, et jamais sur une argile détrempée.",
-      "Laisse compost et paillis en surface : la vie du sol fait le travail."
-    ],
-    "window": {
-      "doy_start": 274,
-      "doy_end": 334
-    },
-    "climate_shift": false,
-    "requires": [
-      "soil_test"
-    ],
     "done_by": null
   },
   {
