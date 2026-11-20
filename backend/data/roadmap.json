@@ -17,7 +17,8 @@
     },
     "climate_shift": false,
     "requires": [],
-    "done_by": null
+    "done_by": null,
+    "done_when_soil_known": true
   },
   {
     "id": "garden_plan",

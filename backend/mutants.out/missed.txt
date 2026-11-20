@@ -1,0 +1,5 @@
+src/roadmap.rs:177:35: replace == with != in roadmap_status
+src/roadmap.rs:181:95: replace && with || in roadmap_status
+src/roadmap.rs:181:80: replace && with || in roadmap_status
+src/roadmap.rs:193:61: replace == with != in roadmap_status
+src/roadmap.rs:235:35: delete ! in roadmap_status

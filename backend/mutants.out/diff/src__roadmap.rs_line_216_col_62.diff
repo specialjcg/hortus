@@ -1,0 +1,21 @@
+--- src/roadmap.rs
++++ delete ! in roadmap_status
+@@ -208,17 +208,17 @@
+                 Status::Upcoming
+             };
+             StepStatus {
+                 step: step.clone(),
+                 status,
+                 window_local: w,
+                 starts_in_days: if w.contains(doy(today)) { 0 } else { days_until_start(w, today) },
+                 done_on: done[i].and_then(|(date, _)| date),
+-                waiting_for: step.requires.iter().filter(|r| !is_done(r)).cloned().collect(),
++                waiting_for: step.requires.iter().filter(|r|  /* ~ changed by cargo-mutants ~ */is_done(r)).cloned().collect(),
+                 manual: done[i].is_some_and(|(_, by_hand)| by_hand),
+             }
+         })
+         .collect();
+ 
+     let count = |kind: StepKind, only_done: bool| {
+         out.iter().filter(|s| s.step.kind == kind && (!only_done || s.status == Status::Done)).count()
+     };

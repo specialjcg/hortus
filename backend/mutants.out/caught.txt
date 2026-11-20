@@ -1,0 +1,17 @@
+src/roadmap.rs:177:46: replace && with || in roadmap_status
+src/roadmap.rs:177:56: replace >= with < in roadmap_status
+src/roadmap.rs:177:75: replace <= with > in roadmap_status
+src/roadmap.rs:181:57: replace == with != in roadmap_status
+src/roadmap.rs:181:86: replace >= with < in roadmap_status
+src/roadmap.rs:181:101: replace <= with > in roadmap_status
+src/roadmap.rs:185:27: replace != with == in roadmap_status
+src/roadmap.rs:190:60: replace && with || in roadmap_status
+src/roadmap.rs:205:48: replace <= with > in roadmap_status
+src/roadmap.rs:216:62: delete ! in roadmap_status
+src/roadmap.rs:223:51: replace && with || in roadmap_status
+src/roadmap.rs:223:43: replace == with != in roadmap_status
+src/roadmap.rs:223:66: replace || with && in roadmap_status
+src/roadmap.rs:223:55: delete ! in roadmap_status
+src/roadmap.rs:223:78: replace == with != in roadmap_status
+src/roadmap.rs:177:65: replace && with || in roadmap_status
+src/roadmap.rs:172:23: replace - with + in roadmap_status

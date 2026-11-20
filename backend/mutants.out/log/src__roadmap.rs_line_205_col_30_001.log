@@ -1,0 +1,204 @@
+
+*** src/roadmap.rs:205:30: replace - with / in roadmap_status
+
+*** mutation diff:
+--- src/roadmap.rs
++++ replace - with / in roadmap_status
+@@ -197,17 +197,17 @@
+         .enumerate()
+         .map(|(i, step)| {
+             let w = windows[i];
+             let (_, end) = last_occurrence(w, today);
+             let status = if done[i].is_some() {
+                 Status::Done
+             } else if w.contains(doy(today)) {
+                 Status::Now
+-            } else if (today - end).num_days() <= LATE_GRACE_DAYS {
++            } else if (today / /* ~ changed by cargo-mutants ~ */ end).num_days() <= LATE_GRACE_DAYS {
+                 Status::Late
+             } else {
+                 Status::Upcoming
+             };
+             StepStatus {
+                 step: step.clone(),
+                 status,
+                 window_local: w,
+
+
+*** /home/jcgouleau/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --no-run --verbose --package=hortus-backend@0.1.0
+       Fresh unicode-ident v1.0.24
+       Fresh proc-macro2 v1.0.106
+       Fresh quote v1.0.45
+       Fresh syn v2.0.117
+       Fresh cfg-if v1.0.4
+       Fresh shlex v1.3.0
+       Fresh find-msvc-tools v0.1.9
+       Fresh cc v1.2.60
+       Fresh synstructure v0.13.2
+       Fresh smallvec v1.15.1
+       Fresh once_cell v1.21.4
+       Fresh zerofrom-derive v0.1.7
+       Fresh zerofrom v0.1.7
+       Fresh yoke-derive v0.8.2
+       Fresh pin-project-lite v0.2.17
+       Fresh stable_deref_trait v1.2.1
+       Fresh yoke v0.8.2
+       Fresh itoa v1.0.18
+       Fresh bytes v1.11.1
+       Fresh zerovec-derive v0.11.3
+       Fresh futures-core v0.3.32
+       Fresh zerovec v0.11.6
+       Fresh displaydoc v0.2.5
+       Fresh scopeguard v1.2.0
+       Fresh lock_api v0.4.14
+       Fresh parking_lot_core v0.9.12
+       Fresh tracing-core v0.1.36
+       Fresh errno v0.3.14
+       Fresh glob v0.3.4
+       Fresh signal-hook-registry v1.4.8
+       Fresh parking_lot v0.12.5
+       Fresh http v1.4.0
+       Fresh socket2 v0.6.3
+       Fresh mio v1.2.0
+       Fresh getrandom v0.2.17
+       Fresh tracing-attributes v0.1.31
+       Fresh tokio-macros v2.7.0
+       Fresh bitflags v2.11.1
+       Fresh tokio v1.52.1
+       Fresh tracing v0.1.44
+       Fresh http-body v1.0.1
+       Fresh tinystr v0.8.3
+       Fresh writeable v0.6.3
+       Fresh minimal-lexical v0.2.1
+       Fresh litemap v0.8.2
+       Fresh icu_locale_core v2.2.0
+       Fresh nom v7.1.3
+       Fresh libc v0.2.185
+       Fresh serde_core v1.0.228
+       Fresh zerocopy v0.8.48
+       Fresh zerotrie v0.2.4
+       Fresh potential_utf v0.1.5
+       Fresh libloading v0.8.9
+       Fresh utf8_iter v1.0.4
+       Fresh futures-task v0.3.32
+       Fresh either v1.19.0
+       Fresh tower-service v0.3.3
+       Fresh slab v0.4.12
+       Fresh zeroize v1.8.2
+       Fresh percent-encoding v2.3.2
+       Fresh rustls-pki-types v1.14.0
+       Fresh futures-util v0.3.32
+       Fresh itertools v0.13.0
+       Fresh icu_collections v2.2.0
+       Fresh clang-sys v1.9.1
+       Fresh icu_provider v2.2.0
+       Fresh cexpr v0.6.0
+       Fresh regex v1.12.3
+       Fresh prettyplease v0.2.37
+       Fresh rustc-hash v2.1.2
+       Fresh log v0.4.29
+       Fresh version_check v0.9.5
+       Fresh try-lock v0.2.5
+       Fresh untrusted v0.9.0
+       Fresh ring v0.17.14
+       Fresh want v0.3.1
+       Fresh bindgen v0.72.1
+       Fresh icu_properties_data v2.2.0
+       Fresh icu_normalizer_data v2.2.0
+       Fresh httparse v1.10.1
+       Fresh sync_wrapper v1.0.2
+       Fresh futures-channel v0.3.32
+       Fresh cmake v0.1.58
+       Fresh serde_derive v1.0.228
+       Fresh tower-layer v0.3.3
+       Fresh atomic-waker v1.1.2
+       Fresh autocfg v1.5.0
+       Fresh httpdate v1.0.3
+       Fresh hyper v1.9.0
+       Fresh serde v1.0.228
+       Fresh icu_normalizer v2.2.0
+       Fresh icu_properties v2.2.0
+       Fresh rustls-webpki v0.103.13
+       Fresh form_urlencoded v1.2.2
+       Fresh subtle v2.6.1
+       Fresh vcpkg v0.2.15
+       Fresh pkg-config v0.3.33
+       Fresh ipnet v2.12.0
+       Fresh base64 v0.22.1
+       Fresh hyper-util v0.1.20
+       Fresh rustls v0.23.39
+       Fresh ahash v0.8.12
+       Fresh idna_adapter v1.2.1
+       Fresh zmij v1.0.21
+       Fresh tower v0.5.3
+       Fresh http-body-util v0.1.3
+       Fresh ryu v1.0.23
+       Fresh memchr v2.8.0
+       Fresh regex-syntax v0.8.10
+       Fresh regex-automata v0.4.14
+       Fresh serde_json v1.0.149
+       Fresh serde_urlencoded v0.7.1
+       Fresh num-traits v0.2.19
+       Fresh highs-sys v1.15.0
+       Fresh idna v1.1.0
+       Fresh hashbrown v0.14.5
+       Fresh tokio-rustls v0.26.4
+       Fresh webpki-roots v1.0.7
+       Fresh ppv-lite86 v0.2.21
+       Fresh rand_core v0.6.4
+       Fresh mime v0.3.17
+       Fresh lazy_static v1.5.0
+       Fresh iri-string v0.7.12
+       Fresh tower-http v0.6.8
+       Fresh sharded-slab v0.1.7
+       Fresh axum-core v0.5.6
+       Fresh rand_chacha v0.3.1
+       Fresh hyper-rustls v0.27.9
+       Fresh libsqlite3-sys v0.30.1
+       Fresh hashlink v0.9.1
+       Fresh url v2.5.8
+       Fresh highs v2.4.0
+       Fresh matchers v0.2.0
+       Fresh serde_path_to_error v0.1.20
+       Fresh tracing-log v0.2.0
+       Fresh thread_local v1.1.9
+       Fresh thiserror-impl v1.0.69
+       Fresh fallible-streaming-iterator v0.1.9
+       Fresh nu-ansi-term v0.50.3
+       Fresh fallible-iterator v0.3.0
+       Fresh iana-time-zone v0.1.65
+       Fresh fnv v1.0.7
+       Fresh matchit v0.8.4
+       Fresh axum v0.8.9
+       Fresh good_lp v1.15.3
+       Fresh chrono v0.4.44
+       Fresh rusqlite v0.32.1
+       Fresh tracing-subscriber v0.3.23
+       Fresh thiserror v1.0.69
+       Fresh reqwest v0.12.28
+       Fresh rand v0.8.6
+       Fresh approx v0.5.1
+       Dirty hortus-backend v0.1.0 (/tmp/cargo-mutants-backend-VjbRTj.tmp): couldn't read metadata for file `target/debug/deps/libhortus-571d28bb8e90e910.rlib`
+   Compiling hortus-backend v0.1.0 (/tmp/cargo-mutants-backend-VjbRTj.tmp)
+     Running `/home/jcgouleau/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name hortus --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=de0d2fb9ef6f0c83 -C extra-filename=-571d28bb8e90e910 --out-dir /tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps -C linker=clang -C incremental=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/incremental -L dependency=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps --extern axum=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libaxum-a1e3a7b6b81c4e7f.rmeta --extern chrono=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libchrono-97f377add648c5b0.rmeta --extern good_lp=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libgood_lp-8ac52729a5783109.rmeta --extern rand=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librand-ca13b4d7369b3035.rmeta --extern rand_chacha=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librand_chacha-0e09276dfcde8ff3.rmeta --extern reqwest=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libreqwest-f42421df3ae46c4d.rmeta --extern rusqlite=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librusqlite-f2f6869e2423f6a8.rmeta --extern serde=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libserde-f56eafd7f7a24f2b.rmeta --extern serde_json=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libserde_json-f50b38468cf49877.rmeta --extern thiserror=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libthiserror-8ba60a7242a1c00c.rmeta --extern tokio=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtokio-07eafbb8cd62bc21.rmeta --extern tower_http=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtower_http-d921caa57ac6809d.rmeta --extern tracing=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtracing-8c05d36614a1aab2.rmeta --extern tracing_subscriber=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtracing_subscriber-d5fb0d13c6c8cd52.rmeta -C link-arg=-fuse-ld=mold -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/highs-sys-4b1f812da961a408/out/lib -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/highs-sys-4b1f812da961a408/out/lib64 -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/ring-03c23de3b49ed9f5/out -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/libsqlite3-sys-93dcd5388cd70102/out`
+error[E0369]: cannot divide `NaiveDate` by `NaiveDate`
+   --> src/roadmap.rs:205:30
+    |
+205 |             } else if (today / /* ~ changed by cargo-mutants ~ */ end).num_days() <= LATE_GRACE_DAYS {
+    |                        ----- ^                                    --- NaiveDate
+    |                        |
+    |                        NaiveDate
+    |
+note: `NaiveDate` does not implement `Div`
+   --> /home/jcgouleau/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/chrono-0.4.44/src/naive/date/mod.rs:102:1
+    |
+102 | pub struct NaiveDate {
+    | ^^^^^^^^^^^^^^^^^^^^ `NaiveDate` is defined in another crate
+
+For more information about this error, try `rustc --explain E0369`.
+error: could not compile `hortus-backend` (lib) due to 1 previous error
+
+Caused by:
+  process didn't exit successfully: `/home/jcgouleau/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name hortus --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=de0d2fb9ef6f0c83 -C extra-filename=-571d28bb8e90e910 --out-dir /tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps -C linker=clang -C incremental=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/incremental -L dependency=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps --extern axum=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libaxum-a1e3a7b6b81c4e7f.rmeta --extern chrono=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libchrono-97f377add648c5b0.rmeta --extern good_lp=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libgood_lp-8ac52729a5783109.rmeta --extern rand=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librand-ca13b4d7369b3035.rmeta --extern rand_chacha=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librand_chacha-0e09276dfcde8ff3.rmeta --extern reqwest=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libreqwest-f42421df3ae46c4d.rmeta --extern rusqlite=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librusqlite-f2f6869e2423f6a8.rmeta --extern serde=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libserde-f56eafd7f7a24f2b.rmeta --extern serde_json=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libserde_json-f50b38468cf49877.rmeta --extern thiserror=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libthiserror-8ba60a7242a1c00c.rmeta --extern tokio=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtokio-07eafbb8cd62bc21.rmeta --extern tower_http=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtower_http-d921caa57ac6809d.rmeta --extern tracing=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtracing-8c05d36614a1aab2.rmeta --extern tracing_subscriber=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtracing_subscriber-d5fb0d13c6c8cd52.rmeta -C link-arg=-fuse-ld=mold -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/highs-sys-4b1f812da961a408/out/lib -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/highs-sys-4b1f812da961a408/out/lib64 -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/ring-03c23de3b49ed9f5/out -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/libsqlite3-sys-93dcd5388cd70102/out` (exit status: 1)
+
+*** result: Failure(101)

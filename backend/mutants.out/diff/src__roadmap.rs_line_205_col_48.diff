@@ -1,0 +1,21 @@
+--- src/roadmap.rs
++++ replace <= with > in roadmap_status
+@@ -197,17 +197,17 @@
+         .enumerate()
+         .map(|(i, step)| {
+             let w = windows[i];
+             let (_, end) = last_occurrence(w, today);
+             let status = if done[i].is_some() {
+                 Status::Done
+             } else if w.contains(doy(today)) {
+                 Status::Now
+-            } else if (today - end).num_days() <= LATE_GRACE_DAYS {
++            } else if (today - end).num_days() > /* ~ changed by cargo-mutants ~ */ LATE_GRACE_DAYS {
+                 Status::Late
+             } else {
+                 Status::Upcoming
+             };
+             StepStatus {
+                 step: step.clone(),
+                 status,
+                 window_local: w,

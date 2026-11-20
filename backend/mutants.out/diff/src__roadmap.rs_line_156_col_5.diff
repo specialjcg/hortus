@@ -1,0 +1,101 @@
+--- src/roadmap.rs
++++ replace roadmap_status -> Roadmap with Default::default()
+@@ -148,97 +148,17 @@
+ /// Statut de chaque étape applicable au sol du jardin, à la date `garden.today`.
+ /// `manual` : étapes cochées à la main ; `journal` : (type d'action, date) du carnet.
+ pub fn roadmap_status(
+     catalog: &[Step],
+     garden: Garden,
+     manual: &[Completion],
+     journal: &[(String, NaiveDate)],
+ ) -> Roadmap {
+-    let Garden { today, shift, soil } = garden;
+-    let steps: Vec<Step> = catalog.iter().filter(|s| s.applies_to(soil)).map(|s| s.for_soil(soil)).collect();
+-    let steps = steps.as_slice();
+-    let windows: Vec<CalendarWindow> = steps
+-        .iter()
+-        .map(|s| if s.climate_shift { s.window.shifted(shift) } else { s.window })
+-        .collect();
+-
+-    // Dernière réalisation valable pour l'étape (ever pour Setup, cette occurrence pour Yearly).
+-    let done_on = |i: usize| -> Option<(NaiveDate, bool)> {
+-        let step = &steps[i];
+-        let since = match step.kind {
+-            StepKind::Setup => NaiveDate::MIN,
+-            StepKind::Yearly => {
+-                let (start, _) = last_occurrence(windows[i], today);
+-                // Fait un peu avant l'ouverture : compte quand même pour cette saison.
+-                start - Duration::days(LATE_GRACE_DAYS)
+-            }
+-        };
+-        let by_hand = manual
+-            .iter()
+-            .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)
+-            .map(|c| (c.date, true));
+-        let by_journal = journal
+-            .iter()
+-            .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)
+-            .map(|(_, d)| (*d, false));
+-        by_hand.chain(by_journal).max_by_key(|(d, _)| *d)
+-    };
+-    let soil_known = soil != Soil::Unknown;
+-    let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())
+-        .map(|i| {
+-            done_on(i)
+-                .map(|(date, by_hand)| (Some(date), by_hand))
+-                .or_else(|| (steps[i].done_when_soil_known && soil_known).then_some((None, false)))
+-        })
+-        .collect();
+-    let is_done = |id: &str| steps.iter().position(|s| s.id == id).is_some_and(|i| done[i].is_some());
+-
+-    let mut out: Vec<StepStatus> = steps
+-        .iter()
+-        .enumerate()
+-        .map(|(i, step)| {
+-            let w = windows[i];
+-            let (_, end) = last_occurrence(w, today);
+-            let status = if done[i].is_some() {
+-                Status::Done
+-            } else if w.contains(doy(today)) {
+-                Status::Now
+-            } else if (today - end).num_days() <= LATE_GRACE_DAYS {
+-                Status::Late
+-            } else {
+-                Status::Upcoming
+-            };
+-            StepStatus {
+-                step: step.clone(),
+-                status,
+-                window_local: w,
+-                starts_in_days: if w.contains(doy(today)) { 0 } else { days_until_start(w, today) },
+-                done_on: done[i].and_then(|(date, _)| date),
+-                waiting_for: step.requires.iter().filter(|r| !is_done(r)).cloned().collect(),
+-                manual: done[i].is_some_and(|(_, by_hand)| by_hand),
+-            }
+-        })
+-        .collect();
+-
+-    let count = |kind: StepKind, only_done: bool| {
+-        out.iter().filter(|s| s.step.kind == kind && (!only_done || s.status == Status::Done)).count()
+-    };
+-    let (setup_done, setup_total) = (count(StepKind::Setup, true), count(StepKind::Setup, false));
+-    let (yearly_done, yearly_total) = (count(StepKind::Yearly, true), count(StepKind::Yearly, false));
+-
+-    // À faire d'abord (prêtes avant bloquées), puis à venir par date, puis faites.
+-    let rank = |s: &StepStatus| match s.status {
+-        Status::Late => 0,
+-        Status::Now => 1,
+-        Status::Upcoming => 2,
+-        Status::Done => 3,
+-    };
+-    out.sort_by_key(|s| (rank(s), !s.waiting_for.is_empty(), s.starts_in_days));
+-    Roadmap { soil, setup_done, setup_total, yearly_done, yearly_total, steps: out }
++    Default::default() /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ // ---------------------------------------------------------------- SQLite
+ 
+ pub fn migrate(conn: &rusqlite::Connection) -> Result<(), String> {
+     conn.execute_batch(
+         r#"
+ CREATE TABLE IF NOT EXISTS roadmap_done (

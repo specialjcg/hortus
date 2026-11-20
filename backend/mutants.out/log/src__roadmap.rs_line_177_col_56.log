@@ -1,0 +1,471 @@
+
+*** src/roadmap.rs:177:56: replace >= with < in roadmap_status
+
+*** mutation diff:
+--- src/roadmap.rs
++++ replace >= with < in roadmap_status
+@@ -169,17 +169,17 @@
+             StepKind::Yearly => {
+                 let (start, _) = last_occurrence(windows[i], today);
+                 // Fait un peu avant l'ouverture : compte quand même pour cette saison.
+                 start - Duration::days(LATE_GRACE_DAYS)
+             }
+         };
+         let by_hand = manual
+             .iter()
+-            .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)
++            .filter(|c| c.step_id == step.id && c.date < /* ~ changed by cargo-mutants ~ */ since && c.date <= today)
+             .map(|c| (c.date, true));
+         let by_journal = journal
+             .iter()
+             .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)
+             .map(|(_, d)| (*d, false));
+         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)
+     };
+     let soil_known = soil != Soil::Unknown;
+
+
+*** /home/jcgouleau/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --no-run --verbose --package=hortus-backend@0.1.0
+       Fresh unicode-ident v1.0.24
+       Fresh proc-macro2 v1.0.106
+       Fresh quote v1.0.45
+       Fresh syn v2.0.117
+       Fresh cfg-if v1.0.4
+       Fresh shlex v1.3.0
+       Fresh find-msvc-tools v0.1.9
+       Fresh cc v1.2.60
+       Fresh synstructure v0.13.2
+       Fresh smallvec v1.15.1
+       Fresh once_cell v1.21.4
+       Fresh zerofrom-derive v0.1.7
+       Fresh zerofrom v0.1.7
+       Fresh yoke-derive v0.8.2
+       Fresh pin-project-lite v0.2.17
+       Fresh stable_deref_trait v1.2.1
+       Fresh yoke v0.8.2
+       Fresh bytes v1.11.1
+       Fresh itoa v1.0.18
+       Fresh zerovec-derive v0.11.3
+       Fresh futures-core v0.3.32
+       Fresh zerovec v0.11.6
+       Fresh displaydoc v0.2.5
+       Fresh scopeguard v1.2.0
+       Fresh lock_api v0.4.14
+       Fresh parking_lot_core v0.9.12
+       Fresh tracing-core v0.1.36
+       Fresh errno v0.3.14
+       Fresh glob v0.3.4
+       Fresh signal-hook-registry v1.4.8
+       Fresh parking_lot v0.12.5
+       Fresh http v1.4.0
+       Fresh getrandom v0.2.17
+       Fresh socket2 v0.6.3
+       Fresh mio v1.2.0
+       Fresh tokio-macros v2.7.0
+       Fresh tracing-attributes v0.1.31
+       Fresh bitflags v2.11.1
+       Fresh tracing v0.1.44
+       Fresh tokio v1.52.1
+       Fresh http-body v1.0.1
+       Fresh tinystr v0.8.3
+       Fresh minimal-lexical v0.2.1
+       Fresh writeable v0.6.3
+       Fresh litemap v0.8.2
+       Fresh icu_locale_core v2.2.0
+       Fresh nom v7.1.3
+       Fresh zerocopy v0.8.48
+       Fresh libc v0.2.185
+       Fresh serde_core v1.0.228
+       Fresh zerotrie v0.2.4
+       Fresh potential_utf v0.1.5
+       Fresh libloading v0.8.9
+       Fresh tower-service v0.3.3
+       Fresh futures-task v0.3.32
+       Fresh either v1.19.0
+       Fresh slab v0.4.12
+       Fresh zeroize v1.8.2
+       Fresh utf8_iter v1.0.4
+       Fresh percent-encoding v2.3.2
+       Fresh icu_collections v2.2.0
+       Fresh rustls-pki-types v1.14.0
+       Fresh futures-util v0.3.32
+       Fresh itertools v0.13.0
+       Fresh clang-sys v1.9.1
+       Fresh icu_provider v2.2.0
+       Fresh regex v1.12.3
+       Fresh cexpr v0.6.0
+       Fresh prettyplease v0.2.37
+       Fresh try-lock v0.2.5
+       Fresh version_check v0.9.5
+       Fresh rustc-hash v2.1.2
+       Fresh untrusted v0.9.0
+       Fresh log v0.4.29
+       Fresh bindgen v0.72.1
+       Fresh ring v0.17.14
+       Fresh want v0.3.1
+       Fresh icu_normalizer_data v2.2.0
+       Fresh icu_properties_data v2.2.0
+       Fresh httparse v1.10.1
+       Fresh sync_wrapper v1.0.2
+       Fresh futures-channel v0.3.32
+       Fresh cmake v0.1.58
+       Fresh serde_derive v1.0.228
+       Fresh autocfg v1.5.0
+       Fresh tower-layer v0.3.3
+       Fresh atomic-waker v1.1.2
+       Fresh httpdate v1.0.3
+       Fresh hyper v1.9.0
+       Fresh serde v1.0.228
+       Fresh icu_properties v2.2.0
+       Fresh icu_normalizer v2.2.0
+       Fresh rustls-webpki v0.103.13
+       Fresh form_urlencoded v1.2.2
+       Fresh vcpkg v0.2.15
+       Fresh pkg-config v0.3.33
+       Fresh ipnet v2.12.0
+       Fresh subtle v2.6.1
+       Fresh base64 v0.22.1
+       Fresh hyper-util v0.1.20
+       Fresh rustls v0.23.39
+       Fresh ahash v0.8.12
+       Fresh idna_adapter v1.2.1
+       Fresh zmij v1.0.21
+       Fresh tower v0.5.3
+       Fresh http-body-util v0.1.3
+       Fresh memchr v2.8.0
+       Fresh ryu v1.0.23
+       Fresh regex-syntax v0.8.10
+       Fresh regex-automata v0.4.14
+       Fresh serde_urlencoded v0.7.1
+       Fresh serde_json v1.0.149
+       Fresh num-traits v0.2.19
+       Fresh highs-sys v1.15.0
+       Fresh idna v1.1.0
+       Fresh hashbrown v0.14.5
+       Fresh tokio-rustls v0.26.4
+       Fresh webpki-roots v1.0.7
+       Fresh ppv-lite86 v0.2.21
+       Fresh rand_core v0.6.4
+       Fresh iri-string v0.7.12
+       Fresh lazy_static v1.5.0
+       Fresh mime v0.3.17
+       Fresh axum-core v0.5.6
+       Fresh sharded-slab v0.1.7
+       Fresh tower-http v0.6.8
+       Fresh rand_chacha v0.3.1
+       Fresh hyper-rustls v0.27.9
+       Fresh libsqlite3-sys v0.30.1
+       Fresh hashlink v0.9.1
+       Fresh url v2.5.8
+       Fresh highs v2.4.0
+       Fresh matchers v0.2.0
+       Fresh serde_path_to_error v0.1.20
+       Fresh tracing-log v0.2.0
+       Fresh thread_local v1.1.9
+       Fresh thiserror-impl v1.0.69
+       Fresh iana-time-zone v0.1.65
+       Fresh fallible-streaming-iterator v0.1.9
+       Fresh fnv v1.0.7
+       Fresh matchit v0.8.4
+       Fresh fallible-iterator v0.3.0
+       Fresh nu-ansi-term v0.50.3
+       Fresh tracing-subscriber v0.3.23
+       Fresh rusqlite v0.32.1
+       Fresh axum v0.8.9
+       Fresh good_lp v1.15.3
+       Fresh chrono v0.4.44
+       Fresh thiserror v1.0.69
+       Fresh reqwest v0.12.28
+       Fresh rand v0.8.6
+       Fresh approx v0.5.1
+       Dirty hortus-backend v0.1.0 (/tmp/cargo-mutants-backend-VjbRTj.tmp): the file `src/roadmap.rs` has changed (1795195302.601228954s, 17s after last build at 1795195285.957110255s)
+   Compiling hortus-backend v0.1.0 (/tmp/cargo-mutants-backend-VjbRTj.tmp)
+     Running `/home/jcgouleau/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name hortus --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=de0d2fb9ef6f0c83 -C extra-filename=-571d28bb8e90e910 --out-dir /tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps -C linker=clang -C incremental=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/incremental -L dependency=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps --extern axum=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libaxum-a1e3a7b6b81c4e7f.rmeta --extern chrono=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libchrono-97f377add648c5b0.rmeta --extern good_lp=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libgood_lp-8ac52729a5783109.rmeta --extern rand=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librand-ca13b4d7369b3035.rmeta --extern rand_chacha=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librand_chacha-0e09276dfcde8ff3.rmeta --extern reqwest=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libreqwest-f42421df3ae46c4d.rmeta --extern rusqlite=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librusqlite-f2f6869e2423f6a8.rmeta --extern serde=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libserde-f56eafd7f7a24f2b.rmeta --extern serde_json=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libserde_json-f50b38468cf49877.rmeta --extern thiserror=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libthiserror-8ba60a7242a1c00c.rmeta --extern tokio=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtokio-07eafbb8cd62bc21.rmeta --extern tower_http=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtower_http-d921caa57ac6809d.rmeta --extern tracing=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtracing-8c05d36614a1aab2.rmeta --extern tracing_subscriber=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtracing_subscriber-d5fb0d13c6c8cd52.rmeta -C link-arg=-fuse-ld=mold -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/highs-sys-4b1f812da961a408/out/lib -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/highs-sys-4b1f812da961a408/out/lib64 -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/ring-03c23de3b49ed9f5/out -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/libsqlite3-sys-93dcd5388cd70102/out`
+     Running `/home/jcgouleau/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name hortus_backend --edition=2021 src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=e51b031e1aa328f2 -C extra-filename=-cf8822415214b39f --out-dir /tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps -C linker=clang -C incremental=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/incremental -L dependency=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps --extern approx=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libapprox-7eb356e3b5043862.rlib --extern axum=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libaxum-a1e3a7b6b81c4e7f.rlib --extern chrono=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libchrono-97f377add648c5b0.rlib --extern good_lp=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libgood_lp-8ac52729a5783109.rlib --extern hortus=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libhortus-571d28bb8e90e910.rlib --extern rand=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librand-ca13b4d7369b3035.rlib --extern rand_chacha=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librand_chacha-0e09276dfcde8ff3.rlib --extern reqwest=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libreqwest-f42421df3ae46c4d.rlib --extern rusqlite=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librusqlite-f2f6869e2423f6a8.rlib --extern serde=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libserde-f56eafd7f7a24f2b.rlib --extern serde_json=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libserde_json-f50b38468cf49877.rlib --extern thiserror=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libthiserror-8ba60a7242a1c00c.rlib --extern tokio=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtokio-07eafbb8cd62bc21.rlib --extern tower_http=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtower_http-d921caa57ac6809d.rlib --extern tracing=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtracing-8c05d36614a1aab2.rlib --extern tracing_subscriber=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtracing_subscriber-d5fb0d13c6c8cd52.rlib -C link-arg=-fuse-ld=mold -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/highs-sys-4b1f812da961a408/out/lib -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/highs-sys-4b1f812da961a408/out/lib64 -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/ring-03c23de3b49ed9f5/out -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/libsqlite3-sys-93dcd5388cd70102/out`
+     Running `/home/jcgouleau/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name hortus --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=bec7d259e41a2fcf -C extra-filename=-af49c34fb23033fa --out-dir /tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps -C linker=clang -C incremental=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/incremental -L dependency=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps --extern approx=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libapprox-7eb356e3b5043862.rlib --extern axum=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libaxum-a1e3a7b6b81c4e7f.rlib --extern chrono=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libchrono-97f377add648c5b0.rlib --extern good_lp=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libgood_lp-8ac52729a5783109.rlib --extern rand=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librand-ca13b4d7369b3035.rlib --extern rand_chacha=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librand_chacha-0e09276dfcde8ff3.rlib --extern reqwest=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libreqwest-f42421df3ae46c4d.rlib --extern rusqlite=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/librusqlite-f2f6869e2423f6a8.rlib --extern serde=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libserde-f56eafd7f7a24f2b.rlib --extern serde_json=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libserde_json-f50b38468cf49877.rlib --extern thiserror=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libthiserror-8ba60a7242a1c00c.rlib --extern tokio=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtokio-07eafbb8cd62bc21.rlib --extern tower_http=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtower_http-d921caa57ac6809d.rlib --extern tracing=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtracing-8c05d36614a1aab2.rlib --extern tracing_subscriber=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/libtracing_subscriber-d5fb0d13c6c8cd52.rlib -C link-arg=-fuse-ld=mold -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/highs-sys-4b1f812da961a408/out/lib -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/highs-sys-4b1f812da961a408/out/lib64 -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/ring-03c23de3b49ed9f5/out -L native=/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/build/libsqlite3-sys-93dcd5388cd70102/out`
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.96s
+  Executable `/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/hortus-af49c34fb23033fa`
+  Executable `/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/hortus_backend-cf8822415214b39f`
+
+*** result: Success
+
+*** /home/jcgouleau/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --verbose --package=hortus-backend@0.1.0
+       Fresh unicode-ident v1.0.24
+       Fresh proc-macro2 v1.0.106
+       Fresh quote v1.0.45
+       Fresh syn v2.0.117
+       Fresh cfg-if v1.0.4
+       Fresh shlex v1.3.0
+       Fresh find-msvc-tools v0.1.9
+       Fresh cc v1.2.60
+       Fresh synstructure v0.13.2
+       Fresh smallvec v1.15.1
+       Fresh once_cell v1.21.4
+       Fresh zerofrom-derive v0.1.7
+       Fresh zerofrom v0.1.7
+       Fresh yoke-derive v0.8.2
+       Fresh stable_deref_trait v1.2.1
+       Fresh pin-project-lite v0.2.17
+       Fresh yoke v0.8.2
+       Fresh itoa v1.0.18
+       Fresh bytes v1.11.1
+       Fresh zerovec-derive v0.11.3
+       Fresh futures-core v0.3.32
+       Fresh zerovec v0.11.6
+       Fresh displaydoc v0.2.5
+       Fresh scopeguard v1.2.0
+       Fresh lock_api v0.4.14
+       Fresh parking_lot_core v0.9.12
+       Fresh tracing-core v0.1.36
+       Fresh errno v0.3.14
+       Fresh glob v0.3.4
+       Fresh signal-hook-registry v1.4.8
+       Fresh parking_lot v0.12.5
+       Fresh http v1.4.0
+       Fresh mio v1.2.0
+       Fresh socket2 v0.6.3
+       Fresh getrandom v0.2.17
+       Fresh tracing-attributes v0.1.31
+       Fresh tokio-macros v2.7.0
+       Fresh bitflags v2.11.1
+       Fresh tokio v1.52.1
+       Fresh tracing v0.1.44
+       Fresh http-body v1.0.1
+       Fresh tinystr v0.8.3
+       Fresh minimal-lexical v0.2.1
+       Fresh litemap v0.8.2
+       Fresh writeable v0.6.3
+       Fresh icu_locale_core v2.2.0
+       Fresh nom v7.1.3
+       Fresh serde_core v1.0.228
+       Fresh libc v0.2.185
+       Fresh zerocopy v0.8.48
+       Fresh zerotrie v0.2.4
+       Fresh potential_utf v0.1.5
+       Fresh libloading v0.8.9
+       Fresh slab v0.4.12
+       Fresh utf8_iter v1.0.4
+       Fresh futures-task v0.3.32
+       Fresh percent-encoding v2.3.2
+       Fresh either v1.19.0
+       Fresh zeroize v1.8.2
+       Fresh tower-service v0.3.3
+       Fresh rustls-pki-types v1.14.0
+       Fresh itertools v0.13.0
+       Fresh futures-util v0.3.32
+       Fresh icu_collections v2.2.0
+       Fresh clang-sys v1.9.1
+       Fresh icu_provider v2.2.0
+       Fresh cexpr v0.6.0
+       Fresh regex v1.12.3
+       Fresh prettyplease v0.2.37
+       Fresh rustc-hash v2.1.2
+       Fresh untrusted v0.9.0
+       Fresh log v0.4.29
+       Fresh version_check v0.9.5
+       Fresh try-lock v0.2.5
+       Fresh want v0.3.1
+       Fresh bindgen v0.72.1
+       Fresh ring v0.17.14
+       Fresh icu_properties_data v2.2.0
+       Fresh icu_normalizer_data v2.2.0
+       Fresh httparse v1.10.1
+       Fresh sync_wrapper v1.0.2
+       Fresh futures-channel v0.3.32
+       Fresh cmake v0.1.58
+       Fresh serde_derive v1.0.228
+       Fresh atomic-waker v1.1.2
+       Fresh tower-layer v0.3.3
+       Fresh httpdate v1.0.3
+       Fresh autocfg v1.5.0
+       Fresh hyper v1.9.0
+       Fresh serde v1.0.228
+       Fresh icu_normalizer v2.2.0
+       Fresh icu_properties v2.2.0
+       Fresh rustls-webpki v0.103.13
+       Fresh form_urlencoded v1.2.2
+       Fresh vcpkg v0.2.15
+       Fresh pkg-config v0.3.33
+       Fresh subtle v2.6.1
+       Fresh ipnet v2.12.0
+       Fresh base64 v0.22.1
+       Fresh hyper-util v0.1.20
+       Fresh rustls v0.23.39
+       Fresh ahash v0.8.12
+       Fresh idna_adapter v1.2.1
+       Fresh zmij v1.0.21
+       Fresh tower v0.5.3
+       Fresh http-body-util v0.1.3
+       Fresh memchr v2.8.0
+       Fresh regex-syntax v0.8.10
+       Fresh ryu v1.0.23
+       Fresh serde_urlencoded v0.7.1
+       Fresh regex-automata v0.4.14
+       Fresh serde_json v1.0.149
+       Fresh num-traits v0.2.19
+       Fresh highs-sys v1.15.0
+       Fresh idna v1.1.0
+       Fresh hashbrown v0.14.5
+       Fresh tokio-rustls v0.26.4
+       Fresh webpki-roots v1.0.7
+       Fresh ppv-lite86 v0.2.21
+       Fresh rand_core v0.6.4
+       Fresh iri-string v0.7.12
+       Fresh mime v0.3.17
+       Fresh lazy_static v1.5.0
+       Fresh sharded-slab v0.1.7
+       Fresh axum-core v0.5.6
+       Fresh tower-http v0.6.8
+       Fresh rand_chacha v0.3.1
+       Fresh hyper-rustls v0.27.9
+       Fresh libsqlite3-sys v0.30.1
+       Fresh hashlink v0.9.1
+       Fresh url v2.5.8
+       Fresh highs v2.4.0
+       Fresh matchers v0.2.0
+       Fresh serde_path_to_error v0.1.20
+       Fresh tracing-log v0.2.0
+       Fresh thread_local v1.1.9
+       Fresh thiserror-impl v1.0.69
+       Fresh fallible-streaming-iterator v0.1.9
+       Fresh nu-ansi-term v0.50.3
+       Fresh fallible-iterator v0.3.0
+       Fresh iana-time-zone v0.1.65
+       Fresh matchit v0.8.4
+       Fresh fnv v1.0.7
+       Fresh good_lp v1.15.3
+       Fresh axum v0.8.9
+       Fresh chrono v0.4.44
+       Fresh rusqlite v0.32.1
+       Fresh tracing-subscriber v0.3.23
+       Fresh thiserror v1.0.69
+       Fresh reqwest v0.12.28
+       Fresh rand v0.8.6
+       Fresh approx v0.5.1
+       Fresh hortus-backend v0.1.0 (/tmp/cargo-mutants-backend-VjbRTj.tmp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.22s
+     Running `/tmp/cargo-mutants-backend-VjbRTj.tmp/target/debug/deps/hortus-af49c34fb23033fa`
+
+running 102 tests
+test domain::geo::tests::paris_annual_precip_is_in_expected_range ... ok
+test domain::geometry::tests::area_ignores_winding ... ok
+test domain::geo::tests::paris_summer_warmer_than_winter ... ok
+test domain::geometry::tests::l_shape_area ... ok
+test domain::geo::tests::paris_climate_arrays_have_12_months ... ok
+test domain::geo::tests::paris_location_has_climate ... ok
+test domain::geometry::tests::contains_inside_outside_and_concave_notch ... ok
+test domain::geometry::tests::rejects_bowtie ... ok
+test api::routes::tests::excludes_reject_unknown_id ... ok
+test domain::geometry::tests::edge_distance_to_nearest_side ... ok
+test domain::geometry::tests::rejects_too_few_vertices ... ok
+test domain::geometry::tests::serde_roundtrip_validates ... ok
+test domain::geometry::tests::square_area_and_m2 ... ok
+test domain::geometry::tests::rejects_collinear ... ok
+test domain::geometry::tests::rejects_out_of_bounds ... ok
+test api::routes::tests::excludes_parse_known_ids_and_skip_blanks ... ok
+test domain::geometry::tests::last_strip_narrower_but_kept ... ok
+test domain::soil::tests::parse_round_trips_every_soil ... ok
+test domain::geometry::tests::too_small_zone_gives_nothing ... ok
+test domain::species::tests::every_species_has_explicit_height ... ok
+test domain::species::tests::load_species_from_real_json ... ok
+test domain::species::tests::green_manures_present_and_flagged ... ok
+test domain::geometry::tests::reach_is_half_the_width_of_a_rectangular_bed ... ok
+test domain::species::tests::nitrogen_fixers_are_fabaceae ... ok
+test domain::species::tests::height_class_explicit_or_default ... ok
+test domain::species::tests::window_contains_normal ... ok
+test domain::species::tests::perennial_from_life_cycle ... ok
+test domain::geometry::tests::l_zone_cuts_strips_at_notch ... ok
+test domain::time::tests::advance_handles_multi_year ... ok
+test domain::species::tests::window_contains_wraps ... ok
+test domain::time::tests::month_boundaries ... ok
+test domain::time::tests::next_day_wraps_year ... ok
+test domain::time::tests::photoperiod_at_equator_is_about_12h ... ok
+test domain::time::tests::photoperiod_paris_summer_longer_than_winter ... ok
+test domain::time::tests::photoperiod_polar_night_and_day ... ok
+test domain::time::tests::days_since_is_signed ... ok
+test journal::tests::delete_action_removes_only_target ... ok
+test domain::vigieau::tests::empty_list_means_no_restriction ... ok
+test domain::vigieau::tests::severity_orders_levels ... ok
+test domain::vigieau::tests::parses_zone_in_crisis ... ok
+test journal::tests::delete_plan_actions_keeps_past_and_foreign ... ok
+test journal::tests::insert_repiquage_keeps_grid_coords ... ok
+test domain::vigieau::tests::keeps_most_severe_zone ... ok
+test journal::tests::invalid_shape_rejected_at_parse ... ok
+test journal::tests::explicit_surface_wins_over_polygon ... ok
+test journal::tests::insert_action_rejects_unknown_kind ... ok
+test journal::tests::list_actions_high_limit_returns_all ... ok
+test journal::tests::parcel_at_finds_containing_polygon ... ok
+test domain::geometry::tests::keeps_a_path_around_existing_bed ... ok
+test journal::tests::list_actions_filter_by_kind ... ok
+test journal::tests::list_actions_orders_date_desc ... ok
+test journal::tests::update_without_shape_keeps_it ... ok
+test journal::tests::polygon_parcel_roundtrip_and_computed_surface ... ok
+test placement::tests::overlaps_handles_year_wrap ... ok
+test journal::tests::list_actions_low_limit_drops_old_semis_abri ... ok
+test domain::geometry::tests::strips_fill_full_rectangle ... ok
+test placement::tests::count_matches_plan_area ... ok
+test planner::tests::bed_supplies_follow_spacing_and_appetite ... ok
+test placement::tests::same_seed_same_layout ... ok
+test planner::tests::green_manure_covers_winter_gap ... ok
+test planner::tests::herbs_capped_lower_than_vegetables ... ok
+test planner::tests::impossible_wish_is_reported_not_fatal ... ok
+test planner::tests::no_beds_is_an_error ... ok
+test planner::tests::no_household_no_needs ... ok
+test planner::tests::old_history_no_longer_blocks ... ok
+test planner::tests::options_respect_window_and_harvest ... ok
+test planner::tests::options_skip_sowing_that_matures_out_of_harvest_window ... ok
+test domain::geometry::tests::zone_touching_path_of_neighbour_shifts_first_strip ... ok
+test planner::tests::foes_never_share_a_bed ... ok
+test planner::tests::same_soft_family_species_share_a_bed ... ok
+test planner::tests::plan_never_exceeds_bed_area ... ok
+test planner::tests::soft_rotation_allows_repeat_with_warning ... ok
+test planner::tests::price_favours_valuable_crop ... ok
+test placement::tests::harvested_crop_frees_its_spot ... ok
+test placement::tests::dense_sowing_capped_as_clumps ... ok
+test planner::tests::transplant_only_counts_days_from_planting ... ok
+test planner::tests::transplant_shortens_time_on_bed_when_direct_sow_exists ... ok
+test planner::tests::household_need_caps_production ... ok
+test planner::tests::wish_overrides_household_cap ... ok
+test problems::tests::cascade_suppression ... ok
+test problems::tests::cycle_complet_fiche ... ok
+test problems::tests::rejette_categorie_et_kind_invalides ... ok
+test restrictions::tests::cities_are_independent ... ok
+test restrictions::tests::first_observation_is_not_a_change ... ok
+test restrictions::tests::level_change_is_pending_until_seen ... ok
+test restrictions::tests::lifted_restriction_is_a_change ... ok
+test restrictions::tests::same_level_keeps_no_change ... ok
+test roadmap::tests::catalog_parses_and_requirements_exist ... ok
+test roadmap::tests::journal_action_completes_step ... ok
+test roadmap::tests::requirements_and_climate_shift ... ok
+test roadmap::tests::setup_done_once_yearly_done_per_season ... FAILED
+test roadmap::tests::soil_filters_steps_and_adds_advice ... ok
+test roadmap::tests::soil_test_is_done_once_the_soil_is_known ... ok
+test roadmap::tests::status_follows_window ... ok
+test settings::tests::soil_defaults_to_unknown_then_persists ... ok
+test planner::tests::strict_family_one_species_per_bed_per_year ... ok
+test planner::tests::species_share_cap_forces_diversity ... ok
+test placement::tests::crops_form_patches_leaving_room_for_others ... ok
+test planner::tests::strict_rotation_blocks_cabbage_family ... ok
+test planner::tests::wish_forces_low_value_crop ... ok
+test planner::tests::soft_rotation_prefers_another_bed ... ok
+test placement::tests::plants_inside_bed_and_spaced ... ok
+
+failures:
+
+---- roadmap::tests::setup_done_once_yearly_done_per_season stdout ----
+
+thread 'roadmap::tests::setup_done_once_yearly_done_per_season' (1935951) panicked at src/roadmap.rs:364:9:
+assertion `left == right` failed
+  left: Upcoming
+ right: Done
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    roadmap::tests::setup_done_once_yearly_done_per_season
+
+test result: FAILED. 101 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+
+error: test failed, to rerun pass `-p hortus-backend --lib`
+
+*** result: Failure(101)

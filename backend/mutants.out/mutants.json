@@ -1,0 +1,834 @@
+[
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace roadmap_status -> Roadmap with Default::default()\n@@ -148,97 +148,17 @@\n /// Statut de chaque étape applicable au sol du jardin, à la date `garden.today`.\n /// `manual` : étapes cochées à la main ; `journal` : (type d'action, date) du carnet.\n pub fn roadmap_status(\n     catalog: &[Step],\n     garden: Garden,\n     manual: &[Completion],\n     journal: &[(String, NaiveDate)],\n ) -> Roadmap {\n-    let Garden { today, shift, soil } = garden;\n-    let steps: Vec<Step> = catalog.iter().filter(|s| s.applies_to(soil)).map(|s| s.for_soil(soil)).collect();\n-    let steps = steps.as_slice();\n-    let windows: Vec<CalendarWindow> = steps\n-        .iter()\n-        .map(|s| if s.climate_shift { s.window.shifted(shift) } else { s.window })\n-        .collect();\n-\n-    // Dernière réalisation valable pour l'étape (ever pour Setup, cette occurrence pour Yearly).\n-    let done_on = |i: usize| -> Option<(NaiveDate, bool)> {\n-        let step = &steps[i];\n-        let since = match step.kind {\n-            StepKind::Setup => NaiveDate::MIN,\n-            StepKind::Yearly => {\n-                let (start, _) = last_occurrence(windows[i], today);\n-                // Fait un peu avant l'ouverture : compte quand même pour cette saison.\n-                start - Duration::days(LATE_GRACE_DAYS)\n-            }\n-        };\n-        let by_hand = manual\n-            .iter()\n-            .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n-            .map(|c| (c.date, true));\n-        let by_journal = journal\n-            .iter()\n-            .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n-            .map(|(_, d)| (*d, false));\n-        by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n-    };\n-    let soil_known = soil != Soil::Unknown;\n-    let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())\n-        .map(|i| {\n-            done_on(i)\n-                .map(|(date, by_hand)| (Some(date), by_hand))\n-                .or_else(|| (steps[i].done_when_soil_known && soil_known).then_some((None, false)))\n-        })\n-        .collect();\n-    let is_done = |id: &str| steps.iter().position(|s| s.id == id).is_some_and(|i| done[i].is_some());\n-\n-    let mut out: Vec<StepStatus> = steps\n-        .iter()\n-        .enumerate()\n-        .map(|(i, step)| {\n-            let w = windows[i];\n-            let (_, end) = last_occurrence(w, today);\n-            let status = if done[i].is_some() {\n-                Status::Done\n-            } else if w.contains(doy(today)) {\n-                Status::Now\n-            } else if (today - end).num_days() <= LATE_GRACE_DAYS {\n-                Status::Late\n-            } else {\n-                Status::Upcoming\n-            };\n-            StepStatus {\n-                step: step.clone(),\n-                status,\n-                window_local: w,\n-                starts_in_days: if w.contains(doy(today)) { 0 } else { days_until_start(w, today) },\n-                done_on: done[i].and_then(|(date, _)| date),\n-                waiting_for: step.requires.iter().filter(|r| !is_done(r)).cloned().collect(),\n-                manual: done[i].is_some_and(|(_, by_hand)| by_hand),\n-            }\n-        })\n-        .collect();\n-\n-    let count = |kind: StepKind, only_done: bool| {\n-        out.iter().filter(|s| s.step.kind == kind && (!only_done || s.status == Status::Done)).count()\n-    };\n-    let (setup_done, setup_total) = (count(StepKind::Setup, true), count(StepKind::Setup, false));\n-    let (yearly_done, yearly_total) = (count(StepKind::Yearly, true), count(StepKind::Yearly, false));\n-\n-    // À faire d'abord (prêtes avant bloquées), puis à venir par date, puis faites.\n-    let rank = |s: &StepStatus| match s.status {\n-        Status::Late => 0,\n-        Status::Now => 1,\n-        Status::Upcoming => 2,\n-        Status::Done => 3,\n-    };\n-    out.sort_by_key(|s| (rank(s), !s.waiting_for.is_empty(), s.starts_in_days));\n-    Roadmap { soil, setup_done, setup_total, yearly_done, yearly_total, steps: out }\n+    Default::default() /* ~ changed by cargo-mutants ~ */\n }\n \n // ---------------------------------------------------------------- SQLite\n \n pub fn migrate(conn: &rusqlite::Connection) -> Result<(), String> {\n     conn.execute_batch(\n         r#\"\n CREATE TABLE IF NOT EXISTS roadmap_done (\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "FnValue",
+    "name": "src/roadmap.rs:156:5: replace roadmap_status -> Roadmap with Default::default()",
+    "package": "hortus-backend",
+    "replacement": "Default::default()",
+    "span": {
+      "end": {
+        "column": 85,
+        "line": 236
+      },
+      "start": {
+        "column": 5,
+        "line": 156
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace - with + in roadmap_status\n@@ -164,17 +164,17 @@\n     // Dernière réalisation valable pour l'étape (ever pour Setup, cette occurrence pour Yearly).\n     let done_on = |i: usize| -> Option<(NaiveDate, bool)> {\n         let step = &steps[i];\n         let since = match step.kind {\n             StepKind::Setup => NaiveDate::MIN,\n             StepKind::Yearly => {\n                 let (start, _) = last_occurrence(windows[i], today);\n                 // Fait un peu avant l'ouverture : compte quand même pour cette saison.\n-                start - Duration::days(LATE_GRACE_DAYS)\n+                start + /* ~ changed by cargo-mutants ~ */ Duration::days(LATE_GRACE_DAYS)\n             }\n         };\n         let by_hand = manual\n             .iter()\n             .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:172:23: replace - with + in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "+",
+    "span": {
+      "end": {
+        "column": 24,
+        "line": 172
+      },
+      "start": {
+        "column": 23,
+        "line": 172
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace - with / in roadmap_status\n@@ -164,17 +164,17 @@\n     // Dernière réalisation valable pour l'étape (ever pour Setup, cette occurrence pour Yearly).\n     let done_on = |i: usize| -> Option<(NaiveDate, bool)> {\n         let step = &steps[i];\n         let since = match step.kind {\n             StepKind::Setup => NaiveDate::MIN,\n             StepKind::Yearly => {\n                 let (start, _) = last_occurrence(windows[i], today);\n                 // Fait un peu avant l'ouverture : compte quand même pour cette saison.\n-                start - Duration::days(LATE_GRACE_DAYS)\n+                start / /* ~ changed by cargo-mutants ~ */ Duration::days(LATE_GRACE_DAYS)\n             }\n         };\n         let by_hand = manual\n             .iter()\n             .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:172:23: replace - with / in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "/",
+    "span": {
+      "end": {
+        "column": 24,
+        "line": 172
+      },
+      "start": {
+        "column": 23,
+        "line": 172
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace && with || in roadmap_status\n@@ -169,17 +169,17 @@\n             StepKind::Yearly => {\n                 let (start, _) = last_occurrence(windows[i], today);\n                 // Fait un peu avant l'ouverture : compte quand même pour cette saison.\n                 start - Duration::days(LATE_GRACE_DAYS)\n             }\n         };\n         let by_hand = manual\n             .iter()\n-            .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n+            .filter(|c| c.step_id == step.id && c.date >= since || /* ~ changed by cargo-mutants ~ */ c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n             .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n     let soil_known = soil != Soil::Unknown;\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:177:65: replace && with || in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "||",
+    "span": {
+      "end": {
+        "column": 67,
+        "line": 177
+      },
+      "start": {
+        "column": 65,
+        "line": 177
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace && with || in roadmap_status\n@@ -169,17 +169,17 @@\n             StepKind::Yearly => {\n                 let (start, _) = last_occurrence(windows[i], today);\n                 // Fait un peu avant l'ouverture : compte quand même pour cette saison.\n                 start - Duration::days(LATE_GRACE_DAYS)\n             }\n         };\n         let by_hand = manual\n             .iter()\n-            .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n+            .filter(|c| c.step_id == step.id || /* ~ changed by cargo-mutants ~ */ c.date >= since && c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n             .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n     let soil_known = soil != Soil::Unknown;\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:177:46: replace && with || in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "||",
+    "span": {
+      "end": {
+        "column": 48,
+        "line": 177
+      },
+      "start": {
+        "column": 46,
+        "line": 177
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace == with != in roadmap_status\n@@ -169,17 +169,17 @@\n             StepKind::Yearly => {\n                 let (start, _) = last_occurrence(windows[i], today);\n                 // Fait un peu avant l'ouverture : compte quand même pour cette saison.\n                 start - Duration::days(LATE_GRACE_DAYS)\n             }\n         };\n         let by_hand = manual\n             .iter()\n-            .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n+            .filter(|c| c.step_id != /* ~ changed by cargo-mutants ~ */ step.id && c.date >= since && c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n             .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n     let soil_known = soil != Soil::Unknown;\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:177:35: replace == with != in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "!=",
+    "span": {
+      "end": {
+        "column": 37,
+        "line": 177
+      },
+      "start": {
+        "column": 35,
+        "line": 177
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace >= with < in roadmap_status\n@@ -169,17 +169,17 @@\n             StepKind::Yearly => {\n                 let (start, _) = last_occurrence(windows[i], today);\n                 // Fait un peu avant l'ouverture : compte quand même pour cette saison.\n                 start - Duration::days(LATE_GRACE_DAYS)\n             }\n         };\n         let by_hand = manual\n             .iter()\n-            .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n+            .filter(|c| c.step_id == step.id && c.date < /* ~ changed by cargo-mutants ~ */ since && c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n             .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n     let soil_known = soil != Soil::Unknown;\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:177:56: replace >= with < in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "<",
+    "span": {
+      "end": {
+        "column": 58,
+        "line": 177
+      },
+      "start": {
+        "column": 56,
+        "line": 177
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace <= with > in roadmap_status\n@@ -169,17 +169,17 @@\n             StepKind::Yearly => {\n                 let (start, _) = last_occurrence(windows[i], today);\n                 // Fait un peu avant l'ouverture : compte quand même pour cette saison.\n                 start - Duration::days(LATE_GRACE_DAYS)\n             }\n         };\n         let by_hand = manual\n             .iter()\n-            .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n+            .filter(|c| c.step_id == step.id && c.date >= since && c.date > /* ~ changed by cargo-mutants ~ */ today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n             .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n     let soil_known = soil != Soil::Unknown;\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:177:75: replace <= with > in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": ">",
+    "span": {
+      "end": {
+        "column": 77,
+        "line": 177
+      },
+      "start": {
+        "column": 75,
+        "line": 177
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace && with || in roadmap_status\n@@ -173,17 +173,17 @@\n             }\n         };\n         let by_hand = manual\n             .iter()\n             .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n-            .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n+            .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since || /* ~ changed by cargo-mutants ~ */ *d <= today)\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n     let soil_known = soil != Soil::Unknown;\n     let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())\n         .map(|i| {\n             done_on(i)\n                 .map(|(date, by_hand)| (Some(date), by_hand))\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:181:95: replace && with || in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "||",
+    "span": {
+      "end": {
+        "column": 97,
+        "line": 181
+      },
+      "start": {
+        "column": 95,
+        "line": 181
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace && with || in roadmap_status\n@@ -173,17 +173,17 @@\n             }\n         };\n         let by_hand = manual\n             .iter()\n             .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n-            .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n+            .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) || /* ~ changed by cargo-mutants ~ */ *d >= since && *d <= today)\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n     let soil_known = soil != Soil::Unknown;\n     let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())\n         .map(|i| {\n             done_on(i)\n                 .map(|(date, by_hand)| (Some(date), by_hand))\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:181:80: replace && with || in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "||",
+    "span": {
+      "end": {
+        "column": 82,
+        "line": 181
+      },
+      "start": {
+        "column": 80,
+        "line": 181
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace == with != in roadmap_status\n@@ -173,17 +173,17 @@\n             }\n         };\n         let by_hand = manual\n             .iter()\n             .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n-            .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n+            .filter(|(kind, d)| step.done_by.as_deref() != /* ~ changed by cargo-mutants ~ */ Some(kind.as_str()) && *d >= since && *d <= today)\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n     let soil_known = soil != Soil::Unknown;\n     let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())\n         .map(|i| {\n             done_on(i)\n                 .map(|(date, by_hand)| (Some(date), by_hand))\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:181:57: replace == with != in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "!=",
+    "span": {
+      "end": {
+        "column": 59,
+        "line": 181
+      },
+      "start": {
+        "column": 57,
+        "line": 181
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace >= with < in roadmap_status\n@@ -173,17 +173,17 @@\n             }\n         };\n         let by_hand = manual\n             .iter()\n             .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n-            .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n+            .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d < /* ~ changed by cargo-mutants ~ */ since && *d <= today)\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n     let soil_known = soil != Soil::Unknown;\n     let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())\n         .map(|i| {\n             done_on(i)\n                 .map(|(date, by_hand)| (Some(date), by_hand))\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:181:86: replace >= with < in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "<",
+    "span": {
+      "end": {
+        "column": 88,
+        "line": 181
+      },
+      "start": {
+        "column": 86,
+        "line": 181
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace <= with > in roadmap_status\n@@ -173,17 +173,17 @@\n             }\n         };\n         let by_hand = manual\n             .iter()\n             .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n-            .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n+            .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d > /* ~ changed by cargo-mutants ~ */ today)\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n     let soil_known = soil != Soil::Unknown;\n     let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())\n         .map(|i| {\n             done_on(i)\n                 .map(|(date, by_hand)| (Some(date), by_hand))\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:181:101: replace <= with > in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": ">",
+    "span": {
+      "end": {
+        "column": 103,
+        "line": 181
+      },
+      "start": {
+        "column": 101,
+        "line": 181
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace != with == in roadmap_status\n@@ -177,17 +177,17 @@\n             .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)\n             .map(|c| (c.date, true));\n         let by_journal = journal\n             .iter()\n             .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n-    let soil_known = soil != Soil::Unknown;\n+    let soil_known = soil == /* ~ changed by cargo-mutants ~ */ Soil::Unknown;\n     let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())\n         .map(|i| {\n             done_on(i)\n                 .map(|(date, by_hand)| (Some(date), by_hand))\n                 .or_else(|| (steps[i].done_when_soil_known && soil_known).then_some((None, false)))\n         })\n         .collect();\n     let is_done = |id: &str| steps.iter().position(|s| s.id == id).is_some_and(|i| done[i].is_some());\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:185:27: replace != with == in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "==",
+    "span": {
+      "end": {
+        "column": 29,
+        "line": 185
+      },
+      "start": {
+        "column": 27,
+        "line": 185
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace && with || in roadmap_status\n@@ -182,17 +182,17 @@\n             .map(|(_, d)| (*d, false));\n         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)\n     };\n     let soil_known = soil != Soil::Unknown;\n     let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())\n         .map(|i| {\n             done_on(i)\n                 .map(|(date, by_hand)| (Some(date), by_hand))\n-                .or_else(|| (steps[i].done_when_soil_known && soil_known).then_some((None, false)))\n+                .or_else(|| (steps[i].done_when_soil_known || /* ~ changed by cargo-mutants ~ */ soil_known).then_some((None, false)))\n         })\n         .collect();\n     let is_done = |id: &str| steps.iter().position(|s| s.id == id).is_some_and(|i| done[i].is_some());\n \n     let mut out: Vec<StepStatus> = steps\n         .iter()\n         .enumerate()\n         .map(|(i, step)| {\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:190:60: replace && with || in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "||",
+    "span": {
+      "end": {
+        "column": 62,
+        "line": 190
+      },
+      "start": {
+        "column": 60,
+        "line": 190
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace == with != in roadmap_status\n@@ -185,17 +185,17 @@\n     let soil_known = soil != Soil::Unknown;\n     let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())\n         .map(|i| {\n             done_on(i)\n                 .map(|(date, by_hand)| (Some(date), by_hand))\n                 .or_else(|| (steps[i].done_when_soil_known && soil_known).then_some((None, false)))\n         })\n         .collect();\n-    let is_done = |id: &str| steps.iter().position(|s| s.id == id).is_some_and(|i| done[i].is_some());\n+    let is_done = |id: &str| steps.iter().position(|s| s.id != /* ~ changed by cargo-mutants ~ */ id).is_some_and(|i| done[i].is_some());\n \n     let mut out: Vec<StepStatus> = steps\n         .iter()\n         .enumerate()\n         .map(|(i, step)| {\n             let w = windows[i];\n             let (_, end) = last_occurrence(w, today);\n             let status = if done[i].is_some() {\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:193:61: replace == with != in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "!=",
+    "span": {
+      "end": {
+        "column": 63,
+        "line": 193
+      },
+      "start": {
+        "column": 61,
+        "line": 193
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace <= with > in roadmap_status\n@@ -197,17 +197,17 @@\n         .enumerate()\n         .map(|(i, step)| {\n             let w = windows[i];\n             let (_, end) = last_occurrence(w, today);\n             let status = if done[i].is_some() {\n                 Status::Done\n             } else if w.contains(doy(today)) {\n                 Status::Now\n-            } else if (today - end).num_days() <= LATE_GRACE_DAYS {\n+            } else if (today - end).num_days() > /* ~ changed by cargo-mutants ~ */ LATE_GRACE_DAYS {\n                 Status::Late\n             } else {\n                 Status::Upcoming\n             };\n             StepStatus {\n                 step: step.clone(),\n                 status,\n                 window_local: w,\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:205:48: replace <= with > in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": ">",
+    "span": {
+      "end": {
+        "column": 50,
+        "line": 205
+      },
+      "start": {
+        "column": 48,
+        "line": 205
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace - with + in roadmap_status\n@@ -197,17 +197,17 @@\n         .enumerate()\n         .map(|(i, step)| {\n             let w = windows[i];\n             let (_, end) = last_occurrence(w, today);\n             let status = if done[i].is_some() {\n                 Status::Done\n             } else if w.contains(doy(today)) {\n                 Status::Now\n-            } else if (today - end).num_days() <= LATE_GRACE_DAYS {\n+            } else if (today + /* ~ changed by cargo-mutants ~ */ end).num_days() <= LATE_GRACE_DAYS {\n                 Status::Late\n             } else {\n                 Status::Upcoming\n             };\n             StepStatus {\n                 step: step.clone(),\n                 status,\n                 window_local: w,\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:205:30: replace - with + in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "+",
+    "span": {
+      "end": {
+        "column": 31,
+        "line": 205
+      },
+      "start": {
+        "column": 30,
+        "line": 205
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace - with / in roadmap_status\n@@ -197,17 +197,17 @@\n         .enumerate()\n         .map(|(i, step)| {\n             let w = windows[i];\n             let (_, end) = last_occurrence(w, today);\n             let status = if done[i].is_some() {\n                 Status::Done\n             } else if w.contains(doy(today)) {\n                 Status::Now\n-            } else if (today - end).num_days() <= LATE_GRACE_DAYS {\n+            } else if (today / /* ~ changed by cargo-mutants ~ */ end).num_days() <= LATE_GRACE_DAYS {\n                 Status::Late\n             } else {\n                 Status::Upcoming\n             };\n             StepStatus {\n                 step: step.clone(),\n                 status,\n                 window_local: w,\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:205:30: replace - with / in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "/",
+    "span": {
+      "end": {
+        "column": 31,
+        "line": 205
+      },
+      "start": {
+        "column": 30,
+        "line": 205
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ delete ! in roadmap_status\n@@ -208,17 +208,17 @@\n                 Status::Upcoming\n             };\n             StepStatus {\n                 step: step.clone(),\n                 status,\n                 window_local: w,\n                 starts_in_days: if w.contains(doy(today)) { 0 } else { days_until_start(w, today) },\n                 done_on: done[i].and_then(|(date, _)| date),\n-                waiting_for: step.requires.iter().filter(|r| !is_done(r)).cloned().collect(),\n+                waiting_for: step.requires.iter().filter(|r|  /* ~ changed by cargo-mutants ~ */is_done(r)).cloned().collect(),\n                 manual: done[i].is_some_and(|(_, by_hand)| by_hand),\n             }\n         })\n         .collect();\n \n     let count = |kind: StepKind, only_done: bool| {\n         out.iter().filter(|s| s.step.kind == kind && (!only_done || s.status == Status::Done)).count()\n     };\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "UnaryOperator",
+    "name": "src/roadmap.rs:216:62: delete ! in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "",
+    "span": {
+      "end": {
+        "column": 63,
+        "line": 216
+      },
+      "start": {
+        "column": 62,
+        "line": 216
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace && with || in roadmap_status\n@@ -215,17 +215,17 @@\n                 done_on: done[i].and_then(|(date, _)| date),\n                 waiting_for: step.requires.iter().filter(|r| !is_done(r)).cloned().collect(),\n                 manual: done[i].is_some_and(|(_, by_hand)| by_hand),\n             }\n         })\n         .collect();\n \n     let count = |kind: StepKind, only_done: bool| {\n-        out.iter().filter(|s| s.step.kind == kind && (!only_done || s.status == Status::Done)).count()\n+        out.iter().filter(|s| s.step.kind == kind || /* ~ changed by cargo-mutants ~ */ (!only_done || s.status == Status::Done)).count()\n     };\n     let (setup_done, setup_total) = (count(StepKind::Setup, true), count(StepKind::Setup, false));\n     let (yearly_done, yearly_total) = (count(StepKind::Yearly, true), count(StepKind::Yearly, false));\n \n     // À faire d'abord (prêtes avant bloquées), puis à venir par date, puis faites.\n     let rank = |s: &StepStatus| match s.status {\n         Status::Late => 0,\n         Status::Now => 1,\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:223:51: replace && with || in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "||",
+    "span": {
+      "end": {
+        "column": 53,
+        "line": 223
+      },
+      "start": {
+        "column": 51,
+        "line": 223
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace == with != in roadmap_status\n@@ -215,17 +215,17 @@\n                 done_on: done[i].and_then(|(date, _)| date),\n                 waiting_for: step.requires.iter().filter(|r| !is_done(r)).cloned().collect(),\n                 manual: done[i].is_some_and(|(_, by_hand)| by_hand),\n             }\n         })\n         .collect();\n \n     let count = |kind: StepKind, only_done: bool| {\n-        out.iter().filter(|s| s.step.kind == kind && (!only_done || s.status == Status::Done)).count()\n+        out.iter().filter(|s| s.step.kind != /* ~ changed by cargo-mutants ~ */ kind && (!only_done || s.status == Status::Done)).count()\n     };\n     let (setup_done, setup_total) = (count(StepKind::Setup, true), count(StepKind::Setup, false));\n     let (yearly_done, yearly_total) = (count(StepKind::Yearly, true), count(StepKind::Yearly, false));\n \n     // À faire d'abord (prêtes avant bloquées), puis à venir par date, puis faites.\n     let rank = |s: &StepStatus| match s.status {\n         Status::Late => 0,\n         Status::Now => 1,\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:223:43: replace == with != in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "!=",
+    "span": {
+      "end": {
+        "column": 45,
+        "line": 223
+      },
+      "start": {
+        "column": 43,
+        "line": 223
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace || with && in roadmap_status\n@@ -215,17 +215,17 @@\n                 done_on: done[i].and_then(|(date, _)| date),\n                 waiting_for: step.requires.iter().filter(|r| !is_done(r)).cloned().collect(),\n                 manual: done[i].is_some_and(|(_, by_hand)| by_hand),\n             }\n         })\n         .collect();\n \n     let count = |kind: StepKind, only_done: bool| {\n-        out.iter().filter(|s| s.step.kind == kind && (!only_done || s.status == Status::Done)).count()\n+        out.iter().filter(|s| s.step.kind == kind && (!only_done && /* ~ changed by cargo-mutants ~ */ s.status == Status::Done)).count()\n     };\n     let (setup_done, setup_total) = (count(StepKind::Setup, true), count(StepKind::Setup, false));\n     let (yearly_done, yearly_total) = (count(StepKind::Yearly, true), count(StepKind::Yearly, false));\n \n     // À faire d'abord (prêtes avant bloquées), puis à venir par date, puis faites.\n     let rank = |s: &StepStatus| match s.status {\n         Status::Late => 0,\n         Status::Now => 1,\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:223:66: replace || with && in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "&&",
+    "span": {
+      "end": {
+        "column": 68,
+        "line": 223
+      },
+      "start": {
+        "column": 66,
+        "line": 223
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ delete ! in roadmap_status\n@@ -215,17 +215,17 @@\n                 done_on: done[i].and_then(|(date, _)| date),\n                 waiting_for: step.requires.iter().filter(|r| !is_done(r)).cloned().collect(),\n                 manual: done[i].is_some_and(|(_, by_hand)| by_hand),\n             }\n         })\n         .collect();\n \n     let count = |kind: StepKind, only_done: bool| {\n-        out.iter().filter(|s| s.step.kind == kind && (!only_done || s.status == Status::Done)).count()\n+        out.iter().filter(|s| s.step.kind == kind && ( /* ~ changed by cargo-mutants ~ */only_done || s.status == Status::Done)).count()\n     };\n     let (setup_done, setup_total) = (count(StepKind::Setup, true), count(StepKind::Setup, false));\n     let (yearly_done, yearly_total) = (count(StepKind::Yearly, true), count(StepKind::Yearly, false));\n \n     // À faire d'abord (prêtes avant bloquées), puis à venir par date, puis faites.\n     let rank = |s: &StepStatus| match s.status {\n         Status::Late => 0,\n         Status::Now => 1,\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "UnaryOperator",
+    "name": "src/roadmap.rs:223:55: delete ! in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "",
+    "span": {
+      "end": {
+        "column": 56,
+        "line": 223
+      },
+      "start": {
+        "column": 55,
+        "line": 223
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ replace == with != in roadmap_status\n@@ -215,17 +215,17 @@\n                 done_on: done[i].and_then(|(date, _)| date),\n                 waiting_for: step.requires.iter().filter(|r| !is_done(r)).cloned().collect(),\n                 manual: done[i].is_some_and(|(_, by_hand)| by_hand),\n             }\n         })\n         .collect();\n \n     let count = |kind: StepKind, only_done: bool| {\n-        out.iter().filter(|s| s.step.kind == kind && (!only_done || s.status == Status::Done)).count()\n+        out.iter().filter(|s| s.step.kind == kind && (!only_done || s.status != /* ~ changed by cargo-mutants ~ */ Status::Done)).count()\n     };\n     let (setup_done, setup_total) = (count(StepKind::Setup, true), count(StepKind::Setup, false));\n     let (yearly_done, yearly_total) = (count(StepKind::Yearly, true), count(StepKind::Yearly, false));\n \n     // À faire d'abord (prêtes avant bloquées), puis à venir par date, puis faites.\n     let rank = |s: &StepStatus| match s.status {\n         Status::Late => 0,\n         Status::Now => 1,\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "BinaryOperator",
+    "name": "src/roadmap.rs:223:78: replace == with != in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "!=",
+    "span": {
+      "end": {
+        "column": 80,
+        "line": 223
+      },
+      "start": {
+        "column": 78,
+        "line": 223
+      }
+    }
+  },
+  {
+    "diff": "--- src/roadmap.rs\n+++ delete ! in roadmap_status\n@@ -227,17 +227,17 @@\n \n     // À faire d'abord (prêtes avant bloquées), puis à venir par date, puis faites.\n     let rank = |s: &StepStatus| match s.status {\n         Status::Late => 0,\n         Status::Now => 1,\n         Status::Upcoming => 2,\n         Status::Done => 3,\n     };\n-    out.sort_by_key(|s| (rank(s), !s.waiting_for.is_empty(), s.starts_in_days));\n+    out.sort_by_key(|s| (rank(s),  /* ~ changed by cargo-mutants ~ */s.waiting_for.is_empty(), s.starts_in_days));\n     Roadmap { soil, setup_done, setup_total, yearly_done, yearly_total, steps: out }\n }\n \n // ---------------------------------------------------------------- SQLite\n \n pub fn migrate(conn: &rusqlite::Connection) -> Result<(), String> {\n     conn.execute_batch(\n         r#\"\n",
+    "file": "src/roadmap.rs",
+    "function": {
+      "function_name": "roadmap_status",
+      "return_type": "-> Roadmap",
+      "span": {
+        "end": {
+          "column": 2,
+          "line": 237
+        },
+        "start": {
+          "column": 1,
+          "line": 148
+        }
+      }
+    },
+    "genre": "UnaryOperator",
+    "name": "src/roadmap.rs:235:35: delete ! in roadmap_status",
+    "package": "hortus-backend",
+    "replacement": "",
+    "span": {
+      "end": {
+        "column": 36,
+        "line": 235
+      },
+      "start": {
+        "column": 35,
+        "line": 235
+      }
+    }
+  }
+]
