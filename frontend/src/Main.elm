@@ -103,7 +103,6 @@ type alias Model =
     , hoverPlant : Maybe Int -- action id
     , movingPlant : Maybe Int -- id action en cours de déplacement (click-move)
     , drawingBed : Maybe (List ( Int, Int )) -- sommets posés de la planche en cours de dessin
-    , drawingZone : Bool -- le contour dessiné est une zone à remplir de planches
     , proposedBeds : List (List ( Int, Int )) -- planches proposées, pas encore créées
     , bedName : String
     , plan : Maybe SeasonPlan
@@ -510,7 +509,6 @@ init flags =
       , hoverPlant = Nothing
       , movingPlant = Nothing
       , drawingBed = Nothing
-      , drawingZone = False
       , proposedBeds = []
       , bedName = ""
       , plan = Nothing
@@ -637,9 +635,8 @@ type Msg
     | StartDrawBed
     | AddBedPoint Int Int
     | CancelDrawBed
-    | StartDrawZone
+    | ProposeWholeField
     | SetPersons String
-    | ProposeBeds
     | GotProposedBeds (Result String (List (List ( Int, Int ))))
     | CreateProposedBeds Bool
     | CancelProposedBeds
@@ -865,29 +862,21 @@ update msg model =
             ( { model | paletteSpecies = Nothing }, Cmd.none )
 
         StartDrawBed ->
-            ( { model | drawingBed = Just [], drawingZone = False, proposedBeds = [], bedName = "", paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
+            ( { model | drawingBed = Just [], proposedBeds = [], bedName = "", paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
 
         CancelDrawBed ->
-            ( { model | drawingBed = Nothing, drawingZone = False }, Cmd.none )
+            ( { model | drawingBed = Nothing }, Cmd.none )
 
-        StartDrawZone ->
-            ( { model | drawingBed = Just [], drawingZone = True, proposedBeds = [], paletteSpecies = Nothing, movingPlant = Nothing }, Cmd.none )
+        ProposeWholeField ->
+            ( { model | drawingBed = Nothing, proposedBeds = [], paletteSpecies = Nothing, movingPlant = Nothing, error = Nothing }
+            , proposeBeds model.backendUrl wholeField
+            )
 
         SetPersons s ->
             ( { model | persons = String.toInt s }, Cmd.none )
 
-        ProposeBeds ->
-            case model.drawingBed of
-                Just pts ->
-                    ( { model | drawingBed = Nothing, drawingZone = False, error = Nothing }
-                    , proposeBeds model.backendUrl pts
-                    )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
         GotProposedBeds (Ok []) ->
-            ( { model | error = Just "Aucune planche ne tient dans cette zone (trop petite ou déjà occupée)." }, Cmd.none )
+            ( { model | error = Just "Aucune planche ne tient sur le terrain : il est déjà occupé par tes planches." }, Cmd.none )
 
         GotProposedBeds (Ok beds) ->
             ( { model | proposedBeds = beds }, Cmd.none )
@@ -2286,6 +2275,22 @@ createParcel url form =
         , body = Http.jsonBody (encodeParcel form)
         , expect = Http.expectJson GotParcelSaved parcelDecoder
         }
+
+
+-- Terrain dessinable entier (px SVG, 1 px = 1 cm), aligné sur le backend.
+fieldWidthPx : Int
+fieldWidthPx =
+    800
+
+
+fieldHeightPx : Int
+fieldHeightPx =
+    560
+
+
+wholeField : List ( Int, Int )
+wholeField =
+    [ ( 0, 0 ), ( fieldWidthPx, 0 ), ( fieldWidthPx, fieldHeightPx ), ( 0, fieldHeightPx ) ]
 
 
 proposeBeds : String -> List ( Int, Int ) -> Cmd Msg
@@ -6564,15 +6569,6 @@ viewBedToolbar model =
     div [ A.class "bed-toolbar" ]
         (case ( model.drawingBed, model.proposedBeds ) of
             ( Just pts, _ ) ->
-                if model.drawingZone then
-                    [ span [] [ text "Trace le contour de la zone cultivable :" ]
-                    , button [ E.onClick ProposeBeds, A.disabled (List.length pts < 3) ]
-                        [ text ("⬚ Proposer (" ++ String.fromInt (List.length pts) ++ " sommets)") ]
-                    , button [ E.onClick UndoBedPoint, A.disabled (List.isEmpty pts) ] [ text "↶ Sommet" ]
-                    , button [ E.onClick CancelDrawBed ] [ text "✖ Annuler" ]
-                    ]
-
-                else
                 [ input [ A.placeholder "Nom de la planche", A.value model.bedName, E.onInput SetBedName ] []
                 , button [ E.onClick SaveBed, A.disabled (List.length pts < 3 || String.trim model.bedName == "") ]
                     [ text ("✔ Enregistrer (" ++ String.fromInt (List.length pts) ++ " sommets)") ]
@@ -6595,7 +6591,7 @@ viewBedToolbar model =
 
             ( Nothing, [] ) ->
                 button [ E.onClick StartDrawBed ] [ text "✏ Dessiner une planche" ]
-                    :: button [ E.onClick StartDrawZone, A.title "Trace la zone cultivable, Hortus la remplit de planches de 1,2 m séparées d'allées de 40 cm, puis peut planifier les légumes du foyer" ] [ text "✨ Proposer des planches" ]
+                    :: button [ E.onClick ProposeWholeField, A.title "Remplit tout le terrain libre de planches de 1,2 m séparées d'allées de 40 cm (tes planches existantes sont gardées), puis peut planifier les légumes du foyer" ] [ text "✨ Proposer des planches" ]
                     :: List.map chip beds
         )
 
