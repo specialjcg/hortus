@@ -378,6 +378,44 @@ mod tests {
     }
 
     #[test]
+    fn manual_completion_counts_only_for_its_own_step() {
+        let steps = vec![step("survey", StepKind::Setup, 300, 330), step("drip", StepKind::Setup, 300, 330)];
+        let manual = vec![Completion { step_id: "survey".into(), date: d(2026, 11, 2) }];
+
+        let r = roadmap_status(&steps, garden(d(2026, 11, 12), 0), &manual, &[]);
+
+        assert_eq!(status_of(&r, "survey"), Status::Done);
+        assert_eq!(status_of(&r, "drip"), Status::Now);
+    }
+
+    #[test]
+    fn journal_action_outside_the_season_does_not_complete_step() {
+        let mut mulch = step("mulch", StepKind::Yearly, 290, 340);
+        mulch.done_by = Some("paillage".into());
+        let journal = vec![("paillage".to_string(), d(2025, 11, 2)), ("paillage".to_string(), d(2026, 11, 20))];
+
+        let r = roadmap_status(&[mulch], garden(d(2026, 11, 12), 0), &[], &journal);
+
+        assert_eq!(r.steps[0].status, Status::Now);
+    }
+
+    #[test]
+    fn done_requirement_unblocks_and_ready_steps_come_first() {
+        let mut drip = step("drip", StepKind::Setup, 300, 330);
+        drip.requires = vec!["survey".into()];
+        let mut tank = step("tank", StepKind::Setup, 300, 330);
+        tank.requires = vec!["plan".into()];
+        let steps = vec![tank, drip, step("survey", StepKind::Setup, 1, 40), step("plan", StepKind::Setup, 1, 40)];
+        let manual = vec![Completion { step_id: "survey".into(), date: d(2026, 1, 10) }];
+
+        let r = roadmap_status(&steps, garden(d(2026, 11, 12), 0), &manual, &[]);
+
+        let ids: Vec<&str> = r.steps.iter().map(|s| s.step.id.as_str()).collect();
+        assert_eq!(&ids[..2], ["drip", "tank"], "drip prête (survey faite), tank bloquée");
+        assert!(r.steps[0].waiting_for.is_empty());
+    }
+
+    #[test]
     fn requirements_and_climate_shift() {
         let mut drip = step("drip", StepKind::Setup, 300, 320);
         drip.requires = vec!["survey".into()];
