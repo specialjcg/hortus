@@ -1,0 +1,21 @@
+--- src/roadmap.rs
++++ replace != with == in roadmap_status
+@@ -177,17 +177,17 @@
+             .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)
+             .map(|c| (c.date, true));
+         let by_journal = journal
+             .iter()
+             .filter(|(kind, d)| step.done_by.as_deref() == Some(kind.as_str()) && *d >= since && *d <= today)
+             .map(|(_, d)| (*d, false));
+         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)
+     };
+-    let soil_known = soil != Soil::Unknown;
++    let soil_known = soil == /* ~ changed by cargo-mutants ~ */ Soil::Unknown;
+     let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())
+         .map(|i| {
+             done_on(i)
+                 .map(|(date, by_hand)| (Some(date), by_hand))
+                 .or_else(|| (steps[i].done_when_soil_known && soil_known).then_some((None, false)))
+         })
+         .collect();
+     let is_done = |id: &str| steps.iter().position(|s| s.id == id).is_some_and(|i| done[i].is_some());

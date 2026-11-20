@@ -1,0 +1,21 @@
+--- src/roadmap.rs
++++ replace - with + in roadmap_status
+@@ -164,17 +164,17 @@
+     // Dernière réalisation valable pour l'étape (ever pour Setup, cette occurrence pour Yearly).
+     let done_on = |i: usize| -> Option<(NaiveDate, bool)> {
+         let step = &steps[i];
+         let since = match step.kind {
+             StepKind::Setup => NaiveDate::MIN,
+             StepKind::Yearly => {
+                 let (start, _) = last_occurrence(windows[i], today);
+                 // Fait un peu avant l'ouverture : compte quand même pour cette saison.
+-                start - Duration::days(LATE_GRACE_DAYS)
++                start + /* ~ changed by cargo-mutants ~ */ Duration::days(LATE_GRACE_DAYS)
+             }
+         };
+         let by_hand = manual
+             .iter()
+             .filter(|c| c.step_id == step.id && c.date >= since && c.date <= today)
+             .map(|c| (c.date, true));
+         let by_journal = journal
+             .iter()

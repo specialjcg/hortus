@@ -1,0 +1,21 @@
+--- src/roadmap.rs
++++ replace == with != in roadmap_status
+@@ -185,17 +185,17 @@
+     let soil_known = soil != Soil::Unknown;
+     let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())
+         .map(|i| {
+             done_on(i)
+                 .map(|(date, by_hand)| (Some(date), by_hand))
+                 .or_else(|| (steps[i].done_when_soil_known && soil_known).then_some((None, false)))
+         })
+         .collect();
+-    let is_done = |id: &str| steps.iter().position(|s| s.id == id).is_some_and(|i| done[i].is_some());
++    let is_done = |id: &str| steps.iter().position(|s| s.id != /* ~ changed by cargo-mutants ~ */ id).is_some_and(|i| done[i].is_some());
+ 
+     let mut out: Vec<StepStatus> = steps
+         .iter()
+         .enumerate()
+         .map(|(i, step)| {
+             let w = windows[i];
+             let (_, end) = last_occurrence(w, today);
+             let status = if done[i].is_some() {

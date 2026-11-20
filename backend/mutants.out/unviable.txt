@@ -1,0 +1,4 @@
+src/roadmap.rs:156:5: replace roadmap_status -> Roadmap with Default::default()
+src/roadmap.rs:205:30: replace - with + in roadmap_status
+src/roadmap.rs:205:30: replace - with / in roadmap_status
+src/roadmap.rs:172:23: replace - with / in roadmap_status

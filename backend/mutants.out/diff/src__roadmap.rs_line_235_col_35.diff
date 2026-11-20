@@ -1,0 +1,21 @@
+--- src/roadmap.rs
++++ delete ! in roadmap_status
+@@ -227,17 +227,17 @@
+ 
+     // À faire d'abord (prêtes avant bloquées), puis à venir par date, puis faites.
+     let rank = |s: &StepStatus| match s.status {
+         Status::Late => 0,
+         Status::Now => 1,
+         Status::Upcoming => 2,
+         Status::Done => 3,
+     };
+-    out.sort_by_key(|s| (rank(s), !s.waiting_for.is_empty(), s.starts_in_days));
++    out.sort_by_key(|s| (rank(s),  /* ~ changed by cargo-mutants ~ */s.waiting_for.is_empty(), s.starts_in_days));
+     Roadmap { soil, setup_done, setup_total, yearly_done, yearly_total, steps: out }
+ }
+ 
+ // ---------------------------------------------------------------- SQLite
+ 
+ pub fn migrate(conn: &rusqlite::Connection) -> Result<(), String> {
+     conn.execute_batch(
+         r#"

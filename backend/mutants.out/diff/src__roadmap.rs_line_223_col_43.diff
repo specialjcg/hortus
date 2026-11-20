@@ -1,0 +1,21 @@
+--- src/roadmap.rs
++++ replace == with != in roadmap_status
+@@ -215,17 +215,17 @@
+                 done_on: done[i].and_then(|(date, _)| date),
+                 waiting_for: step.requires.iter().filter(|r| !is_done(r)).cloned().collect(),
+                 manual: done[i].is_some_and(|(_, by_hand)| by_hand),
+             }
+         })
+         .collect();
+ 
+     let count = |kind: StepKind, only_done: bool| {
+-        out.iter().filter(|s| s.step.kind == kind && (!only_done || s.status == Status::Done)).count()
++        out.iter().filter(|s| s.step.kind != /* ~ changed by cargo-mutants ~ */ kind && (!only_done || s.status == Status::Done)).count()
+     };
+     let (setup_done, setup_total) = (count(StepKind::Setup, true), count(StepKind::Setup, false));
+     let (yearly_done, yearly_total) = (count(StepKind::Yearly, true), count(StepKind::Yearly, false));
+ 
+     // À faire d'abord (prêtes avant bloquées), puis à venir par date, puis faites.
+     let rank = |s: &StepStatus| match s.status {
+         Status::Late => 0,
+         Status::Now => 1,

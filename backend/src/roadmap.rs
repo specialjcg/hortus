@@ -39,6 +39,9 @@ pub struct Step {
     pub requires: Vec<String>,
     /// Type d'action du carnet qui valide l'étape automatiquement.
     pub done_by: Option<String>,
+    /// Validée dès que le sol est renseigné dans les réglages (sans date).
+    #[serde(default)]
+    pub done_when_soil_known: bool,
     /// Sols concernés ; vide = tous les sols.
     #[serde(default)]
     pub soils: Vec<Soil>,
@@ -179,7 +182,14 @@ pub fn roadmap_status(
             .map(|(_, d)| (*d, false));
         by_hand.chain(by_journal).max_by_key(|(d, _)| *d)
     };
-    let done: Vec<Option<(NaiveDate, bool)>> = (0..steps.len()).map(done_on).collect();
+    let soil_known = soil != Soil::Unknown;
+    let done: Vec<Option<(Option<NaiveDate>, bool)>> = (0..steps.len())
+        .map(|i| {
+            done_on(i)
+                .map(|(date, by_hand)| (Some(date), by_hand))
+                .or_else(|| (steps[i].done_when_soil_known && soil_known).then_some((None, false)))
+        })
+        .collect();
     let is_done = |id: &str| steps.iter().position(|s| s.id == id).is_some_and(|i| done[i].is_some());
 
     let mut out: Vec<StepStatus> = steps
@@ -202,7 +212,7 @@ pub fn roadmap_status(
                 status,
                 window_local: w,
                 starts_in_days: if w.contains(doy(today)) { 0 } else { days_until_start(w, today) },
-                done_on: done[i].map(|(d, _)| d),
+                done_on: done[i].and_then(|(date, _)| date),
                 waiting_for: step.requires.iter().filter(|r| !is_done(r)).cloned().collect(),
                 manual: done[i].is_some_and(|(_, by_hand)| by_hand),
             }
@@ -300,6 +310,7 @@ mod tests {
             climate_shift: false,
             requires: vec![],
             done_by: None,
+            done_when_soil_known: false,
             soils: vec![],
             how_by_soil: HashMap::new(),
         }
@@ -367,6 +378,44 @@ mod tests {
     }
 
     #[test]
+    fn manual_completion_counts_only_for_its_own_step() {
+        let steps = vec![step("survey", StepKind::Setup, 300, 330), step("drip", StepKind::Setup, 300, 330)];
+        let manual = vec![Completion { step_id: "survey".into(), date: d(2026, 11, 2) }];
+
+        let r = roadmap_status(&steps, garden(d(2026, 11, 12), 0), &manual, &[]);
+
+        assert_eq!(status_of(&r, "survey"), Status::Done);
+        assert_eq!(status_of(&r, "drip"), Status::Now);
+    }
+
+    #[test]
+    fn journal_action_outside_the_season_does_not_complete_step() {
+        let mut mulch = step("mulch", StepKind::Yearly, 290, 340);
+        mulch.done_by = Some("paillage".into());
+        let journal = vec![("paillage".to_string(), d(2025, 11, 2)), ("paillage".to_string(), d(2026, 11, 20))];
+
+        let r = roadmap_status(&[mulch], garden(d(2026, 11, 12), 0), &[], &journal);
+
+        assert_eq!(r.steps[0].status, Status::Now);
+    }
+
+    #[test]
+    fn done_requirement_unblocks_and_ready_steps_come_first() {
+        let mut drip = step("drip", StepKind::Setup, 300, 330);
+        drip.requires = vec!["survey".into()];
+        let mut tank = step("tank", StepKind::Setup, 300, 330);
+        tank.requires = vec!["plan".into()];
+        let steps = vec![tank, drip, step("survey", StepKind::Setup, 1, 40), step("plan", StepKind::Setup, 1, 40)];
+        let manual = vec![Completion { step_id: "survey".into(), date: d(2026, 1, 10) }];
+
+        let r = roadmap_status(&steps, garden(d(2026, 11, 12), 0), &manual, &[]);
+
+        let ids: Vec<&str> = r.steps.iter().map(|s| s.step.id.as_str()).collect();
+        assert_eq!(&ids[..2], ["drip", "tank"], "drip prête (survey faite), tank bloquée");
+        assert!(r.steps[0].waiting_for.is_empty());
+    }
+
+    #[test]
     fn requirements_and_climate_shift() {
         let mut drip = step("drip", StepKind::Setup, 300, 320);
         drip.requires = vec!["survey".into()];
@@ -379,6 +428,22 @@ mod tests {
         assert_eq!(drip.status, Status::Upcoming);
         assert_eq!(drip.starts_in_days, 4);
         assert_eq!(drip.waiting_for, vec!["survey".to_string()]);
+    }
+
+    #[test]
+    fn soil_test_is_done_once_the_soil_is_known() {
+        let mut soil_test = step("soil_test", StepKind::Setup, 1, 365);
+        soil_test.done_when_soil_known = true;
+        let steps = vec![soil_test];
+        let today = d(2026, 11, 20);
+
+        let unknown = roadmap_status(&steps, Garden { today, shift: 0, soil: Soil::Unknown }, &[], &[]);
+        let clay = roadmap_status(&steps, Garden { today, shift: 0, soil: Soil::Clay }, &[], &[]);
+
+        assert_eq!(status_of(&unknown, "soil_test"), Status::Now);
+        assert_eq!(status_of(&clay, "soil_test"), Status::Done);
+        assert_eq!(clay.steps[0].done_on, None);
+        assert!(!clay.steps[0].manual);
     }
 
     #[test]
