@@ -104,6 +104,7 @@ type alias Model =
     , movingPlant : Maybe Int -- id action en cours de déplacement (click-move)
     , drawingBed : Maybe (List ( Int, Int )) -- sommets posés de la planche en cours de dessin
     , proposedBeds : List (List ( Int, Int )) -- planches proposées, pas encore créées
+    , bedsHorizontal : Bool -- planches allongées dans la largeur du terrain
     , bedName : String
     , plan : Maybe SeasonPlan
     , planLoading : Bool
@@ -510,6 +511,7 @@ init flags =
       , movingPlant = Nothing
       , drawingBed = Nothing
       , proposedBeds = []
+      , bedsHorizontal = False
       , bedName = ""
       , plan = Nothing
       , planLoading = False
@@ -640,6 +642,7 @@ type Msg
     | GotProposedBeds (Result String (List (List ( Int, Int ))))
     | CreateProposedBeds Bool
     | CancelProposedBeds
+    | RotateProposedBeds
     | UndoBedPoint
     | SetBedName String
     | SaveBed
@@ -869,7 +872,7 @@ update msg model =
 
         ProposeWholeField ->
             ( { model | drawingBed = Nothing, proposedBeds = [], paletteSpecies = Nothing, movingPlant = Nothing, error = Nothing }
-            , proposeBeds model.backendUrl wholeField
+            , proposeBeds model.backendUrl model.bedsHorizontal wholeField
             )
 
         SetPersons s ->
@@ -899,6 +902,15 @@ update msg model =
 
         CancelProposedBeds ->
             ( { model | proposedBeds = [] }, Cmd.none )
+
+        RotateProposedBeds ->
+            let
+                horizontal =
+                    not model.bedsHorizontal
+            in
+            ( { model | bedsHorizontal = horizontal, error = Nothing }
+            , proposeBeds model.backendUrl horizontal wholeField
+            )
 
         UndoBedPoint ->
             ( { model | drawingBed = Maybe.map (List.reverse >> List.drop 1 >> List.reverse) model.drawingBed }, Cmd.none )
@@ -2293,13 +2305,27 @@ wholeField =
     [ ( 0, 0 ), ( fieldWidthPx, 0 ), ( fieldWidthPx, fieldHeightPx ), ( 0, fieldHeightPx ) ]
 
 
-proposeBeds : String -> List ( Int, Int ) -> Cmd Msg
-proposeBeds url zone =
+proposeBeds : String -> Bool -> List ( Int, Int ) -> Cmd Msg
+proposeBeds url horizontal zone =
     Http.request
         { method = "POST"
         , headers = []
         , url = url ++ "/parcels/propose"
-        , body = Http.jsonBody (Encode.object [ ( "zone", encodePoints zone ) ])
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "zone", encodePoints zone )
+                    , ( "axis"
+                      , Encode.string
+                            (if horizontal then
+                                "horizontal"
+
+                             else
+                                "vertical"
+                            )
+                      )
+                    ]
+                )
         , expect = expectJsonOrMessage GotProposedBeds (D.list pointsDecoder)
         , timeout = Nothing
         , tracker = Nothing
@@ -6584,6 +6610,7 @@ viewBedToolbar model =
                             ++ " m² cultivables"
                         )
                     ]
+                , button [ E.onClick RotateProposedBeds, A.title "Allonge les planches dans l'autre sens du terrain" ] [ text "⟲ Tourner" ]
                 , button [ E.onClick (CreateProposedBeds False) ] [ text "✔ Créer" ]
                 , button [ E.onClick (CreateProposedBeds True), A.title "Crée les planches puis choisit les légumes pour nourrir ton foyer" ] [ text "✨ Créer et planifier" ]
                 , button [ E.onClick CancelProposedBeds ] [ text "✖ Annuler" ]
