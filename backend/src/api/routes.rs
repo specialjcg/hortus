@@ -17,7 +17,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::db::{self, Db};
 use crate::domain::geo::{ClimateProfile, Location};
-use crate::domain::geometry::{self, Polygon};
+use crate::domain::geometry::{self, BedAxis, Polygon, StripLayout};
 use crate::domain::species::{CalendarWindow, Species};
 use crate::journal::{
     self, Action, ActionFilter, ActionInput, Parcel, ParcelInput, ACTION_KINDS,
@@ -393,6 +393,8 @@ pub struct ProposeInput {
     pub zone: Polygon,
     pub bed_cm: Option<i64>,
     pub path_cm: Option<i64>,
+    #[serde(default)]
+    pub axis: BedAxis,
 }
 
 /// Propose des planches en bandes dans la zone, sans les enregistrer.
@@ -410,7 +412,7 @@ async fn propose_beds(
         .into_iter()
         .filter_map(|p| p.shape)
         .collect();
-    Ok(Json(geometry::strip_beds(&input.zone, &taken, bed_cm, path_cm)))
+    Ok(Json(geometry::strip_beds(&input.zone, &taken, StripLayout { bed_cm, path_cm, axis: input.axis })))
 }
 
 async fn put_parcel(

@@ -133,12 +133,51 @@ impl Polygon {
     }
 }
 
-/// Planches rectangulaires en bandes nord-sud (`bed_cm` de large, `path_cm`
-/// d'allée) remplissant `zone`, à au moins une allée des planches `taken`.
-/// Rectangles inscrits : faciles à tracer au cordeau, les bords obliques
-/// de la zone sont perdus.
-pub fn strip_beds(zone: &Polygon, taken: &[Polygon], bed_cm: i64, path_cm: i64) -> Vec<Polygon> {
+/// Sens des planches générées.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BedAxis {
+    /// Planches allongées dans la hauteur du terrain, côte à côte de gauche à droite.
+    #[default]
+    Vertical,
+    /// Planches allongées dans la largeur du terrain, empilées de haut en bas.
+    Horizontal,
+}
+
+impl BedAxis {
+    /// Passe du repère des bandes (u en travers, v en long) au repère
+    /// terrain (x, y). Échange involutif : sert aussi dans l'autre sens.
+    fn oriented<T>(self, u: T, v: T) -> (T, T) {
+        match self {
+            BedAxis::Vertical => (u, v),
+            BedAxis::Horizontal => (v, u),
+        }
+    }
+}
+
+/// Dimensions et sens des planches à générer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StripLayout {
+    pub bed_cm: i64,
+    pub path_cm: i64,
+    pub axis: BedAxis,
+}
+
+impl Default for StripLayout {
+    fn default() -> Self {
+        StripLayout { bed_cm: 120, path_cm: 40, axis: BedAxis::Vertical }
+    }
+}
+
+/// Planches rectangulaires en bandes parallèles (`bed_cm` de large,
+/// `path_cm` d'allée, sens `axis`) remplissant `zone`, à au moins une allée
+/// des planches `taken`. Rectangles inscrits : faciles à tracer au cordeau,
+/// les bords obliques de la zone sont perdus.
+pub fn strip_beds(zone: &Polygon, taken: &[Polygon], layout: StripLayout) -> Vec<Polygon> {
+    let StripLayout { bed_cm, path_cm, axis } = layout;
     let (x_min, y_min, x_max, y_max) = zone.bbox();
+    let (u_min, v_min) = axis.oriented(x_min, y_min);
+    let (u_max, v_max) = axis.oriented(x_max, y_max);
     let p = path_cm as f64;
     let near_taken = |x: f64, y: f64| {
         taken.iter().any(|t| {
@@ -147,31 +186,36 @@ pub fn strip_beds(zone: &Polygon, taken: &[Polygon], bed_cm: i64, path_cm: i64) 
                 .any(|&(tx, ty)| t.contains(tx, ty))
         })
     };
-    let usable = |x: f64, y: f64| zone.contains(x, y) && !near_taken(x, y);
+    let usable = |u: f64, v: f64| {
+        let (x, y) = axis.oriented(u, v);
+        zone.contains(x, y) && !near_taken(x, y)
+    };
 
     let mut beds = Vec::new();
-    let mut x0 = x_min;
-    while x0 + MIN_BED_W_CM <= x_max {
-        let x1 = (x0 + bed_cm).min(x_max);
-        let xs: Vec<f64> = (x0..x1)
+    let mut u0 = u_min;
+    while u0 + MIN_BED_W_CM <= u_max {
+        let u1 = (u0 + bed_cm).min(u_max);
+        let us: Vec<f64> = (u0..u1)
             .step_by(SAMPLE_STEP_CM as usize)
-            .map(|x| x as f64 + 0.5)
-            .chain([x1 as f64 - 0.5])
+            .map(|u| u as f64 + 0.5)
+            .chain([u1 as f64 - 0.5])
             .collect();
         // Une ligne (1 cm) est cultivable si toute la largeur de la bande l'est.
-        let row_ok = |y: i64| xs.iter().all(|&x| usable(x, y as f64 + 0.5));
+        let row_ok = |v: i64| us.iter().all(|&u| usable(u, v as f64 + 0.5));
         let found = beds.len();
-        let mut y = y_min;
-        while y < y_max {
-            if !row_ok(y) {
-                y += 1;
+        let mut v = v_min;
+        while v < v_max {
+            if !row_ok(v) {
+                v += 1;
                 continue;
             }
-            let start = y;
-            while y < y_max && row_ok(y) {
-                y += 1;
+            let start = v;
+            while v < v_max && row_ok(v) {
+                v += 1;
             }
-            if let Ok(bed) = Polygon::rect(x0, start, x1, y) {
+            let (x0, y0) = axis.oriented(u0, start);
+            let (x1, y1) = axis.oriented(u1, v);
+            if let Ok(bed) = Polygon::rect(x0, y0, x1, y1) {
                 if bed.area_m2() >= MIN_BED_M2 {
                     beds.push(bed);
                 }
@@ -179,7 +223,7 @@ pub fn strip_beds(zone: &Polygon, taken: &[Polygon], bed_cm: i64, path_cm: i64) 
         }
         // Bande vide (bord de zone dans une allée voisine…) : elle glisse
         // au lieu de perdre toute sa largeur.
-        x0 = if beds.len() > found { x1 + path_cm } else { x0 + SAMPLE_STEP_CM };
+        u0 = if beds.len() > found { u1 + path_cm } else { u0 + SAMPLE_STEP_CM };
     }
     beds
 }
@@ -313,7 +357,7 @@ mod tests {
     #[test]
     fn strips_fill_full_rectangle() {
         let zone = poly(&[[0, 0], [800, 0], [800, 560], [0, 560]]).unwrap();
-        let beds = strip_beds(&zone, &[], 120, 40);
+        let beds = strip_beds(&zone, &[], StripLayout::default());
         let boxes: Vec<_> = beds.iter().map(Polygon::bbox).collect();
         assert_eq!(
             boxes,
@@ -322,9 +366,22 @@ mod tests {
     }
 
     #[test]
+    fn horizontal_strips_run_along_field_width() {
+        let zone = poly(&[[0, 0], [800, 0], [800, 560], [0, 560]]).unwrap();
+        let layout = StripLayout { axis: BedAxis::Horizontal, ..StripLayout::default() };
+
+        let boxes: Vec<_> = strip_beds(&zone, &[], layout).iter().map(Polygon::bbox).collect();
+
+        assert_eq!(
+            boxes,
+            vec![(0, 0, 800, 120), (0, 160, 800, 280), (0, 320, 800, 440), (0, 480, 800, 560)]
+        );
+    }
+
+    #[test]
     fn last_strip_narrower_but_kept() {
         let zone = poly(&[[0, 0], [250, 0], [250, 200], [0, 200]]).unwrap();
-        let boxes: Vec<_> = strip_beds(&zone, &[], 120, 40).iter().map(Polygon::bbox).collect();
+        let boxes: Vec<_> = strip_beds(&zone, &[], StripLayout::default()).iter().map(Polygon::bbox).collect();
         assert_eq!(boxes, vec![(0, 0, 120, 200), (160, 0, 250, 200)]);
     }
 
@@ -332,21 +389,21 @@ mod tests {
     fn l_zone_cuts_strips_at_notch() {
         // L : pleine hauteur sur x 0..200, seulement y 300..500 sur x 200..500.
         let zone = poly(&[[0, 0], [200, 0], [200, 300], [500, 300], [500, 500], [0, 500]]).unwrap();
-        let boxes: Vec<_> = strip_beds(&zone, &[], 120, 40).iter().map(Polygon::bbox).collect();
+        let boxes: Vec<_> = strip_beds(&zone, &[], StripLayout::default()).iter().map(Polygon::bbox).collect();
         assert_eq!(boxes, vec![(0, 0, 120, 500), (160, 300, 280, 500), (320, 300, 440, 500)]);
     }
 
     #[test]
     fn too_small_zone_gives_nothing() {
         let zone = poly(&[[0, 0], [100, 0], [100, 40], [0, 40]]).unwrap();
-        assert!(strip_beds(&zone, &[], 120, 40).is_empty());
+        assert!(strip_beds(&zone, &[], StripLayout::default()).is_empty());
     }
 
     #[test]
     fn keeps_a_path_around_existing_bed() {
         let zone = poly(&[[0, 0], [120, 0], [120, 500], [0, 500]]).unwrap();
         let taken = poly(&[[0, 200], [120, 200], [120, 300], [0, 300]]).unwrap();
-        let boxes: Vec<_> = strip_beds(&zone, &[taken], 120, 40).iter().map(Polygon::bbox).collect();
+        let boxes: Vec<_> = strip_beds(&zone, &[taken], StripLayout::default()).iter().map(Polygon::bbox).collect();
         assert_eq!(boxes, vec![(0, 0, 120, 160), (0, 340, 120, 500)]);
     }
 
@@ -356,7 +413,7 @@ mod tests {
         // bande glisse au lieu d'être perdue, deux planches tiennent.
         let zone = poly(&[[478, 0], [792, 0], [792, 540], [478, 540]]).unwrap();
         let taken = poly(&[[320, 0], [440, 0], [440, 540], [320, 540]]).unwrap();
-        let boxes: Vec<_> = strip_beds(&zone, &[taken], 120, 40).iter().map(Polygon::bbox).collect();
+        let boxes: Vec<_> = strip_beds(&zone, &[taken], StripLayout::default()).iter().map(Polygon::bbox).collect();
         assert_eq!(boxes.len(), 2, "{boxes:?}");
         assert!(boxes.iter().all(|&(x0, _, x1, _)| x0 >= 480 && x1 - x0 == 120), "{boxes:?}");
     }
